@@ -26,6 +26,7 @@ import {
   RecentTrip,
   ChatRoom,
   AppNotification,
+  DailyTask,
 } from './types';
 import {
   UserRepository,
@@ -130,6 +131,27 @@ export default function App() {
   const [favoritePlaces, setFavoritePlaces] = useState<FavoritePlace[]>(() => TripsRepository.getFavoritePlaces());
   const [recentTrips, setRecentTrips] = useState<RecentTrip[]>(() => TripsRepository.getRecentTrips());
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
+  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
+
+  const handleToggleDailyTask = (id: string) => {
+    const updated = NotesRepository.toggleDailyTask(id);
+    setDailyTasks(updated);
+  };
+
+  const handleAddDailyTask = (task: Omit<DailyTask, 'id' | 'createdAt'>) => {
+    const updated = NotesRepository.addDailyTask(task);
+    setDailyTasks(updated);
+  };
+
+  const handleDeleteDailyTask = (id: string) => {
+    const updated = NotesRepository.deleteDailyTask(id);
+    setDailyTasks(updated);
+  };
+
+  const handleUpdateDailyTasks = (updated: DailyTask[]) => {
+    setDailyTasks(updated);
+    NotesRepository.saveDailyTasks(updated);
+  };
 
   // Setup Theme & RTL
   useEffect(() => {
@@ -209,6 +231,11 @@ export default function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           isSettingsOpen={isSettingsOpen}
           notifications={notifications}
+          dailyTasks={dailyTasks}
+          notes={notes}
+          onToggleDailyTask={handleToggleDailyTask}
+          onAddDailyTask={handleAddDailyTask}
+          onDeleteDailyTask={handleDeleteDailyTask}
         />
 
         {/* 3. Main Android Viewport Container (Scrollable) */}
@@ -233,10 +260,15 @@ export default function App() {
               notes={notes}
               folders={noteFolders}
               tags={noteTags}
+              dailyTasks={dailyTasks}
               onUpdateNotes={(updated) => {
                 setNotes(updated);
                 NotesRepository.saveNotes(updated);
               }}
+              onUpdateDailyTasks={handleUpdateDailyTasks}
+              onToggleDailyTask={handleToggleDailyTask}
+              onAddDailyTask={handleAddDailyTask}
+              onDeleteDailyTask={handleDeleteDailyTask}
             />
           )}
 
@@ -246,10 +278,16 @@ export default function App() {
               notes={notes}
               folders={noteFolders}
               tags={noteTags}
+              dailyTasks={dailyTasks}
+              initialTab="calculator"
               onUpdateNotes={(updated) => {
                 setNotes(updated);
                 NotesRepository.saveNotes(updated);
               }}
+              onUpdateDailyTasks={handleUpdateDailyTasks}
+              onToggleDailyTask={handleToggleDailyTask}
+              onAddDailyTask={handleAddDailyTask}
+              onDeleteDailyTask={handleDeleteDailyTask}
             />
           )}
 

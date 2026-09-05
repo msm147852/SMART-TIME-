@@ -1,7 +1,7 @@
-import { Note, NoteFolder, NoteTag, CalculatorHistoryItem } from '../../types';
+import { Note, NoteFolder, NoteTag, CalculatorHistoryItem, DailyTask } from '../../types';
 import { STORAGE_KEYS } from '../storageKeys';
 import { StorageAdapter } from '../storageAdapter';
-import { DEFAULT_NOTES, DEFAULT_NOTE_FOLDERS, DEFAULT_NOTE_TAGS } from '../seedData';
+import { DEFAULT_NOTES, DEFAULT_NOTE_FOLDERS, DEFAULT_NOTE_TAGS, DEFAULT_DAILY_TASKS } from '../seedData';
 
 export class NotesRepository {
   // Notes
@@ -31,6 +31,58 @@ export class NotesRepository {
     const list = this.getNotes();
     const updated = list.filter((item) => item.id !== id);
     this.saveNotes(updated);
+    return updated;
+  }
+
+  // Daily Tasks (ذكرني - المهمات اليومية فى قسم الملاحظات)
+  static getDailyTasks(): DailyTask[] {
+    return StorageAdapter.getItem<DailyTask[]>(STORAGE_KEYS.DAILY_TASKS, DEFAULT_DAILY_TASKS);
+  }
+
+  static saveDailyTasks(tasks: DailyTask[]): void {
+    StorageAdapter.setItem(STORAGE_KEYS.DAILY_TASKS, tasks);
+  }
+
+  static addDailyTask(task: Omit<DailyTask, 'id' | 'createdAt'>): DailyTask[] {
+    const list = this.getDailyTasks();
+    const newTask: DailyTask = {
+      ...task,
+      id: 'dt_' + Date.now(),
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newTask, ...list];
+    this.saveDailyTasks(updated);
+    return updated;
+  }
+
+  static toggleDailyTask(id: string): DailyTask[] {
+    const list = this.getDailyTasks();
+    const updated = list.map((item) => {
+      if (item.id === id) {
+        const nextCompleted = !item.completed;
+        return {
+          ...item,
+          completed: nextCompleted,
+          completedAt: nextCompleted ? new Date().toISOString() : undefined,
+        };
+      }
+      return item;
+    });
+    this.saveDailyTasks(updated);
+    return updated;
+  }
+
+  static updateDailyTask(task: DailyTask): DailyTask[] {
+    const list = this.getDailyTasks();
+    const updated = list.map((item) => (item.id === task.id ? task : item));
+    this.saveDailyTasks(updated);
+    return updated;
+  }
+
+  static deleteDailyTask(id: string): DailyTask[] {
+    const list = this.getDailyTasks();
+    const updated = list.filter((item) => item.id !== id);
+    this.saveDailyTasks(updated);
     return updated;
   }
 

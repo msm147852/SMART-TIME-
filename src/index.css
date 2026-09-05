@@ -69,12 +69,31 @@
   display: flex;
   width: max-content;
   direction: ltr;
-  animation: ticker-marquee-right 17s linear infinite;
+  animation: ticker-marquee-right 42s linear infinite;
+  will-change: transform;
+}
+
+/* Ticker Marquee Moving to the Left (متحرك لليسار لخروج الأخبار بانسيابية من زر الهوم في الواجهة العربية) */
+@keyframes ticker-marquee-left {
+  0% {
+    transform: translate3d(0%, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-marquee-left {
+  display: flex;
+  width: max-content;
+  direction: rtl;
+  animation: ticker-marquee-left 42s linear infinite;
   will-change: transform;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .animate-marquee-right:hover {
+  .animate-marquee-right:hover,
+  .animate-marquee-left:hover {
     animation-play-state: paused;
   }
 }

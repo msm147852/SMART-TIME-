@@ -31,8 +31,36 @@ export interface TickerPreferences {
   showCustomMessage: boolean;
   customMessage?: string;
   favoriteEgyptianTeam?: string;
-  silverUnit?: '999' | '925' | 'ounce';
-  goldUnit?: '24' | '21' | 'pound';
+  favoriteTeam?: string; // Global & Local favorite team (ريال مدريد, برشلونة, مان سيتي, ليفربول, الأهلي, إلخ)
+  silverUnit?: '999' | '925' | '900' | '800' | 'ounce' | 'all' | string;
+  goldUnit?:
+    | '24'
+    | '22'
+    | '21'
+    | '18'
+    | '14'
+    | '12'
+    | '9'
+    | 'pound'
+    | 'half_pound'
+    | 'quarter_pound'
+    | 'ounce'
+    | 'bar10g'
+    | 'all'
+    | string;
+  selectedCryptos?: string[]; // e.g. ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'TON']
+  customCryptos?: {
+    id: string;
+    name: string;
+    nameAr?: string;
+    nameEn?: string;
+    symbol: string;
+    priceUsd: number;
+    change24h: number;
+    iconColor?: string;
+    iconSymbol?: string;
+  }[];
+  speed?: 'very_slow' | 'slow' | 'medium' | 'fast';
 }
 
 export interface VehiclePreferences {
@@ -131,6 +159,26 @@ export interface CalculatorHistoryItem {
   result: string;
   mode: CalculatorMode;
   timestamp: string;
+}
+
+// ---------------------------
+// DAILY REMINDERS & TASKS (ذكرني - المهمات اليومية)
+// ---------------------------
+export type TaskPriority = 'high' | 'medium' | 'low';
+export type TaskCategory = 'work' | 'personal' | 'finance' | 'health' | 'education' | 'general';
+
+export interface DailyTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: TaskPriority;
+  category: TaskCategory;
+  dueDate?: string;
+  dueTime?: string;
+  noteId?: string;
+  reminderEnabled?: boolean;
+  createdAt: string;
+  completedAt?: string;
 }
 
 // ---------------------------

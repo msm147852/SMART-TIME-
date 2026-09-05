@@ -12,10 +12,12 @@ import {
   ArrowLeft,
   MoreVertical,
   Sparkles,
+  Clock,
 } from 'lucide-react';
-import { Language, ThemeMode, UserProfile, AppNotification } from '../types';
+import { Language, ThemeMode, UserProfile, AppNotification, DailyTask, Note } from '../types';
 import { translations } from '../services/i18n';
 import { LiveHeaderWidgets } from './LiveHeaderWidgets';
+import { DhakirniReminderBar } from './DhakirniReminderBar';
 import smartTimeLogo from '../assets/images/smart_time_logo_1788556138099.jpg';
 
 interface NavigationHeaderProps {
@@ -35,6 +37,11 @@ interface NavigationHeaderProps {
   onOpenSettings: () => void;
   isSettingsOpen?: boolean;
   notifications: AppNotification[];
+  dailyTasks?: DailyTask[];
+  notes?: Note[];
+  onToggleDailyTask?: (id: string) => void;
+  onAddDailyTask?: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
+  onDeleteDailyTask?: (id: string) => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -52,13 +59,30 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onOpenSettings,
   isSettingsOpen = false,
   notifications,
+  dailyTasks = [],
+  notes = [],
+  onToggleDailyTask,
+  onAddDailyTask,
+  onDeleteDailyTask,
 }) => {
   const t = translations[language];
   const isAr = language === 'ar';
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [now, setNow] = useState(new Date());
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // تحديث الساعة الثابتة كل ثانية
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeFormatted = now.toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   // Close overflow menu when clicking outside
   useEffect(() => {
@@ -126,21 +150,19 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </button>
         </div>
 
-        {/* Center / Action Buttons (Home, Settings Gear, Search, Mic, Notifications, Menu) */}
+        {/* Center / Action Buttons (Fixed Clock, Settings Gear, Search, Mic, Notifications, Menu) */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* زر الهوم للرجوع للشاشة الرئيسية مباشرة */}
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
-              isHomeActive
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-xs shadow-amber-500/30'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-            title={isAr ? 'الرئيسية (Home)' : 'Home'}
-            id="android-home-btn"
+          {/* الساعة الثابتة فى الشريط العلوى (Fixed Live Clock) */}
+          <div
+            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-slate-800 dark:text-slate-100 shadow-2xs shrink-0 select-none"
+            title={isAr ? 'الساعة الثابتة — الوقت الحالي' : 'Live Clock — Current Time'}
+            id="android-fixed-clock"
           >
-            <Home className="w-4 h-4" />
-          </button>
+            <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" />
+            <span className="font-mono font-black text-xs tracking-tight">
+              {timeFormatted}
+            </span>
+          </div>
 
           {/* ترس السيتنج (Settings Gear) */}
           <button
@@ -295,9 +317,27 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
 
       {/* 2. شريط الأخبار والأسعار الرقمية المباشرة (يثبت في جميع الأقسام ويختفي فقط عند فتح السيتنج) */}
       {!isSettingsOpen && activeTab !== 'settings' && (
-        <div className="w-full bg-slate-100/90 dark:bg-slate-950/80 border-t border-slate-200/60 dark:border-slate-800/60 px-2 py-1 flex items-center">
-          <LiveHeaderWidgets user={user} language={language} />
-        </div>
+        <>
+          <div className="w-full bg-slate-100/90 dark:bg-slate-950/80 border-t border-slate-200/60 dark:border-slate-800/60 px-1 py-1 flex items-center">
+            <LiveHeaderWidgets
+              user={user}
+              language={language}
+              onGoHome={() => onNavigate('dashboard')}
+              isHomeActive={isHomeActive}
+            />
+          </div>
+
+          {/* 3. مربع التذكير "ذكرني" بعرض الشاشة تحت شريط الأخبار وبارتفاع ضعف شريط الأخبار تقريباً */}
+          <DhakirniReminderBar
+            language={language}
+            tasks={dailyTasks}
+            notes={notes}
+            onToggleTask={(id) => onToggleDailyTask?.(id)}
+            onAddTask={(task) => onAddDailyTask?.(task)}
+            onDeleteTask={(id) => onDeleteDailyTask?.(id)}
+            onNavigateToNotes={() => onNavigate('notes')}
+          />
+        </>
       )}
     </header>
   );
