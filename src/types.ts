@@ -33,6 +33,7 @@ export interface TickerPreferences {
   favoriteEgyptianTeam?: string;
   silverUnit?: '999' | '925' | 'ounce';
   goldUnit?: '24' | '21' | 'pound';
+  tickerSpeed?: 'verySlow' | 'slow' | 'medium' | 'fast';
 }
 
 export interface VehiclePreferences {

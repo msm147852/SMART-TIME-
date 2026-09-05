@@ -69,7 +69,8 @@
   display: flex;
   width: max-content;
   direction: ltr;
-  animation: ticker-marquee-right 17s linear infinite;
+  /* السرعة الافتراضية المريحة: 38 ثانية للدورة الكاملة لقراءة مريحة */
+  animation: ticker-marquee-right 38s linear infinite;
   will-change: transform;
 }
 

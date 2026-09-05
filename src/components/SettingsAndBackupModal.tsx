@@ -147,6 +147,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
     favoriteEgyptianTeam: 'الأهلي',
     silverUnit: '999',
     goldUnit: '24',
+    tickerSpeed: 'slow',
   };
 
   const [tickerPrefs, setTickerPrefs] = useState<TickerPreferences>(initialTicker);
@@ -850,6 +851,50 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                     className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-amber-700 dark:text-amber-400"
                   />
                 )}
+              </div>
+
+              {/* 10. سرعة حركة شريط الأخبار */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⏱️</span>
+                  <div>
+                    <span className="font-bold block text-slate-900 dark:text-white">
+                      {isAr ? 'سرعة حركة شريط الأخبار' : 'Ticker Scrolling Speed'}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {isAr
+                        ? 'اختر السرعة التي تناسب راحتك في قراءة الأخبار والأسعار'
+                        : 'Pick the pace that suits your reading comfort'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    { value: 'verySlow', labelAr: 'هادئ جداً', labelEn: 'Very Calm' },
+                    { value: 'slow', labelAr: 'مريح / بطيء', labelEn: 'Comfortable' },
+                    { value: 'medium', labelAr: 'متوسط', labelEn: 'Medium' },
+                    { value: 'fast', labelAr: 'سريع', labelEn: 'Fast' },
+                  ] as const).map((opt) => {
+                    const active = (tickerPrefs.tickerSpeed || 'slow') === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setTickerPrefs({ ...tickerPrefs, tickerSpeed: opt.value })
+                        }
+                        className={`p-2 rounded-xl border text-[11px] font-bold transition-colors ${
+                          active
+                            ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400'
+                        }`}
+                      >
+                        {isAr ? opt.labelAr : opt.labelEn}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

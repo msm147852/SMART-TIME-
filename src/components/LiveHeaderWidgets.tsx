@@ -73,7 +73,17 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
     favoriteEgyptianTeam: 'الأهلي',
     silverUnit: '999',
     goldUnit: '24',
+    tickerSpeed: 'slow',
   };
+
+  // مدة دورة الحركة (كلما زادت الثواني كانت الحركة أبطأ وأكثر راحة للقراءة)
+  const TICKER_SPEED_DURATIONS: Record<string, string> = {
+    verySlow: '55s',
+    slow: '38s',
+    medium: '25s',
+    fast: '17s',
+  };
+  const tickerDuration = TICKER_SPEED_DURATIONS[prefs.tickerSpeed || 'slow'];
 
   const btcRate = MOCK_CRYPTO_RATES[0];
   const ethRate = MOCK_CRYPTO_RATES[1];
@@ -357,7 +367,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
   return (
     <>
-      {/* حاوية شريط الأخبار المتحرك لليمين مع الإيقاف الفوري عند اللمس واستئناف الحركة فور الإفلات */}
+      {/* حاوية شر��ط الأخبار المتحرك لليمين مع الإيقاف الفوري عند اللمس واستئناف الحركة فور الإفلات */}
       <div
         className="relative w-full overflow-hidden select-none py-0.5 bg-slate-50/50 dark:bg-slate-900/50 border-y border-slate-200/60 dark:border-slate-800/60"
         id="live-ticker-strip-container"
@@ -392,6 +402,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
           className="animate-marquee-right flex items-center"
           style={{
             animationPlayState: isPaused ? 'paused' : 'running',
+            animationDuration: tickerDuration,
           }}
         >
           {renderTickerItems('track-a')}
