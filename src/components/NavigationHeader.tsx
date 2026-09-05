@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Home,
   Settings,
   Search,
   Mic,
@@ -126,21 +125,9 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </button>
         </div>
 
-        {/* Center / Action Buttons (Home, Settings Gear, Search, Mic, Notifications, Menu) */}
+        {/* Center / Action Buttons (Settings Gear, Search, Mic, Notifications, Menu) */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* زر الهوم للرجوع للشاشة الرئيسية مباشرة */}
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
-              isHomeActive
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-xs shadow-amber-500/30'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-            title={isAr ? 'الرئيسية (Home)' : 'Home'}
-            id="android-home-btn"
-          >
-            <Home className="w-4 h-4" />
-          </button>
+          {/* تم نقل زر الهوم إلى بداية شريط الأخبار ليكون ثابتاً */}
 
           {/* ترس السيتنج (Settings Gear) */}
           <button
@@ -296,7 +283,12 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       {/* 2. شريط الأخبار والأسعار الرقمية المباشرة (يثبت في جميع الأقسام ويختفي فقط عند فتح السيتنج) */}
       {!isSettingsOpen && activeTab !== 'settings' && (
         <div className="w-full bg-slate-100/90 dark:bg-slate-950/80 border-t border-slate-200/60 dark:border-slate-800/60 px-2 py-1 flex items-center">
-          <LiveHeaderWidgets user={user} language={language} />
+          <LiveHeaderWidgets
+            user={user}
+            language={language}
+            onHome={() => onNavigate('dashboard')}
+            isHomeActive={isHomeActive}
+          />
         </div>
       )}
     </header>

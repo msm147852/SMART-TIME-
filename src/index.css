@@ -74,8 +74,27 @@
   will-change: transform;
 }
 
+/* Ticker Marquee Moving to the Left (للغة العربية: الأخبار تخرج من خلف لوحة الهوم يميناً وتسير يساراً) */
+@keyframes ticker-marquee-left {
+  0% {
+    transform: translate3d(0%, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-marquee-left {
+  display: flex;
+  width: max-content;
+  direction: ltr;
+  animation: ticker-marquee-left 38s linear infinite;
+  will-change: transform;
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .animate-marquee-right:hover {
+  .animate-marquee-right:hover,
+  .animate-marquee-left:hover {
     animation-play-state: paused;
   }
 }

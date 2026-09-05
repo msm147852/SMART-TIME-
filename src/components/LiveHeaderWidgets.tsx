@@ -12,6 +12,7 @@ import {
   Star,
   Activity,
   Calculator,
+  Home,
 } from 'lucide-react';
 import { Language, UserProfile } from '../types';
 import {
@@ -30,11 +31,15 @@ import {
 interface LiveHeaderWidgetsProps {
   user: UserProfile;
   language: Language;
+  onHome?: () => void;
+  isHomeActive?: boolean;
 }
 
 export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   user,
   language,
+  onHome,
+  isHomeActive,
 }) => {
   const [now, setNow] = useState(new Date());
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -131,26 +136,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   const renderTickerItems = (keyPrefix: string) => (
     <div key={keyPrefix} className="flex items-center gap-2.5 px-3 shrink-0 whitespace-nowrap text-slate-700 dark:text-slate-300 font-semibold text-[11px] font-mono">
       
-      {/* 1. الوقت والتاريخ */}
-      {prefs.showTimeAndDate !== false && (
-        <>
-          <button
-            onClick={() => handleItemClick('time')}
-            className="flex items-center gap-1 hover:text-amber-500 cursor-pointer active:scale-95 transition-colors shrink-0"
-            title={isAr ? 'الوقت والتاريخ' : 'Time & Date'}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-bold text-slate-900 dark:text-white font-mono">
-              {formattedTime}
-            </span>
-            <span className="text-slate-300 dark:text-slate-700">|</span>
-            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-sans font-bold">
-              {hijri}
-            </span>
-          </button>
-          <span className="text-slate-300 dark:text-slate-700 font-normal">/</span>
-        </>
-      )}
+      {/* الوقت والتاريخ الآن مثبتان في بداية الشريط ولا يتحركان مع الأخبار */}
 
       {/* 2. سعر الفضة (جديد ومربوط بالملف الشخصي) */}
       {prefs.showSilver !== false && (
@@ -397,9 +383,9 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             : 'Customized Live Ticker — Press to hold, click any item for details'
         }
       >
-        {/* شريط التحريك المستمر جهة اليمين */}
+        {/* شريط التحريك المستمر: الأخبار تخرج من خلف لوحة الهوم الثابتة */}
         <div
-          className="animate-marquee-right flex items-center"
+          className={`${isAr ? 'animate-marquee-left' : 'animate-marquee-right'} flex items-center`}
           style={{
             animationPlayState: isPaused ? 'paused' : 'running',
             animationDuration: tickerDuration,
@@ -407,6 +393,49 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         >
           {renderTickerItems('track-a')}
           {renderTickerItems('track-b')}
+        </div>
+
+        {/* لوحة ثابتة في بداية الشريط: زر الهوم + الساعة، والأخبار تخرج من خلفها */}
+        <div
+          className={`absolute inset-y-0 start-0 z-20 flex items-center gap-1.5 pe-5 ps-1 ${
+            isAr
+              ? 'bg-gradient-to-l from-slate-100 via-slate-100 to-transparent dark:from-slate-950 dark:via-slate-950 dark:to-transparent'
+              : 'bg-gradient-to-r from-slate-100 via-slate-100 to-transparent dark:from-slate-950 dark:via-slate-950 dark:to-transparent'
+          }`}
+          dir={isAr ? 'rtl' : 'ltr'}
+        >
+          {onHome && (
+            <button
+              onClick={onHome}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 shrink-0 ${
+                isHomeActive
+                  ? 'bg-amber-500 text-slate-950 shadow-xs shadow-amber-500/30'
+                  : 'bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:text-amber-500'
+              }`}
+              title={isAr ? 'الرئيسية (Home)' : 'Home'}
+              id="ticker-home-btn"
+            >
+              <Home className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {prefs.showTimeAndDate !== false && (
+            <button
+              onClick={() => handleItemClick('time')}
+              className="flex items-center gap-1 shrink-0 active:scale-95 transition-transform"
+              title={isAr ? 'الوقت والتاريخ' : 'Time & Date'}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <div className="flex flex-col leading-none items-start">
+                <span className="font-bold text-[11px] text-slate-900 dark:text-white font-mono">
+                  {formattedTime}
+                </span>
+                <span className="text-[8px] text-amber-600 dark:text-amber-400 font-sans font-bold truncate max-w-[74px]">
+                  {hijri}
+                </span>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
