@@ -17,6 +17,7 @@ export type AppView =
   | 'ai'
   | 'chat'
   | 'media'
+  | 'sports'
   | 'settings';
 
 export interface TickerPreferences {
@@ -274,6 +275,21 @@ export interface MaintenanceRecord {
   date: string;
   serviceCenter?: string;
   notes?: string;
+}
+
+export interface VehicleAccidentRecord {
+  id: string;
+  vehicleId?: string;
+  title: string;
+  photoUrl: string;
+  date: string;
+  time: string;
+  location?: string;
+  estimatedDamage?: number;
+  notes?: string;
+  savedToVault?: boolean;
+  vaultRecordId?: string;
+  createdAt: string;
 }
 
 // ---------------------------
@@ -648,4 +664,24 @@ export interface AppNotification {
   date: string;
   isRead: boolean;
   actionTab?: string;
+}
+
+// ---------------------------
+// 13. EDUCATION & STUDENTS
+// ---------------------------
+export interface StudentProfile {
+  id: string;
+  name: string;
+  nationalId: string;
+  age: string;
+  stage: string;
+}
+
+export interface StudentExpenseRecord {
+  id: string;
+  studentId: string;
+  subCategory: 'lessons' | 'personal' | 'transport' | 'school' | 'books';
+  title: string;
+  amount: number;
+  date: string;
 }

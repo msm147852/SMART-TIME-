@@ -414,31 +414,41 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
 
             {/* Footer buttons */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2 flex items-center justify-between gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsListModalOpen(false);
-                  setIsAddModalOpen(true);
-                }}
-                className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isAr ? 'إضافة مهمة جديدة' : 'Add New Task'}</span>
-              </button>
-
-              {onNavigateToNotes && (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsListModalOpen(false);
-                    onNavigateToNotes();
+                    setIsAddModalOpen(true);
                   }}
-                  className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-all"
+                  className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
                 >
-                  <span>{isAr ? 'قسم الملاحظات' : 'Notes View'}</span>
-                  <ArrowRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-180' : ''}`} />
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isAr ? 'إضافة مهمة جديدة' : 'Add New Task'}</span>
                 </button>
-              )}
+
+                {onNavigateToNotes && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsListModalOpen(false);
+                      onNavigateToNotes();
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <span>{isAr ? 'قسم الملاحظات' : 'Notes View'}</span>
+                    <ArrowRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsListModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all"
+              >
+                {isAr ? 'رجوع' : 'Back'}
+              </button>
             </div>
           </div>
         </div>

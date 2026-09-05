@@ -16,6 +16,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Home,
+  Newspaper,
 } from 'lucide-react';
 import { Language, UserProfile } from '../types';
 import {
@@ -291,17 +292,17 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         </>
       )}
 
-      {/* 5. برج المستخدم مع طاقة اليوم (جديد ومربوط بالملف الشخصي) */}
+      {/* 5. برج وعمر المستخدم مع طاقة اليوم */}
       {prefs.showZodiac !== false && (
         <>
           <button
             onClick={() => handleItemClick('zodiac')}
-            className="flex items-center gap-1 hover:text-purple-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-purple-50/70 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-900/60"
-            title={isAr ? 'برج المستخدم وطاقة اليوم' : 'User Zodiac & Energy'}
+            className="flex items-center gap-1.5 hover:text-purple-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-purple-50/70 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-900/60"
+            title={isAr ? 'برج وعمر المستخدم وطاقة اليوم' : 'User Zodiac, Age & Energy'}
           >
             <Sparkles className="w-3 h-3 text-purple-500 shrink-0" />
             <span className="font-bold text-[10px] text-purple-700 dark:text-purple-300 font-sans">
-              {user.zodiacSign || zodiac.nameAr} {zodiac.symbol}:
+              {user.zodiacSign || zodiac.nameAr} {zodiac.symbol} • {age.years} {isAr ? 'سنة' : 'yrs'}:
             </span>
             <span className="text-[10px] text-purple-900 dark:text-purple-200 font-sans font-medium max-w-[140px] truncate">
               {zodiacTip}
@@ -310,6 +311,21 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
           <span className="text-slate-300 dark:text-slate-700 font-normal">/</span>
         </>
       )}
+
+      {/* 5.5 أهم الأخبار المحلية */}
+      <div
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0 font-sans"
+        title={isAr ? 'أهم الأخبار المحلية' : 'Local News Headlines'}
+      >
+        <Newspaper className="w-3 h-3 text-blue-500 shrink-0" />
+        <span className="font-bold text-[10px]">
+          {isAr ? '📰 أخبار محلية:' : '📰 Local News:'}
+        </span>
+        <span className="text-[10px] text-slate-800 dark:text-slate-200 font-medium max-w-[180px] truncate">
+          {isAr ? 'انطلاق مشاريع التطوير العمراني الكبرى وتدفق الاستثمار الخدمي' : 'Major urban development projects launched & services boosted'}
+        </span>
+      </div>
+      <span className="text-slate-300 dark:text-slate-700 font-normal">/</span>
 
       {/* 6. العملات المشفرة الرقمية (اختيار المستخدم) */}
       {prefs.showCrypto !== false && (

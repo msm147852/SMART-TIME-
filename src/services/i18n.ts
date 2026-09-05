@@ -79,6 +79,8 @@ export interface Translations {
   addNote: string;
   send: string;
   typeMessage: string;
+  categories: Record<string, string>;
+  paymentMethods: Record<string, string>;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -161,6 +163,22 @@ export const translations: Record<Language, Translations> = {
     addNote: 'ملاحظة جديدة',
     send: 'إرسال',
     typeMessage: 'اكتب رسالتك هنا...',
+    categories: {
+      food: 'طعام ومطاعم',
+      vehicle: 'سيارات ووقود',
+      education: 'تعليم ودراسة',
+      bills: 'فواتير ومرافق',
+      transport: 'مواصلات ونقل',
+      health: 'صحة وأدوية',
+      shopping: 'تسوق وملابس',
+      entertainment: 'ترفيه وخروج',
+      other: 'أخرى',
+    },
+    paymentMethods: {
+      cash: 'نقدي (كاش)',
+      card: 'بطاقة بنكية',
+      wallet: 'محفظة إلكترونية',
+    },
   },
   en: {
     appName: 'SMART TIME',
@@ -241,6 +259,22 @@ export const translations: Record<Language, Translations> = {
     addNote: 'New Note',
     send: 'Send',
     typeMessage: 'Type your message...',
+    categories: {
+      food: 'Food & Dining',
+      vehicle: 'Vehicle & Fuel',
+      education: 'Education & Tuitions',
+      bills: 'Bills & Utilities',
+      transport: 'Transport',
+      health: 'Health & Pharmacy',
+      shopping: 'Shopping',
+      entertainment: 'Entertainment',
+      other: 'Other',
+    },
+    paymentMethods: {
+      cash: 'Cash',
+      card: 'Bank Card',
+      wallet: 'Digital Wallet',
+    },
   },
   fr: {
     appName: 'SMART TIME',
@@ -321,5 +355,21 @@ export const translations: Record<Language, Translations> = {
     addNote: 'Nouvelle note',
     send: 'Envoyer',
     typeMessage: 'Votre message...',
-  }
+    categories: {
+      food: 'Nourriture',
+      vehicle: 'Véhicule',
+      education: 'Éducation',
+      bills: 'Factures',
+      transport: 'Transport',
+      health: 'Santé',
+      shopping: 'Shopping',
+      entertainment: 'Divertissement',
+      other: 'Autre',
+    },
+    paymentMethods: {
+      cash: 'Espèces',
+      card: 'Carte bancaire',
+      wallet: 'Portefeuille numérique',
+    },
+  },
 };

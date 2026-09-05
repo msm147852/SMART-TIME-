@@ -59,6 +59,7 @@ import { SecureVaultView } from './components/SecureVaultView';
 import { AiCenterView } from './components/AiCenterView';
 import { HotChatView } from './components/HotChatView';
 import { MediaCenterView } from './components/MediaCenterView';
+import { SportsView } from './components/SportsView';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
@@ -413,6 +414,10 @@ export default function App() {
                 MediaRepository.saveItems(updated);
               }}
             />
+          )}
+
+          {currentView === 'sports' && (
+            <SportsView user={userProfile} />
           )}
         </main>
 

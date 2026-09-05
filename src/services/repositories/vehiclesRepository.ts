@@ -1,4 +1,4 @@
-import { Vehicle, FuelRecord, MaintenanceRecord } from '../../types';
+import { Vehicle, FuelRecord, MaintenanceRecord, VehicleAccidentRecord } from '../../types';
 import { STORAGE_KEYS } from '../storageKeys';
 import { StorageAdapter } from '../storageAdapter';
 import { DEFAULT_VEHICLES, DEFAULT_FUEL_RECORDS, DEFAULT_MAINTENANCE_RECORDS } from '../seedData';
@@ -63,6 +63,29 @@ export class VehiclesRepository {
     const list = this.getMaintenanceRecords();
     const updated = [record, ...list];
     this.saveMaintenanceRecords(updated);
+    return updated;
+  }
+
+  // Accident Records
+  static getAccidentRecords(): VehicleAccidentRecord[] {
+    return StorageAdapter.getItem<VehicleAccidentRecord[]>(STORAGE_KEYS.ACCIDENT_RECORDS, []);
+  }
+
+  static saveAccidentRecords(records: VehicleAccidentRecord[]): void {
+    StorageAdapter.setItem(STORAGE_KEYS.ACCIDENT_RECORDS, records);
+  }
+
+  static addAccidentRecord(record: VehicleAccidentRecord): VehicleAccidentRecord[] {
+    const list = this.getAccidentRecords();
+    const updated = [record, ...list];
+    this.saveAccidentRecords(updated);
+    return updated;
+  }
+
+  static deleteAccidentRecord(id: string): VehicleAccidentRecord[] {
+    const list = this.getAccidentRecords();
+    const updated = list.filter((r) => r.id !== id);
+    this.saveAccidentRecords(updated);
     return updated;
   }
 }

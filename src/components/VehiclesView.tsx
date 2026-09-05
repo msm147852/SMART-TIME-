@@ -13,6 +13,9 @@ import {
   Trash2,
   TrendingDown,
   Sparkles,
+  Camera,
+  ShieldCheck,
+  Shield,
 } from 'lucide-react';
 import {
   Vehicle,
@@ -20,9 +23,11 @@ import {
   MaintenanceRecord,
   MaintenanceSystemType,
   Language,
+  VehicleAccidentRecord,
 } from '../types';
 import { translations } from '../services/i18n';
 import { VehiclesRepository } from '../services';
+import { VehicleCameraModal } from './VehicleCameraModal';
 
 interface VehiclesViewProps {
   language: Language;
@@ -47,7 +52,24 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
 }) => {
   const t = translations[language];
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(vehicles[0]?.id || '');
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'fuel' | 'maintenance'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'fuel' | 'maintenance' | 'accidents'>('overview');
+
+  // Camera & Accidents state
+  const [accidentRecords, setAccidentRecords] = useState<VehicleAccidentRecord[]>(() => {
+    return VehiclesRepository.getAccidentRecords();
+  });
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [cameraModalMode, setCameraModalMode] = useState<'accident' | 'odometer'>('accident');
+
+  const openAccidentCamera = () => {
+    setCameraModalMode('accident');
+    setIsCameraModalOpen(true);
+  };
+
+  const openOdometerCamera = () => {
+    setCameraModalMode('odometer');
+    setIsCameraModalOpen(true);
+  };
 
   // Modal states
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
@@ -268,38 +290,70 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
             </div>
           </div>
 
-          {/* Sub-Tabs: Overview, Fuel, Maintenance */}
-          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-            <button
-              onClick={() => setActiveSubTab('overview')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeSubTab === 'overview'
-                  ? 'bg-sky-500 text-white'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {language === 'ar' ? 'فحص الأنظمة والصيانة' : '10 Systems Health'}
-            </button>
-            <button
-              onClick={() => setActiveSubTab('fuel')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeSubTab === 'fuel'
-                  ? 'bg-sky-500 text-white'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {language === 'ar' ? 'سجل تزويد الوقود' : 'Fuel Log'}
-            </button>
-            <button
-              onClick={() => setActiveSubTab('maintenance')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeSubTab === 'maintenance'
-                  ? 'bg-sky-500 text-white'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {language === 'ar' ? 'سجل الفواتير والصيانة' : 'Maintenance History'}
-            </button>
+          {/* Sub-Tabs: Overview, Fuel, Maintenance, Accidents */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <button
+                onClick={() => setActiveSubTab('overview')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  activeSubTab === 'overview'
+                    ? 'bg-sky-500 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {language === 'ar' ? 'فحص الأنظمة والصيانة' : '10 Systems Health'}
+              </button>
+              <button
+                onClick={() => setActiveSubTab('fuel')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  activeSubTab === 'fuel'
+                    ? 'bg-sky-500 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {language === 'ar' ? 'سجل تزويد الوقود' : 'Fuel Log'}
+              </button>
+              <button
+                onClick={() => setActiveSubTab('maintenance')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  activeSubTab === 'maintenance'
+                    ? 'bg-sky-500 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {language === 'ar' ? 'سجل الفواتير والصيانة' : 'Maintenance History'}
+              </button>
+              <button
+                onClick={() => setActiveSubTab('accidents')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  activeSubTab === 'accidents'
+                    ? 'bg-red-600 text-white shadow'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>{language === 'ar' ? '🚨 توثيق الحوادث بالكاميرا' : 'Accidents & Camera'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={openAccidentCamera}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/10 hover:bg-red-600/20 text-red-600 dark:text-red-400 font-extrabold text-xs border border-red-500/30 transition-all active:scale-95"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>{language === 'ar' ? '🚨 تصوير حادث (مؤقت)' : 'Accident Camera'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={openOdometerCamera}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs border border-amber-500/30 transition-all active:scale-95"
+              >
+                <Gauge className="w-3.5 h-3.5" />
+                <span>{language === 'ar' ? '📸 تصوير العداد' : 'Odometer Scan'}</span>
+              </button>
+            </div>
           </div>
 
           {/* 10 Systems Grid */}
@@ -429,6 +483,112 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Accidents SubTab */}
+          {activeSubTab === 'accidents' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-red-500/10 via-slate-900/50 to-amber-500/10 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-start">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/30">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>{language === 'ar' ? 'توثيق وتصوير الحوادث الميدانية مع مؤقت زمني' : 'Field Accident Documentation & Timer'}</span>
+                  </div>
+                  <h4 className="text-base font-black text-slate-900 dark:text-white">
+                    {language === 'ar' ? 'سجل حوادث المركبة والخزنة الرقمية' : 'Accident Records & Digital Vault'}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-lg">
+                    {language === 'ar'
+                      ? 'التقاط صور الحوادث فورا مع مؤقت عد تنازلي (3 / 5 / 10 ثواني) وحفظها المشفر في الخزنة الرقمية للرجوع لها عند الحاجة.'
+                      : 'Capture accident photos with countdown timer, saved securely in the digital vault.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={openAccidentCamera}
+                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 text-white font-black text-xs shadow-lg shadow-red-900/40 hover:brightness-110 active:scale-95 transition-all"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>{language === 'ar' ? '🚨 تصوير حادث (مؤقت زمني)' : '🚨 Capture Accident (Timer)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {accidentRecords.length === 0 ? (
+                <div className="p-12 text-center border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl space-y-3">
+                  <div className="w-14 h-14 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto">
+                    <Camera className="w-7 h-7" />
+                  </div>
+                  <h5 className="font-bold text-slate-800 dark:text-white text-sm">
+                    {language === 'ar' ? 'لا توجد حوادث مسجلة لهذه المركبة' : 'No accident records found'}
+                  </h5>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    {language === 'ar'
+                      ? 'استخدم زر الكاميرا بالأعلى لالتقاط صور أي حوادث أو خدوش بالسيارة وحفظها مباشرة.'
+                      : 'Use the camera button to document vehicle damages with photos and timers.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {accidentRecords.map((acc) => (
+                    <div
+                      key={acc.id}
+                      className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm flex flex-col justify-between"
+                    >
+                      <div className="relative h-44 bg-slate-900">
+                        {acc.photoDataUrl ? (
+                          <img src={acc.photoDataUrl} alt={acc.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-500">
+                            <Camera className="w-8 h-8" />
+                          </div>
+                        )}
+                        {acc.savedToVault && (
+                          <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-emerald-900/80 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>{language === 'ar' ? 'الخزنة' : 'Vault'}</span>
+                          </span>
+                        )}
+                        <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-slate-300 text-[10px] font-mono">
+                          {acc.dateTime}
+                        </span>
+                      </div>
+
+                      <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h6 className="font-bold text-sm text-slate-900 dark:text-white">{acc.title}</h6>
+                          {acc.location && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">📍 {acc.location}</p>
+                          )}
+                          {acc.notes && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 p-2 rounded-xl bg-slate-50 dark:bg-slate-900">
+                              {acc.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                          <span className="text-xs font-mono-num font-black text-rose-500">
+                            {acc.estimatedDamage ? `${acc.estimatedDamage.toLocaleString()} ${currency}` : (language === 'ar' ? 'تلفيات غير محددة' : 'N/A')}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const updated = accidentRecords.filter(x => x.id !== acc.id);
+                              setAccidentRecords(updated);
+                              VehiclesRepository.saveAccidentRecords(updated);
+                            }}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -678,6 +838,34 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Vehicle Camera & Accident / Odometer Scanner Modal */}
+      <VehicleCameraModal
+        isOpen={isCameraModalOpen}
+        initialMode={cameraModalMode}
+        onClose={() => setIsCameraModalOpen(false)}
+        currency={currency}
+        language={language}
+        onAccidentSaved={(newAcc) => {
+          const updated = [newAcc, ...accidentRecords];
+          setAccidentRecords(updated);
+          VehiclesRepository.saveAccidentRecords(updated);
+          setActiveSubTab('accidents');
+        }}
+        onOdometerCaptured={(km) => {
+          if (currentVehicle) {
+            setFuelMileage(km.toString());
+            setMaintCurrentKm(km.toString());
+            if (km > currentVehicle.currentMileage) {
+              const updatedVehs = vehicles.map((v) =>
+                v.id === currentVehicle.id ? { ...v, currentMileage: km } : v
+              );
+              onUpdateVehicles(updatedVehs);
+              VehiclesRepository.saveVehicles(updatedVehs);
+            }
+          }
+        }}
+      />
     </div>
   );
 };

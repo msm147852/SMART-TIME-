@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   VEHICLES: 'smart_time_vehicles',
   FUEL_RECORDS: 'smart_time_fuel_records',
   MAINTENANCE_RECORDS: 'smart_time_maint_records',
+  ACCIDENT_RECORDS: 'smart_time_accident_records',
   STUDENTS: 'smart_time_students',
   LESSONS: 'smart_time_lessons',
   EDUCATION_EXPENSES: 'smart_time_edu_expenses',
