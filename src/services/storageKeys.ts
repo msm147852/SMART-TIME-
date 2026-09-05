@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   NOTE_FOLDERS: 'smart_time_note_folders',
   NOTE_TAGS: 'smart_time_note_tags',
   CALCULATOR_HISTORY: 'smart_time_calc_history',
+  DAILY_TASKS: 'smart_time_daily_tasks',
   EXPENSES: 'smart_time_expenses',
   BUDGET: 'smart_time_budget',
   VEHICLES: 'smart_time_vehicles',

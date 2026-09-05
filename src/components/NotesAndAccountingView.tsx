@@ -32,8 +32,26 @@ import {
   X,
   Palette,
   Highlighter,
+  BellRing,
+  CheckCircle2,
+  Circle,
+  Calendar,
+  Clock,
+  CheckSquare,
+  ArrowUpRight,
+  Filter,
 } from 'lucide-react';
-import { Note, NoteFolder, NoteTag, CalculatorHistoryItem, CalculatorMode, Language } from '../types';
+import {
+  Note,
+  NoteFolder,
+  NoteTag,
+  CalculatorHistoryItem,
+  CalculatorMode,
+  Language,
+  DailyTask,
+  TaskPriority,
+  TaskCategory,
+} from '../types';
 import { translations } from '../services/i18n';
 import { NotesRepository } from '../services';
 
@@ -43,6 +61,12 @@ interface NotesAndAccountingProps {
   folders: NoteFolder[];
   tags: NoteTag[];
   onUpdateNotes: (notes: Note[]) => void;
+  dailyTasks?: DailyTask[];
+  initialTab?: 'notes' | 'tasks' | 'calculator';
+  onUpdateDailyTasks?: (tasks: DailyTask[]) => void;
+  onToggleDailyTask?: (id: string) => void;
+  onAddDailyTask?: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
+  onDeleteDailyTask?: (id: string) => void;
 }
 
 export const NotesAndAccountingView: React.FC<NotesAndAccountingProps> = ({
@@ -51,9 +75,28 @@ export const NotesAndAccountingView: React.FC<NotesAndAccountingProps> = ({
   folders,
   tags,
   onUpdateNotes,
+  dailyTasks = [],
+  initialTab = 'notes',
+  onToggleDailyTask,
+  onAddDailyTask,
+  onDeleteDailyTask,
 }) => {
   const t = translations[language];
-  const [activeTab, setActiveTab] = useState<'notes' | 'calculator'>('notes');
+  const isAr = language === 'ar';
+  const [activeTab, setActiveTab] = useState<'notes' | 'tasks' | 'calculator'>(initialTab);
+
+  // --- Daily Tasks (ذكرني) State ---
+  const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState<'all' | TaskPriority>('all');
+  const [taskCategoryFilter, setTaskCategoryFilter] = useState<'all' | TaskCategory>('all');
+  const [taskSearchQuery, setTaskSearchQuery] = useState('');
+
+  // Task creation form in Notes tab
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>('medium');
+  const [newTaskCategory, setNewTaskCategory] = useState<TaskCategory>('work');
+  const [newTaskDueTime, setNewDueTime] = useState('');
+  const [newTaskNoteId, setNewTaskNoteId] = useState('');
 
   // --- Notes State ---
   const [selectedNote, setSelectedNote] = useState<Note | null>(notes[0] || null);
@@ -395,11 +438,11 @@ export const NotesAndAccountingView: React.FC<NotesAndAccountingProps> = ({
           </p>
         </div>
 
-        {/* Sub-Tabs: Notes vs Calculator */}
-        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
+        {/* Sub-Tabs: Notes vs Tasks vs Calculator */}
+        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto overflow-x-auto max-w-full">
           <button
             onClick={() => setActiveTab('notes')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'notes'
                 ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -414,8 +457,24 @@ export const NotesAndAccountingView: React.FC<NotesAndAccountingProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('tasks')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
+              activeTab === 'tasks'
+                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+            id="subtab-tasks-btn"
+          >
+            <BellRing className="w-4 h-4 text-amber-500" />
+            <span>{isAr ? 'ذكرني (المهمات)' : 'Reminders'}</span>
+            <span className="text-xs px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-bold">
+              {dailyTasks.filter((t) => !t.completed).length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('calculator')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'calculator'
                 ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -803,7 +862,370 @@ export const NotesAndAccountingView: React.FC<NotesAndAccountingProps> = ({
       )}
 
       {/* ========================================================= */}
-      {/* 2. CALCULATOR TAB CONTENT (Section 7 Specification) */}
+      {/* 2. DHAKIRNI (ذكرني - المهمات اليومية) TAB CONTENT */}
+      {/* ========================================================= */}
+      {activeTab === 'tasks' && (
+        <div className="space-y-6" id="dhakirni-tasks-container">
+          {/* Top Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div className="bg-white dark:bg-slate-850 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">
+                {isAr ? 'إجمالي المهمات' : 'Total Tasks'}
+              </span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                  {dailyTasks.length}
+                </span>
+                <span className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  <CheckSquare className="w-5 h-5" />
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-850 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-xs text-amber-600 dark:text-amber-400 block font-medium">
+                {isAr ? 'قيد التنفيذ' : 'Pending'}
+              </span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
+                  {dailyTasks.filter((t) => !t.completed).length}
+                </span>
+                <span className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
+                  <Clock className="w-5 h-5" />
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-850 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 block font-medium">
+                {isAr ? 'تم الإنجاز' : 'Completed'}
+              </span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                  {dailyTasks.filter((t) => t.completed).length}
+                </span>
+                <span className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" />
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-850 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-xs text-indigo-600 dark:text-indigo-400 block font-medium">
+                {isAr ? 'نسبة الإنجاز' : 'Progress'}
+              </span>
+              <div className="mt-2">
+                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                  {dailyTasks.length > 0
+                    ? Math.round((dailyTasks.filter((t) => t.completed).length / dailyTasks.length) * 100)
+                    : 0}
+                  %
+                </span>
+                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-2 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${
+                        dailyTasks.length > 0
+                          ? Math.round((dailyTasks.filter((t) => t.completed).length / dailyTasks.length) * 100)
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Add Task Form */}
+          <div className="bg-white dark:bg-slate-850 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-amber-500" />
+              <span>{isAr ? 'إضافة مهمة جديدة في ذكرني' : 'Add New Daily Task'}</span>
+            </h3>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newTaskTitle.trim()) return;
+                onAddDailyTask?.({
+                  title: newTaskTitle.trim(),
+                  priority: newTaskPriority,
+                  category: newTaskCategory,
+                  completed: false,
+                  dueTime: newTaskDueTime || undefined,
+                  noteId: newTaskNoteId || undefined,
+                });
+                setNewTaskTitle('');
+                setNewDueTime('');
+                setNewTaskNoteId('');
+              }}
+              className="space-y-3"
+            >
+              <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder={isAr ? 'اكتب نص المهمة اليومية...' : 'Enter task title...'}
+                  className="flex-1 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  id="task-input-title"
+                />
+                <button
+                  type="submit"
+                  disabled={!newTaskTitle.trim()}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold text-sm transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 whitespace-nowrap"
+                  id="submit-new-task-btn"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isAr ? 'إضافة المهمة' : 'Add Task'}</span>
+                </button>
+              </div>
+
+              {/* Task Options: Priority, Category, Due Time, Linked Note */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {/* Priority */}
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">
+                    {isAr ? 'الأولوية' : 'Priority'}
+                  </label>
+                  <select
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 focus:outline-none"
+                  >
+                    <option value="high">{isAr ? '🔴 عاجل' : 'High'}</option>
+                    <option value="medium">{isAr ? '🟡 مهم' : 'Medium'}</option>
+                    <option value="low">{isAr ? '🟢 عادي' : 'Low'}</option>
+                  </select>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">
+                    {isAr ? 'التصنيف' : 'Category'}
+                  </label>
+                  <select
+                    value={newTaskCategory}
+                    onChange={(e) => setNewTaskCategory(e.target.value as TaskCategory)}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 focus:outline-none"
+                  >
+                    <option value="work">{isAr ? '💼 عمل' : 'Work'}</option>
+                    <option value="personal">{isAr ? '👤 شخصي' : 'Personal'}</option>
+                    <option value="finance">{isAr ? '💰 مالي' : 'Finance'}</option>
+                    <option value="health">{isAr ? '🏥 صحة' : 'Health'}</option>
+                    <option value="education">{isAr ? '🎓 تعليم' : 'Education'}</option>
+                    <option value="general">{isAr ? '📌 عام' : 'General'}</option>
+                  </select>
+                </div>
+
+                {/* Due Time */}
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">
+                    {isAr ? 'الوقت المحدد' : 'Due Time'}
+                  </label>
+                  <input
+                    type="time"
+                    value={newTaskDueTime}
+                    onChange={(e) => setNewDueTime(e.target.value)}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 focus:outline-none"
+                  />
+                </div>
+
+                {/* Link to Note */}
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">
+                    {isAr ? 'ربط بملاحظة' : 'Link Note'}
+                  </label>
+                  <select
+                    value={newTaskNoteId}
+                    onChange={(e) => setNewTaskNoteId(e.target.value)}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 focus:outline-none"
+                  >
+                    <option value="">{isAr ? '— بدون ربط —' : 'None'}</option>
+                    {notes.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.title.length > 20 ? n.title.slice(0, 20) + '...' : n.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Filters & Search */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-850 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={taskSearchQuery}
+                onChange={(e) => setTaskSearchQuery(e.target.value)}
+                placeholder={isAr ? 'بحث في المهمات...' : 'Search tasks...'}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl ps-9 pe-4 py-2 text-xs focus:outline-none"
+              />
+            </div>
+
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+              <button
+                onClick={() => setTaskStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  taskStatusFilter === 'all'
+                    ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
+                    : 'text-slate-500'
+                }`}
+              >
+                {isAr ? 'الكل' : 'All'}
+              </button>
+              <button
+                onClick={() => setTaskStatusFilter('pending')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  taskStatusFilter === 'pending'
+                    ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
+                    : 'text-slate-500'
+                }`}
+              >
+                {isAr ? 'قيد التنفيذ' : 'Pending'}
+              </button>
+              <button
+                onClick={() => setTaskStatusFilter('completed')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  taskStatusFilter === 'completed'
+                    ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
+                    : 'text-slate-500'
+                }`}
+              >
+                {isAr ? 'المكتملة' : 'Completed'}
+              </button>
+            </div>
+          </div>
+
+          {/* Task Items List */}
+          <div className="space-y-2.5">
+            {dailyTasks
+              .filter((task) => {
+                if (taskStatusFilter === 'pending' && task.completed) return false;
+                if (taskStatusFilter === 'completed' && !task.completed) return false;
+                if (taskSearchQuery.trim()) {
+                  return task.title.toLowerCase().includes(taskSearchQuery.toLowerCase());
+                }
+                return true;
+              })
+              .map((task) => {
+                const linkedNote = task.noteId ? notes.find((n) => n.id === task.noteId) : null;
+                const priorityStyles =
+                  task.priority === 'high'
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900'
+                    : task.priority === 'medium'
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900';
+
+                return (
+                  <div
+                    key={task.id}
+                    className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                      task.completed
+                        ? 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/60 opacity-70'
+                        : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800 hover:border-amber-400 shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <button
+                        onClick={() => onToggleDailyTask?.(task.id)}
+                        className="flex-shrink-0 transition-transform active:scale-90"
+                      >
+                        {task.completed ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/20" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-slate-300 hover:text-amber-500 transition-colors" />
+                        )}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`text-sm font-semibold truncate ${
+                            task.completed
+                              ? 'line-through text-slate-400 dark:text-slate-500'
+                              : 'text-slate-900 dark:text-white'
+                          }`}
+                        >
+                          {task.title}
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          {/* Priority badge */}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${priorityStyles}`}>
+                            {task.priority === 'high'
+                              ? isAr
+                                ? 'عاجل'
+                                : 'High'
+                              : task.priority === 'medium'
+                              ? isAr
+                                ? 'مهم'
+                                : 'Medium'
+                              : isAr
+                              ? 'عادي'
+                              : 'Low'}
+                          </span>
+
+                          {/* Time */}
+                          {task.dueTime && (
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-500" />
+                              <span className="font-mono">{task.dueTime}</span>
+                            </span>
+                          )}
+
+                          {/* Linked Note Button */}
+                          {linkedNote && (
+                            <button
+                              onClick={() => {
+                                setSelectedNote(linkedNote);
+                                setActiveTab('notes');
+                              }}
+                              className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-amber-200 dark:border-amber-800 transition-colors"
+                              title={isAr ? 'عرض الملاحظة المرتبطة' : 'View Linked Note'}
+                            >
+                              <FileText className="w-2.5 h-2.5" />
+                              <span>{linkedNote.title.slice(0, 16)}</span>
+                              <ArrowUpRight className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onDeleteDailyTask?.(task.id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors ms-2"
+                      title={isAr ? 'حذف المهمة' : 'Delete Task'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+
+            {dailyTasks.length === 0 && (
+              <div className="text-center py-16 bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <BellRing className="w-10 h-10 text-amber-400 mx-auto mb-2 opacity-80" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {isAr ? 'لا توجد مهمات حالياً' : 'No tasks available'}
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isAr ? 'أضف مهمتك اليومية الأولى من النموذج أعلاه' : 'Add your first task using the form above'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 3. CALCULATOR TAB CONTENT (Section 7 Specification) */}
       {/* ========================================================= */}
       {activeTab === 'calculator' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
