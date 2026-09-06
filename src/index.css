@@ -1,0 +1,296 @@
+@import "tailwindcss";
+
+/* CRITICAL FIX: Tailwind v4 defaults dark: to prefers-color-scheme media query.
+   The app toggles a `.dark` class on <html>, so we must opt into class-based dark mode
+   for the existing dark: toggle button (and all dark: utility classes) to actually work. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===========================================================
+   ACCENT COLOR THEME SYSTEM ("App Style" Themes)
+   Defines a full `accent-50..950` color scale as real Tailwind
+   utilities (bg-accent-500, text-accent-400, border-accent-500/20, ...).
+   Default ramp = the app's original gold identity.
+   Switching the `.theme-*` class on <html> re-points every one of
+   these variables, which instantly re-colors every icon, button,
+   badge and border already using accent-* across the whole app.
+=========================================================== */
+@theme {
+  --color-accent-50: #fefbf0;
+  --color-accent-100: #fbf3d9;
+  --color-accent-200: #f5e5ac;
+  --color-accent-300: #edd37a;
+  --color-accent-400: #e2c158;
+  --color-accent-500: #d4af37;
+  --color-accent-600: #c29e2f;
+  --color-accent-700: #aa8c2c;
+  --color-accent-800: #967923;
+  --color-accent-900: #5c4915;
+  --color-accent-950: #332810;
+  --color-accent-contrast: #0f172a;
+}
+
+/* وضع فيسبوك (Facebook Blue) */
+html.theme-facebook {
+  --color-accent-50: #eaf3fe;
+  --color-accent-100: #d3e7fd;
+  --color-accent-200: #a7cffb;
+  --color-accent-300: #7ab6f9;
+  --color-accent-400: #4e9ef7;
+  --color-accent-500: #1877f2;
+  --color-accent-600: #1466d1;
+  --color-accent-700: #1055b0;
+  --color-accent-800: #0c4490;
+  --color-accent-900: #08336f;
+  --color-accent-950: #04223f;
+  --color-accent-contrast: #ffffff;
+}
+
+/* وضع واتساب (WhatsApp Green) */
+html.theme-whatsapp {
+  --color-accent-50: #e9fbf0;
+  --color-accent-100: #c9f5da;
+  --color-accent-200: #97ecb6;
+  --color-accent-300: #65e293;
+  --color-accent-400: #3ddb79;
+  --color-accent-500: #25d366;
+  --color-accent-600: #1eb459;
+  --color-accent-700: #17954b;
+  --color-accent-800: #10763d;
+  --color-accent-900: #0a572f;
+  --color-accent-950: #052e18;
+  --color-accent-contrast: #052e18;
+}
+
+/* وضع تيليجرام (Telegram Blue) */
+html.theme-telegram {
+  --color-accent-50: #eaf7fd;
+  --color-accent-100: #c9ebfa;
+  --color-accent-200: #94d6f4;
+  --color-accent-300: #5fc2ee;
+  --color-accent-400: #3caee3;
+  --color-accent-500: #229ed9;
+  --color-accent-600: #1c81b4;
+  --color-accent-700: #16648f;
+  --color-accent-800: #10486a;
+  --color-accent-900: #0a2c45;
+  --color-accent-950: #05161f;
+  --color-accent-contrast: #ffffff;
+}
+
+/* وضع يوتيوب (YouTube Red) */
+html.theme-youtube {
+  --color-accent-50: #fff1f1;
+  --color-accent-100: #ffdcdc;
+  --color-accent-200: #ffb8b8;
+  --color-accent-300: #ff8585;
+  --color-accent-400: #ff5b5b;
+  --color-accent-500: #ff0000;
+  --color-accent-600: #d90000;
+  --color-accent-700: #b30000;
+  --color-accent-800: #8f0000;
+  --color-accent-900: #650000;
+  --color-accent-950: #380000;
+  --color-accent-contrast: #ffffff;
+}
+
+/* وضع انستغرام (Instagram Pink) */
+html.theme-instagram {
+  --color-accent-50: #fdecf2;
+  --color-accent-100: #fad0e0;
+  --color-accent-200: #f4a1c1;
+  --color-accent-300: #ed72a2;
+  --color-accent-400: #e64c87;
+  --color-accent-500: #e1306c;
+  --color-accent-600: #c0245a;
+  --color-accent-700: #9e1d49;
+  --color-accent-800: #7d1638;
+  --color-accent-900: #5b0f27;
+  --color-accent-950: #390917;
+  --color-accent-contrast: #ffffff;
+}
+
+
+/* SMART TIME Ocean — calm blue identity (no gold as the primary app accent) */
+html.theme-ocean {
+  --color-accent-50: #eefaff;
+  --color-accent-100: #d9f5ff;
+  --color-accent-200: #b8ebfb;
+  --color-accent-300: #86dff5;
+  --color-accent-400: #52cce9;
+  --color-accent-500: #20b8d6;
+  --color-accent-600: #149bb9;
+  --color-accent-700: #117d98;
+  --color-accent-800: #12647a;
+  --color-accent-900: #124f61;
+  --color-accent-950: #0b3340;
+  --color-accent-contrast: #ffffff;
+}
+
+/* Dashboard section-card palette: soft, distinct, and readable in both modes. */
+.dashboard-section-card {
+  --section-color: #20b8d6;
+  --section-soft: rgba(32, 184, 214, 0.11);
+  --section-border: rgba(32, 184, 214, 0.28);
+  --section-dark: rgba(32, 184, 214, 0.17);
+}
+.dashboard-section-chat { --section-color: #22b8d6; --section-soft: rgba(34,184,214,.11); --section-border: rgba(34,184,214,.28); --section-dark: rgba(34,184,214,.17); }
+.dashboard-section-expenses { --section-color: #35b779; --section-soft: rgba(53,183,121,.11); --section-border: rgba(53,183,121,.28); --section-dark: rgba(53,183,121,.17); }
+.dashboard-section-trips { --section-color: #28a9e0; --section-soft: rgba(40,169,224,.11); --section-border: rgba(40,169,224,.28); --section-dark: rgba(40,169,224,.17); }
+.dashboard-section-vehicles { --section-color: #5969c8; --section-soft: rgba(89,105,200,.11); --section-border: rgba(89,105,200,.28); --section-dark: rgba(89,105,200,.17); }
+.dashboard-section-education { --section-color: #9566d9; --section-soft: rgba(149,102,217,.11); --section-border: rgba(149,102,217,.28); --section-dark: rgba(149,102,217,.17); }
+.dashboard-section-food { --section-color: #e58aa8; --section-soft: rgba(229,138,168,.11); --section-border: rgba(229,138,168,.28); --section-dark: rgba(229,138,168,.17); }
+.dashboard-section-sports { --section-color: #e99a57; --section-soft: rgba(233,154,87,.11); --section-border: rgba(233,154,87,.28); --section-dark: rgba(233,154,87,.17); }
+.dashboard-section-notes { --section-color: #2bb8a5; --section-soft: rgba(43,184,165,.11); --section-border: rgba(43,184,165,.28); --section-dark: rgba(43,184,165,.17); }
+.dashboard-section-vault { --section-color: #748091; --section-soft: rgba(116,128,145,.11); --section-border: rgba(116,128,145,.28); --section-dark: rgba(116,128,145,.17); }
+.dashboard-section-ai { --section-color: #d45bb6; --section-soft: rgba(212,91,182,.11); --section-border: rgba(212,91,182,.28); --section-dark: rgba(212,91,182,.17); }
+.dashboard-section-religious { --section-color: #438ed6; --section-soft: rgba(67,142,214,.11); --section-border: rgba(67,142,214,.28); --section-dark: rgba(67,142,214,.17); }
+.dashboard-section-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.98), color-mix(in srgb, var(--section-soft) 72%, white));
+  border-color: var(--section-border);
+  box-shadow: 0 12px 28px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.dark .dashboard-section-card {
+  background: linear-gradient(145deg, rgba(15,23,42,.98), color-mix(in srgb, var(--section-dark) 72%, #0f172a));
+  box-shadow: 0 14px 30px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.dashboard-section-icon { color: var(--section-color); background: var(--section-soft); border-color: var(--section-border); }
+.dark .dashboard-section-icon { background: var(--section-dark); }
+.dashboard-section-emoji { filter: saturate(.9); text-shadow: 0 1px 8px color-mix(in srgb, var(--section-color) 18%, transparent); }
+.dashboard-section-title { color: #1e293b; }
+.dark .dashboard-section-title { color: #f8fafc; }
+.dashboard-section-mini-icon { color: var(--section-color); }
+
+@layer base {
+  :root {
+    font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  [dir="ltr"] {
+    font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  .font-mono-num {
+    font-family: 'Fira Code', 'Outfit', monospace;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Map pulse effects */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 12px rgba(245, 158, 11, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+.pulse-location {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Ticker Marquee Moving to the Right (متحرك لليمين بسلاسة وبسرعة مثالية دون فراغ) */
+@keyframes ticker-marquee-right {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+.animate-marquee-right {
+  display: flex;
+  width: max-content;
+  direction: ltr;
+  animation: ticker-marquee-right 42s linear infinite;
+  will-change: transform;
+}
+
+/* Ticker Marquee Moving to the Left (متحرك لليسار لخروج الأخبار بانسيابية من زر الهوم في الواجهة العربية) */
+@keyframes ticker-marquee-left {
+  0% {
+    transform: translate3d(0%, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-marquee-left {
+  display: flex;
+  width: max-content;
+  direction: rtl;
+  animation: ticker-marquee-left 42s linear infinite;
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .animate-marquee-right:hover,
+  .animate-marquee-left:hover {
+    animation-play-state: paused;
+  }
+}
+
+
+
+/* ===========================================================
+   SMART TIME THEME POLISH
+   Visual-only layer: no view, navigation, data or repository changes.
+   Accent variables above remain the single source of truth.
+=========================================================== */
+html[class*="theme-"] .text-accent-500,
+html[class*="theme-"] .text-accent-600,
+html[class*="theme-"] .text-accent-700,
+html[class*="theme-"] .text-accent-400 {
+  transition: color 180ms ease;
+}
+
+html[class*="theme-"] .bg-accent-500,
+html[class*="theme-"] .bg-accent-600,
+html[class*="theme-"] .border-accent-500 {
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* Give accent-backed icon containers a subtle theme-aware glow. */
+html[class*="theme-"] [class*="bg-accent-500/10"],
+html[class*="theme-"] [class*="bg-accent-500/15"] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent-500) 10%, transparent),
+              0 8px 22px color-mix(in srgb, var(--color-accent-500) 8%, transparent);
+}
+
+/* The active bottom tab keeps its existing geometry but inherits the theme identity. */
+html[class*="theme-"] nav button[class*="text-accent-600"] {
+  text-shadow: 0 0 14px color-mix(in srgb, var(--color-accent-500) 25%, transparent);
+}
+
+/* Dark mode gets a restrained accent halo without changing layout. */
+.dark html[class*="theme-"] {
+  color-scheme: dark;
+}

@@ -1,0 +1,38 @@
+import React, { useState } from 'react';
+import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound, Phone, UserRoundCheck, KeyRound } from 'lucide-react';
+import { loginWithEmail, loginWithPhone, requestPhoneLoginOtp, registerWithEmail, requestPasswordReset, resetPassword } from '../services/authService';
+
+interface Props { onAuthenticated: () => void; onGuest: () => void; }
+export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest }) => {
+  const [mode, setMode] = useState<'login'|'register'|'phone'|'forgot'>('login');
+  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [phone, setPhone] = useState(''); const [code, setCode] = useState('');
+  const [show, setShow] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [phoneSent, setPhoneSent] = useState(false); const [resetSent, setResetSent] = useState(false);
+  const submit = async (e: React.FormEvent) => { e.preventDefault(); setError(''); setBusy(true); try {
+    if (mode === 'register') { if (name.trim().length < 2) throw new Error('اكتب اسمًا صحيحًا'); await registerWithEmail(name.trim(), email.trim(), password); }
+    else if (mode === 'phone') { if (!phoneSent) { const d:any = await requestPhoneLoginOtp(phone.trim()); setPhoneSent(true); setError(d.devCode ? `رمز SMS في وضع التطوير: ${d.devCode}` : 'تم إرسال رمز SMS إلى هاتفك.'); setBusy(false); return; } await loginWithPhone(phone.trim(), code.trim()); }
+    else if (mode === 'forgot') { if (!resetSent) { const d:any = await requestPasswordReset(email.trim()); setResetSent(true); setCode(d.devCode || ''); setError(d.devCode ? `رمز إعادة التعيين في وضع التطوير: ${d.devCode}` : 'تم إرسال تعليمات إعادة تعيين كلمة المرور إلى البريد الإلكتروني.'); setBusy(false); return; } await resetPassword(email.trim(), code.trim(), password); setMode('login'); setCode(''); setPassword(''); setError('تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.'); setBusy(false); return; }
+    else await loginWithEmail(email.trim(), password); onAuthenticated();
+  } catch (err:any) { setError(err.message || 'تعذر تسجيل الدخول'); } finally { setBusy(false); } };
+  return <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4" dir="rtl">
+    <div className="w-full max-w-md rounded-[32px] bg-white dark:bg-slate-900 shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+      <div className="p-7 bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-500 text-slate-950">
+        <div className="w-14 h-14 rounded-2xl bg-white/70 flex items-center justify-center mb-4"><ShieldCheck className="w-8 h-8"/></div>
+        <h1 className="text-2xl font-black">SMART TIME</h1><p className="font-bold mt-1">وقتك من ذهب — حسابك هو مفتاح التطبيق</p>
+      </div>
+      <form onSubmit={submit} className="p-6 space-y-4">
+        <div className="flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800"><button type="button" onClick={()=>setMode('login')} className={`flex-1 py-2 rounded-xl font-bold ${mode==='login'?'bg-white dark:bg-slate-700 shadow':''}`}>البريد الإلكتروني</button><button type="button" onClick={()=>setMode('phone')} className={`flex-1 py-2 rounded-xl font-bold ${mode==='phone'?'bg-white dark:bg-slate-700 shadow':''}`}>رقم الهاتف</button></div>
+        {mode==='register' && <label className="block"><span className="text-xs font-bold">الاسم الظاهر</span><div className="relative mt-1"><UserRound className="absolute right-3 top-3.5 w-4 h-4 text-slate-400"/><input required value={name} onChange={e=>setName(e.target.value)} className="w-full pr-10 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800" placeholder="الاسم الذي سيظهر للآخرين"/></div></label>}
+        {mode==='phone' ? <><label className="block"><span className="text-xs font-bold">رقم الهاتف</span><div className="relative mt-1"><Phone className="absolute right-3 top-3.5 w-4 h-4 text-slate-400"/><input required dir="ltr" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="w-full pr-10 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800" placeholder="+20 1XXXXXXXXX"/></div></label><label className="block"><span className="text-xs font-bold">رمز SMS</span><input required={phoneSent} inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} className="w-full mt-1 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800 text-center tracking-[.4em]" placeholder="••••••"/></label></> : <label className="block"><span className="text-xs font-bold">البريد الإلكتروني</span><div className="relative mt-1"><Mail className="absolute right-3 top-3.5 w-4 h-4 text-slate-400"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full pr-10 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800" placeholder="name@example.com"/></div></label>}
+        {mode!=='phone' && <label className="block"><span className="text-xs font-bold">{mode==='forgot' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</span><div className="relative mt-1"><LockKeyhole className="absolute right-3 top-3.5 w-4 h-4 text-slate-400"/><input required={mode!=='forgot' || resetSent} minLength={8} type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} className="w-full pr-10 pl-10 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800" placeholder="8 أحرف على الأقل"/><button type="button" onClick={()=>setShow(!show)} className="absolute left-3 top-3"><>{show?<EyeOff className="w-5"/>:<Eye className="w-5"/>}</></button></div></label>}
+        {mode==='forgot' && resetSent && <label className="block"><span className="text-xs font-bold">رمز إعادة التعيين</span><input required value={code} onChange={e=>setCode(e.target.value)} className="w-full mt-1 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800 text-center" placeholder="رمز البريد"/></label>}
+        {error && <div className="rounded-xl bg-red-50 text-red-700 p-3 text-xs font-bold">{error}</div>}
+        <button disabled={busy} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black disabled:opacity-50">{busy?'جارٍ التحقق…':mode==='register'?'إنشاء الحساب':mode==='phone'?'دخول برقم الهاتف':mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'):'دخول آمن'}</button>
+        {mode==='login' && <div className="flex items-center justify-between gap-3 text-[11px] font-bold"><button type="button" onClick={()=>{setMode('forgot');setError('');setCode('');setResetSent(false)}} className="text-accent-600">هل نسيت كلمة المرور؟</button><button type="button" onClick={()=>{setMode('register');setError('')}} className="text-slate-500">إنشاء حساب جديد</button></div>}
+        {mode==='phone' && <p className="text-[10px] text-slate-500 text-center">{phoneSent?'تم إرسال الرمز. أدخل رمز SMS لإكمال الدخول.':'تسجيل الدخول بالهاتف اختياري. اضغط زر الدخول لإرسال رمز SMS أولاً.'}</p>}
+        {mode!=='login' && <button type="button" onClick={()=>{setMode('login');setError('');setCode('');setPhoneSent(false);setResetSent(false)}} className="w-full py-2 text-xs font-bold text-slate-500">العودة إلى تسجيل الدخول بالبريد</button>}
+        <button type="button" onClick={onGuest} className="w-full py-3 rounded-2xl border border-slate-200 dark:border-slate-700 font-black flex items-center justify-center gap-2"><UserRoundCheck className="w-4"/> الدخول كزائر</button>
+        <p className="text-[10px] text-slate-500 text-center">الدخول بالبريد الإلكتروني لا يحتاج إلى تفعيل مسبق. عند دخول الشات فقط يتم توثيق رقم الهاتف برسالة SMS، والرقم لا يظهر للأعضاء.</p>
+      </form>
+    </div>
+  </div>;
+};
