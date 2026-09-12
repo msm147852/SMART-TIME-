@@ -341,8 +341,8 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
     <div className="space-y-6" id="religious-module">
       {/* Toast Notification for Stop Markers and Bookmarks */}
       {showToast && toastMessage && (
-        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl bg-slate-900/95 dark:bg-white/95 text-white dark:text-slate-950 font-bold text-xs sm:text-sm shadow-2xl backdrop-blur-md flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 border border-amber-500/40">
-          <Bookmark className="w-4 h-4 text-amber-400 dark:text-amber-600 shrink-0 fill-current" />
+        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl bg-slate-900/95 dark:bg-white/95 text-white dark:text-slate-950 font-bold text-xs sm:text-sm shadow-2xl backdrop-blur-md flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 border border-accent-500/40">
+          <Bookmark className="w-4 h-4 text-accent-400 dark:text-accent-600 shrink-0 fill-current" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -435,12 +435,12 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-bold">
-                      <Flame className="w-3.5 h-3.5 text-amber-300" />
+                      <Flame className="w-3.5 h-3.5 text-accent-300" />
                       <span>{wird.streakDays} يوم متتالي من القراءة اليومية المستمرة</span>
                     </span>
                     <h2 className="text-2xl sm:text-3xl font-black mt-2">ورد القرآن الكريم اليومي</h2>
                     <p className="text-xs sm:text-sm text-emerald-100 mt-1">
-                      آخر علامة وقف: <span className="font-bold text-amber-300">سورة {lastStopPosition.surahName} (الآية {lastStopPosition.ayahNumber})</span> • صفحة {wird.currentPage} من {wird.totalPages}
+                      آخر علامة وقف: <span className="font-bold text-accent-300">سورة {lastStopPosition.surahName} (الآية {lastStopPosition.ayahNumber})</span> • صفحة {wird.currentPage} من {wird.totalPages}
                     </p>
                   </div>
 
@@ -453,7 +453,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                     <button
                       onClick={handleToggleWirdReminder}
                       className={`p-2 rounded-xl transition-all ${
-                        wird.reminderEnabled ? 'bg-amber-400 text-slate-900 shadow-md' : 'bg-white/10 text-white'
+                        wird.reminderEnabled ? 'bg-accent-400 text-slate-900 shadow-md' : 'bg-white/10 text-white'
                       }`}
                       title="تفعيل/تعطيل التذكير"
                     >
@@ -470,7 +470,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                   </div>
                   <div className="w-full h-3.5 rounded-full bg-black/30 overflow-hidden p-0.5">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-400 to-emerald-300 transition-all duration-500 shadow-sm"
+                      className="h-full rounded-full bg-gradient-to-r from-accent-400 to-emerald-300 transition-all duration-500 shadow-sm"
                       style={{ width: `${quranCompletionPct}%` }}
                     />
                   </div>
@@ -481,15 +481,15 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                 </div>
 
                 {/* KEY FEATURE: PROMINENT CONTINUE READING FROM LAST STOP BUTTON */}
-                <div className="p-4 rounded-2xl bg-black/25 backdrop-blur-md border border-amber-400/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="p-4 rounded-2xl bg-black/25 backdrop-blur-md border border-accent-400/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-md">
+                    <div className="w-11 h-11 rounded-2xl bg-accent-400 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-md">
                       <Bookmark className="w-6 h-6 fill-current" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-amber-300">موضع التوقف الحالي للقراءة</span>
-                        <span className="text-[10px] bg-amber-400/20 px-2 py-0.5 rounded-full text-amber-200 font-mono-num border border-amber-400/30">
+                        <span className="text-xs font-bold text-accent-300">موضع التوقف الحالي للقراءة</span>
+                        <span className="text-[10px] bg-accent-400/20 px-2 py-0.5 rounded-full text-accent-200 font-mono-num border border-accent-400/30">
                           صفحة {lastStopPosition.pageNumber}
                         </span>
                       </div>
@@ -501,7 +501,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
 
                   <button
                     onClick={() => handleJumpToLastStop()}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-amber-200 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/30 active:scale-95 transition-all group"
+                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-accent-400 via-accent-300 to-yellow-400 hover:from-accent-300 hover:to-accent-200 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-accent-500/30 active:scale-95 transition-all group"
                     id="continue-reading-btn"
                   >
                     <span>{language === 'ar' ? 'متابعة القراءة من آخر علامة وقف' : 'Continue from Last Stop'}</span>
@@ -513,7 +513,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                 <div className="space-y-2 pt-1 border-t border-white/15">
                   <div className="flex items-center justify-between text-xs text-emerald-100 font-bold">
                     <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <Sparkles className="w-3.5 h-3.5 text-accent-300" />
                       <span>علامات الترقيم والوقف القرآني (اضغط للانتقال المباشر لآخر وقف):</span>
                     </span>
                     <span className="text-[10px] text-emerald-200">دليل أحكام الوقف والتجويد</span>
@@ -523,7 +523,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                     {/* Last stop shortcut button */}
                     <button
                       onClick={() => handleJumpToLastStop()}
-                      className="p-2.5 rounded-xl bg-amber-400/90 hover:bg-amber-300 text-slate-950 font-black text-xs flex flex-col items-center justify-center gap-1 shadow-md transition-all active:scale-95"
+                      className="p-2.5 rounded-xl bg-accent-400/90 hover:bg-accent-300 text-slate-950 font-black text-xs flex flex-col items-center justify-center gap-1 shadow-md transition-all active:scale-95"
                       title="الانتقال المباشر لآخر علامة وقف"
                     >
                       <Bookmark className="w-4 h-4 fill-current text-slate-900" />
@@ -541,7 +541,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                         className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white flex flex-col items-center justify-center gap-0.5 border border-white/10 transition-all text-center group"
                         title={sign.nameAr}
                       >
-                        <span className="font-arabic font-black text-base text-amber-300 group-hover:scale-110 transition-transform">
+                        <span className="font-arabic font-black text-base text-accent-300 group-hover:scale-110 transition-transform">
                           {sign.symbol}
                         </span>
                         <span className="text-[9px] font-medium text-emerald-100 line-clamp-1">
@@ -624,7 +624,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleJumpToLastStop()}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-accent-400 to-accent-500 hover:from-accent-300 hover:to-accent-400 text-slate-950 font-black text-xs shadow-md shadow-accent-500/20 active:scale-95 transition-all"
                       title="الذهاب الفوري لآخر علامة وقف محفوظة"
                     >
                       <Bookmark className="w-4 h-4 fill-current" />
@@ -643,7 +643,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                 </div>
 
                 {/* Tajweed Punctuation & Stopping Signs Interactive Guide Strip */}
-                <div className="p-3 rounded-2xl bg-amber-50/50 dark:bg-slate-900/60 border border-amber-200/60 dark:border-slate-800 flex items-center gap-2 overflow-x-auto pb-2">
+                <div className="p-3 rounded-2xl bg-accent-50/50 dark:bg-slate-900/60 border border-accent-200/60 dark:border-slate-800 flex items-center gap-2 overflow-x-auto pb-2">
                   <span className="text-[11px] font-black text-slate-600 dark:text-slate-300 shrink-0 flex items-center gap-1">
                     <span>علامات الترقيم:</span>
                   </span>
@@ -651,9 +651,9 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                     <button
                       key={sign.symbol}
                       onClick={() => setSelectedSignInfo(sign)}
-                      className="px-2.5 py-1 rounded-xl text-xs font-bold border border-amber-300/50 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-amber-100/50 dark:hover:bg-slate-700 flex items-center gap-1.5 shrink-0 transition-all"
+                      className="px-2.5 py-1 rounded-xl text-xs font-bold border border-accent-300/50 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-accent-100/50 dark:hover:bg-slate-700 flex items-center gap-1.5 shrink-0 transition-all"
                     >
-                      <span className="font-arabic font-bold text-amber-600 dark:text-amber-400 text-sm">
+                      <span className="font-arabic font-bold text-accent-600 dark:text-accent-400 text-sm">
                         {sign.symbol}
                       </span>
                       <span className="text-[10px]">{sign.nameAr}</span>
@@ -721,7 +721,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                               <div className="font-bold text-sm text-slate-900 dark:text-white font-arabic flex items-center gap-1.5">
                                 <span>سورة {surah.name}</span>
                                 {hasLastStop && (
-                                  <Bookmark className="w-3.5 h-3.5 text-amber-500 fill-current" title="موضع آخر وقف محفوظ هنا" />
+                                  <Bookmark className="w-3.5 h-3.5 text-accent-500 fill-current" title="موضع آخر وقف محفوظ هنا" />
                                 )}
                               </div>
                               <div className="text-[10px] text-slate-400">{surah.englishName} • {surah.type}</div>
@@ -749,7 +749,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                         <h2 className="font-black text-2xl sm:text-3xl font-arabic text-emerald-700 dark:text-emerald-400">
                           سورة {currentSurahMeta.name}
                         </h2>
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-accent-100 dark:bg-accent-950/60 text-accent-800 dark:text-accent-300">
                           {currentSurahMeta.type}
                         </span>
                       </div>
@@ -775,8 +775,8 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
 
                   {/* Bismillah Header for Surahs other than At-Tawbah */}
                   {selectedSurah !== 9 && (
-                    <div className="text-center py-3 bg-amber-50/40 dark:bg-slate-900/40 rounded-2xl border border-amber-200/40 dark:border-slate-800">
-                      <p className="font-arabic text-xl sm:text-2xl font-bold text-slate-800 dark:text-amber-100">
+                    <div className="text-center py-3 bg-accent-50/40 dark:bg-slate-900/40 rounded-2xl border border-accent-200/40 dark:border-slate-800">
+                      <p className="font-arabic text-xl sm:text-2xl font-bold text-slate-800 dark:text-accent-100">
                         بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                       </p>
                     </div>
@@ -805,15 +805,15 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                             id={`ayah-item-${selectedSurah}-${verse.num}`}
                             className={`p-5 rounded-3xl border-2 transition-all relative group ${
                               isLastStop
-                                ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/40 shadow-md'
+                                ? 'bg-accent-50/80 dark:bg-accent-950/30 border-accent-400 ring-2 ring-accent-400/40 shadow-md'
                                 : isHighlighted
                                 ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-400'
-                                : 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800 hover:border-amber-300'
+                                : 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800 hover:border-accent-300'
                             }`}
                           >
                             {/* Visual Stop Badge if this is the last stop */}
                             {isLastStop && (
-                              <div className="absolute -top-3 end-6 px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center gap-1 shadow-md animate-bounce">
+                              <div className="absolute -top-3 end-6 px-3 py-0.5 rounded-full bg-accent-400 text-slate-950 font-black text-[10px] flex items-center gap-1 shadow-md animate-bounce">
                                 <Bookmark className="w-3 h-3 fill-current" />
                                 <span>آخر موضع وقف للقراءة 🔖</span>
                               </div>
@@ -829,8 +829,8 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                                   onClick={() => handlePunctuationClick(verse, currentSurahMeta)}
                                   className={`inline-flex items-center justify-center gap-1 mx-1 px-2.5 py-1 rounded-2xl border transition-all align-middle active:scale-90 select-none group/mark ${
                                     isLastStop
-                                      ? 'bg-amber-400 border-amber-500 text-slate-950 font-black shadow-md scale-105'
-                                      : 'bg-white dark:bg-slate-800 border-amber-400/80 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-slate-700'
+                                      ? 'bg-accent-400 border-accent-500 text-slate-950 font-black shadow-md scale-105'
+                                      : 'bg-white dark:bg-slate-800 border-accent-400/80 text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-slate-700'
                                   }`}
                                   title="انقر لتثبيت علامة الوقف هنا"
                                 >
@@ -855,7 +855,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                                   {verse.stopMark && (
                                     <>
                                       <span>•</span>
-                                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                      <span className="text-accent-600 dark:text-accent-400 font-bold">
                                         علامة وقف: ({verse.stopMark})
                                       </span>
                                     </>
@@ -868,8 +868,8 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                                     onClick={() => handlePunctuationClick(verse, currentSurahMeta)}
                                     className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
                                       isLastStop
-                                        ? 'bg-amber-400 text-slate-950 shadow-sm'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 hover:text-amber-900'
+                                        ? 'bg-accent-400 text-slate-950 shadow-sm'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-accent-100 hover:text-accent-900'
                                     }`}
                                   >
                                     <Bookmark className="w-3.5 h-3.5" />
@@ -908,7 +908,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                      <Bookmark className="w-5 h-5 text-amber-500 fill-current" />
+                      <Bookmark className="w-5 h-5 text-accent-500 fill-current" />
                       <span>علامات الوقف والإشارات المرجعية المحفوظة</span>
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -918,7 +918,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
 
                   <button
                     onClick={() => handleJumpToLastStop()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all shrink-0"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent-400 hover:bg-accent-300 text-slate-950 font-black text-xs shadow-md transition-all shrink-0"
                   >
                     <Bookmark className="w-4 h-4 fill-current" />
                     <span>الذهاب إلى آخر علامة وقف 🔖</span>
@@ -930,10 +930,10 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                   {bookmarks.map((bm) => (
                     <div
                       key={bm.id}
-                      className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-3 hover:border-amber-400 transition-all"
+                      className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-3 hover:border-accent-400 transition-all"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold">
+                        <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-950/60 text-accent-700 dark:text-accent-300 flex items-center justify-center font-bold">
                           <Bookmark className="w-5 h-5 fill-current" />
                         </div>
                         <div>
@@ -1075,10 +1075,10 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                 <div className="bg-white dark:bg-slate-850 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                     <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                      <Sliders className="w-4 h-4 text-amber-500" />
+                      <Sliders className="w-4 h-4 text-accent-500" />
                       <span>نوع الأذان والتنبيه 🔔</span>
                     </h4>
-                    <span className="text-[11px] text-amber-600 font-bold">خيارات التنبيه</span>
+                    <span className="text-[11px] text-accent-600 font-bold">خيارات التنبيه</span>
                   </div>
 
                   <div className="space-y-3">
@@ -1146,7 +1146,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                     onClick={() => setAthkarCategory('morning')}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                       athkarCategory === 'morning'
-                        ? 'bg-amber-500 text-white shadow-sm'
+                        ? 'bg-accent-500 text-white shadow-sm'
                         : 'bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
                     }`}
                   >
@@ -1181,7 +1181,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
 
                 <button
                   onClick={handleResetAthkar}
-                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-amber-500 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800"
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-accent-500 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>{language === 'ar' ? 'إعادة ضبط العدادات' : 'Reset Counters'}</span>
@@ -1443,14 +1443,14 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
           <div className="bg-white dark:bg-slate-850 p-6 rounded-3xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-arabic font-black text-2xl shadow-md">
+                <div className="w-12 h-12 rounded-2xl bg-accent-400 text-slate-950 flex items-center justify-center font-arabic font-black text-2xl shadow-md">
                   {selectedSignInfo.symbol}
                 </div>
                 <div>
                   <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
                     {selectedSignInfo.nameAr}
                   </h4>
-                  <span className="text-xs text-amber-600 dark:text-amber-400 font-bold">
+                  <span className="text-xs text-accent-600 dark:text-accent-400 font-bold">
                     علامة ترقيم ووقف قرآنية
                   </span>
                 </div>
@@ -1481,7 +1481,7 @@ export const ReligiousView: React.FC<ReligiousViewProps> = ({
                   setSelectedSignInfo(null);
                   handleJumpToLastStop();
                 }}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-accent-400 to-accent-500 hover:from-accent-300 hover:to-accent-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <Bookmark className="w-4 h-4 fill-current" />
                 <span>الانتقال إلى آخر علامة وقف 🔖</span>

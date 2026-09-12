@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserProfile } from '../types';
-import { Trophy, Dumbbell, Flame, Footprints, Heart, Plus, Activity, Award, Shield, CheckCircle2 } from 'lucide-react';
+import { Trophy, Dumbbell, Flame, Footprints, Heart, Plus, Activity, Award, Shield, CheckCircle2, RefreshCw, Radio } from 'lucide-react';
+import { fetchLiveSports, LiveSportsMatch } from '../services/liveDataService';
 
 interface SportsViewProps {
   user: UserProfile;
@@ -17,6 +18,23 @@ interface WorkoutItem {
 
 export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
   const isAr = user.language === 'ar';
+  const [liveMatches, setLiveMatches] = useState<LiveSportsMatch[]>([]);
+  const [sportsLoading, setSportsLoading] = useState(true);
+  const [sportsUpdatedAt, setSportsUpdatedAt] = useState<Date | null>(null);
+
+  const refreshLiveSports = async () => {
+    setSportsLoading(true);
+    const data = await fetchLiveSports();
+    setLiveMatches(data);
+    if (data.length) setSportsUpdatedAt(new Date());
+    setSportsLoading(false);
+  };
+
+  useEffect(() => {
+    refreshLiveSports();
+    const timer = window.setInterval(refreshLiveSports, 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const [workouts, setWorkouts] = useState<WorkoutItem[]>([
     { id: '1', title: isAr ? 'جري خفيف صباحي' : 'Morning Light Jog', category: isAr ? 'كارديو' : 'Cardio', duration: 30, calories: 280, date: 'اليوم' },
@@ -49,12 +67,12 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
   return (
     <div className="w-full space-y-4 pb-20 animate-fade-in text-slate-100">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1a1a1a] via-[#242424] to-[#1a1a1a] p-5 border border-[#D4AF37]/30 shadow-xl">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1a1a1a] via-[#242424] to-[#1a1a1a] p-5 border border-accent-500/30 shadow-xl">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-accent-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="flex items-center justify-between relative z-10">
           <div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 mb-2">
-              <Trophy className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-accent-500/20 text-accent-500 border border-accent-500/30 mb-2">
+              <Trophy className="w-3.5 h-3.5 text-accent-500" />
               {isAr ? 'القسم الرياضي واللياقة' : 'Sports & Fitness Hub'}
             </span>
             <h1 className="text-xl font-black text-white">
@@ -66,7 +84,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
           </div>
           <button
             onClick={() => setIsAdding(!isAdding)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#aa8c2c] text-slate-950 font-bold text-xs shadow-lg hover:opacity-90 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-700 text-slate-950 font-bold text-xs shadow-lg hover:opacity-90 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4" />
             {isAr ? 'إضافة تمرين' : 'Add Workout'}
@@ -74,10 +92,44 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Fitness Stats Overview */}
+      {/* Live Internet Scores */}
+      <section className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500"><Radio className="w-5 h-5" /></span>
+            <div>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">{isAr ? 'النتائج المباشرة' : 'Live Scores'}</h2>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">{sportsUpdatedAt ? (isAr ? `تحديث ${sportsUpdatedAt.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}` : `Updated ${sportsUpdatedAt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}`) : (isAr ? 'جاري الاتصال بالإنترنت…' : 'Connecting…')}</p>
+            </div>
+          </div>
+          <button onClick={refreshLiveSports} disabled={sportsLoading} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
+            <RefreshCw className={`w-4 h-4 ${sportsLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {liveMatches.slice(0, 8).map((match, i) => (
+            <div key={`${match.fixture?.id || 'match'}-${i}`} className="p-3.5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] text-slate-500 truncate">{match.league?.name || (isAr ? 'مباراة' : 'Fixture')}</div>
+                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{match.teams?.home?.name || 'Home'}</div>
+                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{match.teams?.away?.name || 'Away'}</div>
+              </div>
+              <div className="text-center shrink-0">
+                <div className="font-mono-num text-lg font-black text-accent-500">{match.goals?.home ?? '-'} : {match.goals?.away ?? '-'}</div>
+                <div className="text-[10px] font-bold text-red-500">{match.fixture?.status?.short || 'LIVE'} {match.fixture?.status?.elapsed ? `${match.fixture.status.elapsed}'` : ''}</div>
+              </div>
+            </div>
+          ))}
+          {!sportsLoading && liveMatches.length === 0 && (
+            <div className="p-5 text-xs text-slate-500">{isAr ? 'لا توجد مباريات مباشرة الآن أو مزود النتائج غير متاح.' : 'No live matches right now or the score provider is unavailable.'}</div>
+          )}
+        </div>
+      </section>
+
+      { /* Fitness Stats Overview */ }
       <div className="grid grid-cols-3 gap-2.5">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 text-center shadow-lg">
-          <div className="w-9 h-9 mx-auto mb-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#D4AF37]">
+          <div className="w-9 h-9 mx-auto mb-2 rounded-xl bg-accent-500/10 border border-accent-500/30 flex items-center justify-center text-accent-500">
             <Footprints className="w-5 h-5" />
           </div>
           <div className="text-lg font-black font-mono-num text-white">8,432</div>
@@ -103,10 +155,10 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
 
       {/* Add Workout Form Modal / Card */}
       {isAdding && (
-        <form onSubmit={handleAddWorkout} className="bg-slate-900 border border-[#D4AF37]/40 rounded-2xl p-4 shadow-xl space-y-3 animate-fade-in">
+        <form onSubmit={handleAddWorkout} className="bg-slate-900 border border-accent-500/40 rounded-2xl p-4 shadow-xl space-y-3 animate-fade-in">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Dumbbell className="w-4 h-4 text-[#D4AF37]" />
+              <Dumbbell className="w-4 h-4 text-accent-500" />
               {isAr ? 'تسجيل تمرين جديد' : 'Log New Workout'}
             </h3>
             <button
@@ -124,7 +176,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder={isAr ? 'مثال: تمارين صدر، سباحة، جري...' : 'e.g., Chest workout, swimming...'}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-500"
               required
             />
           </div>
@@ -135,7 +187,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
                 type="number"
                 value={newDuration}
                 onChange={(e) => setNewDuration(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-500"
               />
             </div>
             <div>
@@ -144,7 +196,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
                 type="number"
                 value={newCalories}
                 onChange={(e) => setNewCalories(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-500"
               />
             </div>
             <div>
@@ -152,7 +204,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
               <select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-500"
               >
                 <option value={isAr ? 'كارديو' : 'Cardio'}>{isAr ? 'كارديو' : 'Cardio'}</option>
                 <option value={isAr ? 'قوة' : 'Strength'}>{isAr ? 'قوة' : 'Strength'}</option>
@@ -170,7 +222,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-xl bg-[#D4AF37] text-slate-950 text-xs font-bold shadow hover:bg-[#c29e2f]"
+              className="px-4 py-1.5 rounded-xl bg-accent-500 text-slate-950 text-xs font-bold shadow hover:bg-accent-600"
             >
               {isAr ? 'حفظ التمرين' : 'Save Workout'}
             </button>
@@ -186,10 +238,10 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
         {workouts.map((w) => (
           <div
             key={w.id}
-            className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-[#D4AF37]/30 transition-all shadow-md"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-accent-500/30 transition-all shadow-md"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-[#aa8c2c]/10 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37]">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500/20 to-accent-700/10 border border-accent-500/30 flex items-center justify-center text-accent-500">
                 <Activity className="w-5 h-5" />
               </div>
               <div>
@@ -201,7 +253,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
               </div>
             </div>
             <div className="text-left font-mono-num">
-              <div className="text-xs font-bold text-[#D4AF37]">{w.duration} {isAr ? 'دقيقة' : 'min'}</div>
+              <div className="text-xs font-bold text-accent-500">{w.duration} {isAr ? 'دقيقة' : 'min'}</div>
               <div className="text-[11px] text-slate-400">{w.calories} {isAr ? 'سعر حراري' : 'kcal'}</div>
             </div>
           </div>

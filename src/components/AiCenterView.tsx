@@ -16,6 +16,7 @@ import {
 import { AiMessage, AiModelType, Language } from '../types';
 import { translations } from '../services/i18n';
 import { ChatRepository } from '../services';
+import { apiUrl } from '../services/apiConfig';
 
 interface AiCenterViewProps {
   language: Language;
@@ -83,7 +84,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
 
     try {
       // Server-side Gemini API call via /api/ai/chat
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch(apiUrl('/api/ai/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,7 +192,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
             onClick={() => setSelectedModel('claude-3-5-sonnet')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
               selectedModel === 'claude-3-5-sonnet'
-                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm'
+                ? 'bg-white dark:bg-slate-900 text-accent-600 dark:text-accent-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >

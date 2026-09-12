@@ -75,7 +75,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         return {
           label: isAr ? 'المشاوير' : 'Trips',
           icon: Navigation,
-          color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+          color: 'text-accent-500 bg-accent-500/10 border-accent-500/20',
         };
       case 'expenses':
         return {
@@ -196,7 +196,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         {/* Modal Header */}
         <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-2xl bg-accent-500/10 border border-accent-500/20 text-accent-600 flex items-center justify-center">
               <Bell className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -252,7 +252,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                 onClick={() => setActiveFilter(tab.id)}
                 className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 shrink-0 ${
                   isActive
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                    ? 'bg-accent-500 text-slate-950 font-bold shadow-xs'
                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700'
                 }`}
               >
@@ -261,7 +261,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   <span
                     className={`px-1 py-0.2 rounded-md text-[10px] font-mono ${
                       isActive
-                        ? 'bg-slate-950 text-amber-400'
+                        ? 'bg-slate-950 text-accent-400'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                     }`}
                   >
@@ -298,7 +298,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   className={`p-3 rounded-2xl border transition-all cursor-pointer relative group ${
                     notif.isRead
                       ? 'bg-white dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 opacity-80 hover:opacity-100'
-                      : 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40 shadow-xs'
+                      : 'bg-accent-50/40 dark:bg-accent-950/20 border-accent-200 dark:border-accent-900/40 shadow-xs'
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
@@ -312,7 +312,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 px-1.5 py-0.2 rounded-md bg-amber-500/10">
+                        <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400 px-1.5 py-0.2 rounded-md bg-accent-500/10">
                           {meta.label}
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono">
@@ -344,7 +344,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                               onNavigateToSection(notif.actionTab!);
                               onClose();
                             }}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline active:scale-95"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline active:scale-95"
                           >
                             <span>{isAr ? 'فتح القسم ومتابعة الإشعار' : 'Open Section'}</span>
                             <ExternalLink className="w-3 h-3" />
@@ -368,7 +368,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
                     {/* Unread indicator point */}
                     {!notif.isRead && (
-                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 mt-1" />
+                      <span className="w-2 h-2 rounded-full bg-accent-500 shrink-0 mt-1" />
                     )}
                   </div>
                 </div>

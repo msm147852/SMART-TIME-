@@ -19,6 +19,7 @@ import {
   Newspaper,
 } from 'lucide-react';
 import { Language, UserProfile } from '../types';
+import { fetchLiveMarket, fetchLiveNews, fetchLiveSports, fetchLiveWeather, LiveMarketData, LiveNewsArticle, LiveSportsMatch, LiveWeatherData } from '../services/liveDataService';
 import {
   MOCK_CRYPTO_RATES,
   MOCK_CURRENCY_GOLD_RATES,
@@ -56,12 +57,31 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   const [silverCalcGrams, setSilverCalcGrams] = useState<number>(10);
   const [goldCalcGrams, setGoldCalcGrams] = useState<number>(10);
   const [goldCalcKarat, setGoldCalcKarat] = useState<string>('21');
+  const [liveMarket, setLiveMarket] = useState<LiveMarketData | null>(null);
+  const [liveNews, setLiveNews] = useState<LiveNewsArticle[]>([]);
+  const [liveSports, setLiveSports] = useState<LiveSportsMatch[]>([]);
+  const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null);
   const pointerDownTimeRef = useRef(0);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Live Internet feed: market data is refreshed frequently, news/scores on their natural cadence.
+  useEffect(() => {
+    let mounted = true;
+    const refreshMarket = async () => { const data = await fetchLiveMarket(); if (mounted && data) setLiveMarket(data); };
+    const refreshNews = async () => { const data = await fetchLiveNews(language); if (mounted && data.length) setLiveNews(data); };
+    const refreshSports = async () => { const data = await fetchLiveSports(); if (mounted && data.length) setLiveSports(data); };
+    const refreshWeather = async () => { const data = await fetchLiveWeather(user.city || 'Cairo'); if (mounted && data) setLiveWeather(data); };
+    refreshMarket(); refreshNews(); refreshSports(); refreshWeather();
+    const marketTimer = window.setInterval(refreshMarket, 60_000);
+    const newsTimer = window.setInterval(refreshNews, 300_000);
+    const sportsTimer = window.setInterval(refreshSports, 15_000);
+    const weatherTimer = window.setInterval(refreshWeather, 600_000);
+    return () => { mounted = false; window.clearInterval(marketTimer); window.clearInterval(newsTimer); window.clearInterval(sportsTimer); window.clearInterval(weatherTimer); };
+  }, [language, user.city]);
 
   const isAr = language === 'ar';
   const age = calculateUserAge(user.birthDate);
@@ -108,21 +128,75 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
     }
   };
 
-  const usdRate = MOCK_CURRENCY_GOLD_RATES[0];
-  const sarRate = MOCK_CURRENCY_GOLD_RATES[4] || { pair: 'SAR / EGP', rate: 13.05, unit: 'ج.م', change: 0.02 };
-  const aedRate = MOCK_CURRENCY_GOLD_RATES[5] || { pair: 'AED / EGP', rate: 13.34, unit: 'ج.م', change: 0.03 };
+  const usdLive = liveMarket?.currencies?.EGP;
+  const usdRate = usdLive ? { ...MOCK_CURRENCY_GOLD_RATES[0], rate: usdLive } : MOCK_CURRENCY_GOLD_RATES[0];
+  const sarRate = liveMarket?.currencies?.SAR && usdLive
+    ? { pair: 'SAR / EGP', rate: usdLive / liveMarket.currencies.SAR, unit: 'ج.م', change: 0 }
+    : (MOCK_CURRENCY_GOLD_RATES[4] || { pair: 'SAR / EGP', rate: 13.05, unit: 'ج.م', change: 0.02 });
+  const aedRate = liveMarket?.currencies?.AED && usdLive
+    ? { pair: 'AED / EGP', rate: usdLive / liveMarket.currencies.AED, unit: 'ج.م', change: 0 }
+    : (MOCK_CURRENCY_GOLD_RATES[5] || { pair: 'AED / EGP', rate: 13.34, unit: 'ج.م', change: 0.03 });
+  const liveGoldUsdOz = Number(liveMarket?.gold?.price ?? liveMarket?.gold?.priceUsd ?? liveMarket?.gold?.value ?? 0);
+  const liveSilverUsdOz = Number(liveMarket?.silver?.price ?? liveMarket?.silver?.priceUsd ?? liveMarket?.silver?.value ?? 0);
+  const liveGoldGramEgp = liveGoldUsdOz > 0 && usdLive ? (liveGoldUsdOz * usdLive) / 31.1034768 : null;
+  const liveSilverGramEgp = liveSilverUsdOz > 0 && usdLive ? (liveSilverUsdOz * usdLive) / 31.1034768 : null;
+
+  // Build the complete gold/silver tables from the live international feed.
+  // Mock values remain only as a safe fallback when the internet feed is unavailable.
+  const goldBase = liveGoldGramEgp || MOCK_GOLD_KARAT_RATES.find((g) => g.id === '24')?.priceEgp || 0;
+  const liveGoldKaratRates = MOCK_GOLD_KARAT_RATES.map((item) => {
+    const karat = Number(item.karat);
+    let priceEgp = item.priceEgp;
+    if (Number.isFinite(karat) && karat > 0 && karat <= 24 && goldBase > 0) {
+      priceEgp = goldBase * (karat / 24);
+    } else if (item.id === 'pound' && goldBase > 0) {
+      priceEgp = goldBase * 21 / 24 * 8;
+    } else if (item.id === 'half_pound' && goldBase > 0) {
+      priceEgp = goldBase * 21 / 24 * 4;
+    } else if (item.id === 'quarter_pound' && goldBase > 0) {
+      priceEgp = goldBase * 21 / 24 * 2;
+    } else if (item.id === 'ounce' && liveGoldUsdOz > 0) {
+      priceEgp = liveGoldUsdOz * (usdLive || 0);
+    } else if (item.id === 'bar10g' && goldBase > 0) {
+      priceEgp = goldBase * 10;
+    } else if (item.id === 'bar50g' && goldBase > 0) {
+      priceEgp = goldBase * 50;
+    }
+    return { ...item, priceEgp, rateEgp: priceEgp || item.rateEgp, priceUsd: item.id === 'ounce' && liveGoldUsdOz > 0 ? liveGoldUsdOz : item.priceUsd };
+  });
+  const silverBase = liveSilverGramEgp || MOCK_SILVER_RATES[0].rateEgp;
+  const liveSilverRates = MOCK_SILVER_RATES.map((item) => {
+    let rateEgp = item.rateEgp;
+    if (item.id === 'silver_999') rateEgp = silverBase;
+    if (item.id === 'silver_925') rateEgp = silverBase * 0.925;
+    if (item.id === 'silver_800') rateEgp = silverBase * 0.8;
+    if (item.id === 'silver_oz' && liveSilverUsdOz > 0) rateEgp = liveSilverUsdOz * (usdLive || 0);
+    return { ...item, rateEgp, rateUsd: item.id === 'silver_oz' && liveSilverUsdOz > 0 ? liveSilverUsdOz : item.rateUsd };
+  });
+  const marketIsLive = Boolean(liveMarket && liveGoldUsdOz > 0 && usdLive);
+  const weatherIsLive = Boolean(liveWeather);
+  const weatherLabel = (code: number) => {
+    if ([0, 1].includes(code)) return isAr ? 'صافي' : 'Clear';
+    if ([2, 3].includes(code)) return isAr ? 'غائم جزئياً' : 'Partly cloudy';
+    if ([45, 48].includes(code)) return isAr ? 'ضباب' : 'Fog';
+    if ([51, 53, 55, 56, 57].includes(code)) return isAr ? 'رذاذ' : 'Drizzle';
+    if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return isAr ? 'أمطار' : 'Rain';
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return isAr ? 'ثلوج' : 'Snow';
+    if ([95, 96, 99].includes(code)) return isAr ? 'عواصف رعدية' : 'Thunderstorm';
+    return isAr ? 'متغير' : 'Variable';
+  };
   
   // أسعار الذهب حسب اختيار المستخدم مع دعم كافة العيارات والسبائك
   const isAllGold = prefs.goldUnit === 'all';
   const selectedGoldItems = isAllGold
     ? [
-        MOCK_GOLD_KARAT_RATES.find((g) => g.id === '21')!,
-        MOCK_GOLD_KARAT_RATES.find((g) => g.id === '24')!,
-        MOCK_GOLD_KARAT_RATES.find((g) => g.id === '18')!,
-        MOCK_GOLD_KARAT_RATES.find((g) => g.id === 'pound')!,
+        liveGoldKaratRates.find((g) => g.id === '21')!,
+        liveGoldKaratRates.find((g) => g.id === '24')!,
+        liveGoldKaratRates.find((g) => g.id === '18')!,
+        liveGoldKaratRates.find((g) => g.id === 'pound')!,
       ].filter(Boolean)
     : [
-        MOCK_GOLD_KARAT_RATES.find((g) => g.id === (prefs.goldUnit || '21')) ||
+        liveGoldKaratRates.find((g) => g.id === (prefs.goldUnit || '21')) ||
           MOCK_GOLD_KARAT_RATES[2],
       ];
 
@@ -152,9 +226,9 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   });
 
   // أسعار الفضة حسب اختيار المستخدم
-  const silverRate999 = MOCK_SILVER_RATES[0];
-  const silverRate925 = MOCK_SILVER_RATES[1];
-  const silverRateOz = MOCK_SILVER_RATES[3];
+  const silverRate999 = liveSilverRates[0];
+  const silverRate925 = liveSilverRates[1];
+  const silverRateOz = liveSilverRates[3];
   const selectedSilver = prefs.silverUnit === '925' 
     ? silverRate925 
     : prefs.silverUnit === 'ounce' 
@@ -166,7 +240,15 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
   // مباريات فريقك المفضل (دعم الأندية العالمية والمحلية)
   const favTeam = prefs.favoriteTeam || prefs.favoriteEgyptianTeam || 'الأهلي';
-  const highlightedMatch = getMatchForFavoriteTeam(favTeam);
+  const liveFavoriteMatch = liveSports.find((m) => {
+    const home = m.teams?.home?.name || '';
+    const away = m.teams?.away?.name || '';
+    const fav = favTeam.toLowerCase();
+    return home.toLowerCase().includes(fav) || away.toLowerCase().includes(fav) || fav.includes(home.toLowerCase()) || fav.includes(away.toLowerCase());
+  });
+  const highlightedMatch = liveFavoriteMatch
+    ? { id: String(liveFavoriteMatch.fixture?.id || 'live-favorite'), homeTeam: liveFavoriteMatch.teams?.home?.name || favTeam, awayTeam: liveFavoriteMatch.teams?.away?.name || '—', homeScore: liveFavoriteMatch.goals?.home ?? 0, awayScore: liveFavoriteMatch.goals?.away ?? 0, leagueNameAr: liveFavoriteMatch.league?.name || 'مباشر', leagueNameEn: liveFavoriteMatch.league?.name || 'Live' }
+    : getMatchForFavoriteTeam(favTeam);
   const otherMatches = GLOBAL_FOOTBALL_MATCHES.filter((m) => m.id !== highlightedMatch.id);
 
   // يتوقف الشريط فقط عند الوقوف عليه بالماوس أو الضغط واللمس بالأصبع
@@ -182,17 +264,21 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   // دالة تصيير الأرقام والبيانات في شريط الأخبار المباشرة
   const renderTickerItems = (keyPrefix: string) => (
     <div key={keyPrefix} className="flex items-center gap-2.5 px-3 shrink-0 whitespace-nowrap text-slate-700 dark:text-slate-300 font-semibold text-[11px] font-mono">
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${marketIsLive ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'}`} title={marketIsLive ? (isAr ? 'بيانات السوق من الإنترنت' : 'Internet market feed') : (isAr ? 'البيانات الحية غير متاحة حالياً — يتم استخدام آخر قيم احتياطية' : 'Live feed unavailable — fallback values are shown')}>
+        <span className={`w-1.5 h-1.5 rounded-full ${marketIsLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+        {marketIsLive ? (isAr ? 'مباشر' : 'LIVE') : (isAr ? 'احتياطي' : 'FALLBACK')}
+      </span>
       
       {/* 1. التاريخ الهجري والميلادي */}
       {prefs.showTimeAndDate !== false && (
         <>
           <button
             onClick={() => handleItemClick('time')}
-            className="flex items-center gap-1 hover:text-amber-500 cursor-pointer active:scale-95 transition-colors shrink-0"
+            className="flex items-center gap-1 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'التاريخ والتقويم (هجري وميلادي)' : 'Date & Calendar'}
           >
-            <Calendar className="w-3 h-3 text-amber-500 shrink-0" />
-            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-sans font-bold">
+            <Calendar className="w-3 h-3 text-accent-500 shrink-0" />
+            <span className="text-[10px] text-accent-600 dark:text-accent-400 font-sans font-bold">
               {hijri}
             </span>
             <span className="text-slate-300 dark:text-slate-700">|</span>
@@ -234,15 +320,15 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             <React.Fragment key={goldItem.id}>
               <button
                 onClick={() => handleItemClick('gold')}
-                className="flex items-center gap-1 hover:text-amber-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-amber-50/70 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900/60"
+                className="flex items-center gap-1 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-accent-50/70 dark:bg-accent-950/40 px-2 py-0.5 rounded-md border border-accent-200 dark:border-accent-900/60"
                 title={isAr ? `ذهب ${goldItem.nameAr} - انقر لعرض جميع العيارات وحاسبة الجرام` : `Gold ${goldItem.nameEn} - Click for all karats & calculator`}
               >
-                <span className="text-amber-500 font-bold">🥇</span>
-                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 font-sans">
+                <span className="text-accent-500 font-bold">🥇</span>
+                <span className="text-[10px] font-bold text-accent-700 dark:text-accent-300 font-sans">
                   {isAr ? goldItem.nameAr : goldItem.nameEn}:
                 </span>
-                <span className="font-bold font-mono text-amber-950 dark:text-amber-200">
-                  {goldItem.priceEgp ? `${goldItem.priceEgp.toLocaleString()} ج.م` : `$${goldItem.priceUsd}`}
+                <span className="font-bold font-mono text-accent-950 dark:text-accent-200">
+                  {liveGoldGramEgp ? `${Math.round(liveGoldGramEgp * (goldItem.id === '24' ? 1 : goldItem.id === '21' ? 21/24 : goldItem.id === '18' ? 18/24 : 1)).toLocaleString()} ج.م` : (goldItem.priceEgp ? `${goldItem.priceEgp.toLocaleString()} ج.م` : `$${goldItem.priceUsd}`)}
                 </span>
                 <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono">
                   +{goldItem.change24h}
@@ -284,7 +370,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             )}
             {otherMatches[0] && (
               <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-slate-500 font-sans ps-1 border-s border-emerald-200 dark:border-emerald-800">
-                <span>{otherMatches[0].homeTeam} {otherMatches[0].homeScore}-{otherMatches[0].awayScore} {otherMatches[0].awayTeam}</span>
+                <span>{liveSports[0]?.teams?.home?.name || otherMatches[0].homeTeam} {liveSports[0]?.goals?.home ?? otherMatches[0].homeScore}-{liveSports[0]?.goals?.away ?? otherMatches[0].awayScore} {liveSports[0]?.teams?.away?.name || otherMatches[0].awayTeam}</span>
               </span>
             )}
           </button>
@@ -319,10 +405,10 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
       >
         <Newspaper className="w-3 h-3 text-blue-500 shrink-0" />
         <span className="font-bold text-[10px]">
-          {isAr ? '📰 أخبار محلية:' : '📰 Local News:'}
+          {isAr ? '📰 أخبار مباشرة:' : '📰 Live News:'}
         </span>
         <span className="text-[10px] text-slate-800 dark:text-slate-200 font-medium max-w-[180px] truncate">
-          {isAr ? 'انطلاق مشاريع التطوير العمراني الكبرى وتدفق الاستثمار الخدمي' : 'Major urban development projects launched & services boosted'}
+          {liveNews[0]?.title || (isAr ? 'جاري تحميل الأخبار من الإنترنت…' : 'Loading live news…')}
         </span>
       </div>
       <span className="text-slate-300 dark:text-slate-700 font-normal">/</span>
@@ -334,15 +420,15 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             <React.Fragment key={cryptoCoin.id}>
               <button
                 onClick={() => handleItemClick('crypto')}
-                className="flex items-center gap-1 hover:text-amber-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-amber-500/5 dark:bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20"
+                className="flex items-center gap-1 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-accent-500/5 dark:bg-accent-500/10 px-1.5 py-0.5 rounded-md border border-accent-500/20"
                 title={isAr ? `${cryptoCoin.nameAr} (${cryptoCoin.symbol}) - انقر لعرض قائمة العملات المشفرة` : `${cryptoCoin.nameEn} - Click for crypto market`}
               >
-                <span className="text-amber-500 font-black">{cryptoCoin.iconSymbol || '🪙'}</span>
+                <span className="text-accent-500 font-black">{cryptoCoin.iconSymbol || '🪙'}</span>
                 <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 font-mono">
                   {cryptoCoin.symbol}:
                 </span>
                 <span className="font-bold font-mono text-slate-900 dark:text-white">
-                  ${cryptoCoin.priceUsd.toLocaleString()}
+                  ${(() => { const idMap: Record<string,string> = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', BNB: 'binancecoin', XRP: 'ripple' }; const v = liveMarket?.crypto?.[idMap[cryptoCoin.symbol]]?.usd; return (v ?? cryptoCoin.priceUsd).toLocaleString(undefined, { maximumFractionDigits: 8 }); })()}
                 </span>
                 <span
                   className={`text-[9px] font-mono ${
@@ -419,9 +505,9 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             className="flex items-center gap-1 hover:text-sky-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'الطقس' : 'Weather'}
           >
-            <CloudSun className="w-3.5 h-3.5 text-amber-500" />
+            <CloudSun className="w-3.5 h-3.5 text-accent-500" />
             <span className="font-bold font-mono text-sky-600 dark:text-sky-400">
-              29°C
+              {weatherIsLive ? `${Math.round(liveWeather!.temperatureC)}°C` : '—'}
             </span>
             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-sans">
               {user.city || (isAr ? 'القاهرة' : 'Cairo')}
@@ -434,7 +520,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
       {/* 9. عبارة المستخدم المخصصة */}
       {prefs.showCustomMessage && prefs.customMessage && (
         <>
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-sans font-bold shrink-0">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-500/10 text-accent-600 dark:text-accent-400 text-[10px] font-sans font-bold shrink-0">
             <span>📢</span>
             <span>{prefs.customMessage}</span>
           </div>
@@ -458,8 +544,8 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             onClick={onGoHome}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-90 shrink-0 ${
               isHomeActive
-                ? 'bg-amber-500 text-slate-950 font-black shadow-amber-500/30 ring-1 ring-amber-400'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-amber-500 hover:border-amber-400/50 border border-slate-200 dark:border-slate-700'
+                ? 'bg-accent-500 text-slate-950 font-black shadow-accent-500/30 ring-1 ring-accent-400'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-accent-500 hover:border-accent-400/50 border border-slate-200 dark:border-slate-700'
             }`}
             title={isAr ? 'الرئيسية — انقر للرجوع للشاشة الرئيسية' : 'Home — Click to go to Dashboard'}
             id="ticker-fixed-home-btn"
@@ -469,7 +555,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
           </button>
           
           {/* مؤشر تدفق وانطلاق الأخبار من زر الهوم باتجاه اليمين */}
-          <span className="ms-1 text-[11px] text-amber-500 font-bold animate-pulse select-none">
+          <span className="ms-1 text-[11px] text-accent-500 font-bold animate-pulse select-none">
             ▶
           </span>
         </div>
@@ -555,7 +641,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
             {/* بطاقات أسعار الفضة بالعيار */}
             <div className="space-y-2 mb-4">
-              {MOCK_SILVER_RATES.map((item) => (
+              {liveSilverRates.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50"
@@ -581,8 +667,8 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             </div>
 
             {/* حاسبة جرامات الفضة التفاعلية */}
-            <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-400 mb-2">
+            <div className="p-3 bg-accent-500/10 rounded-2xl border border-accent-500/20 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-accent-700 dark:text-accent-400 mb-2">
                 <Calculator className="w-3.5 h-3.5" />
                 <span>{isAr ? 'حاسبة قيمة الفضة السريعة' : 'Quick Silver Value'}</span>
               </div>
@@ -659,7 +745,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                       key={match.id}
                       className={`p-2.5 rounded-2xl border transition-all ${
                         isFav
-                          ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-600 shadow-xs'
+                          ? 'bg-accent-50/70 dark:bg-accent-950/30 border-accent-400 dark:border-accent-600 shadow-xs'
                           : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'
                       }`}
                     >
@@ -688,13 +774,13 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                         <div
                           className={`flex items-center gap-1.5 flex-1 ${
                             favTeam && match.homeTeam.toLowerCase().includes(favTeam.toLowerCase())
-                              ? 'text-amber-600 dark:text-amber-400 font-black'
+                              ? 'text-accent-600 dark:text-accent-400 font-black'
                               : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           <span className="truncate">{match.homeTeam}</span>
                           {favTeam && match.homeTeam.toLowerCase().includes(favTeam.toLowerCase()) && (
-                            <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
+                            <Star className="w-3.5 h-3.5 fill-accent-500 text-accent-500 shrink-0" />
                           )}
                         </div>
                         <div className="px-3 py-1 bg-white dark:bg-slate-900 rounded-xl shadow-xs font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 mx-2 shrink-0">
@@ -703,12 +789,12 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                         <div
                           className={`flex items-center justify-end gap-1.5 flex-1 ${
                             favTeam && match.awayTeam.toLowerCase().includes(favTeam.toLowerCase())
-                              ? 'text-amber-600 dark:text-amber-400 font-black'
+                              ? 'text-accent-600 dark:text-accent-400 font-black'
                               : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           {favTeam && match.awayTeam.toLowerCase().includes(favTeam.toLowerCase()) && (
-                            <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
+                            <Star className="w-3.5 h-3.5 fill-accent-500 text-accent-500 shrink-0" />
                           )}
                           <span className="truncate">{match.awayTeam}</span>
                         </div>
@@ -722,7 +808,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             {/* جدول الترتيب المصغر */}
             <div>
               <h4 className="font-bold text-xs text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1">
-                <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                <Trophy className="w-3.5 h-3.5 text-accent-500" />
                 <span>{isAr ? 'صدارة جدول الترتيب' : 'League Standings'}</span>
               </h4>
               <div className="overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 text-[11px]">
@@ -733,14 +819,14 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                       <th className="py-1.5 px-2 text-start">{isAr ? 'الفريق' : 'Team'}</th>
                       <th className="py-1.5 px-1">{isAr ? 'لعب' : 'P'}</th>
                       <th className="py-1.5 px-1">{isAr ? 'فوز' : 'W'}</th>
-                      <th className="py-1.5 px-2 font-black text-amber-600">{isAr ? 'نقاط' : 'Pts'}</th>
+                      <th className="py-1.5 px-2 font-black text-accent-600">{isAr ? 'نقاط' : 'Pts'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {EGYPTIAN_LEAGUE_STANDINGS.map((team) => (
                       <tr
                         key={team.rank}
-                        className={team.team.includes(favTeam) ? 'bg-amber-50/70 dark:bg-amber-950/40 font-bold' : ''}
+                        className={team.team.includes(favTeam) ? 'bg-accent-50/70 dark:bg-accent-950/40 font-bold' : ''}
                       >
                         <td className="py-1.5 px-2 text-start text-slate-400">{team.rank}</td>
                         <td className="py-1.5 px-2 text-start font-medium text-slate-900 dark:text-white">
@@ -748,7 +834,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                         </td>
                         <td className="py-1.5 px-1 text-slate-500">{team.played}</td>
                         <td className="py-1.5 px-1 text-emerald-600">{team.won}</td>
-                        <td className="py-1.5 px-2 font-bold font-mono text-amber-600 dark:text-amber-400">
+                        <td className="py-1.5 px-2 font-bold font-mono text-accent-600 dark:text-accent-400">
                           {team.points}
                         </td>
                       </tr>
@@ -837,7 +923,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
           >
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-accent-500/15 text-accent-600 dark:text-accent-400 flex items-center justify-center font-bold">
                   🥇
                 </div>
                 <div>
@@ -858,13 +944,13 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             </div>
 
             {/* حاسبة أسعار الذهب الفورية */}
-            <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-850">
+            <div className="mb-4 p-3.5 rounded-2xl bg-accent-50 dark:bg-accent-950/30 border border-accent-200 dark:border-accent-850">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                  <Calculator className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-xs font-bold text-accent-900 dark:text-accent-200 flex items-center gap-1.5">
+                  <Calculator className="w-3.5 h-3.5 text-accent-600" />
                   <span>{isAr ? 'حاسبة قيمة الذهب السريعة' : 'Instant Gold Value Calculator'}</span>
                 </span>
-                <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                <span className="text-[10px] text-accent-700 dark:text-accent-400 font-medium">
                   {isAr ? 'سعر الذهب الصافي بدون مصنعية' : 'Raw gold estimate'}
                 </span>
               </div>
@@ -891,7 +977,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                     onChange={(e) => setGoldCalcKarat(e.target.value)}
                     className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white"
                   >
-                    {MOCK_GOLD_KARAT_RATES.filter((g) => g.priceEgp && !g.id.startsWith('pound') && !g.id.startsWith('bar')).map((g) => (
+                    {liveGoldKaratRates.filter((g) => g.priceEgp && !g.id.startsWith('pound') && !g.id.startsWith('bar')).map((g) => (
                       <option key={g.id} value={g.id}>
                         {isAr ? g.nameAr : g.nameEn}
                       </option>
@@ -899,13 +985,13 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                   </select>
                 </div>
                 <div className="flex flex-col justify-end">
-                  <div className="p-2 rounded-xl bg-amber-500 text-slate-950 text-center font-bold">
-                    <span className="text-[9px] block text-amber-950/80 font-medium">
+                  <div className="p-2 rounded-xl bg-accent-500 text-slate-950 text-center font-bold">
+                    <span className="text-[9px] block text-accent-950/80 font-medium">
                       {isAr ? 'القيمة الإجمالية التقديرية' : 'Estimated Total'}
                     </span>
                     <span className="text-sm font-mono font-extrabold">
                       {(() => {
-                        const target = MOCK_GOLD_KARAT_RATES.find((g) => g.id === goldCalcKarat) || MOCK_GOLD_KARAT_RATES[2];
+                        const target = liveGoldKaratRates.find((g) => g.id === goldCalcKarat) || MOCK_GOLD_KARAT_RATES[2];
                         const total = (target.priceEgp || 3420) * goldCalcGrams;
                         return `${Math.round(total).toLocaleString()} ج.م`;
                       })()}
@@ -921,12 +1007,12 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                 {isAr ? 'أسعار جميع العيارات الرسمية اليوم:' : 'All Official Karats & Products Today:'}
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {MOCK_GOLD_KARAT_RATES.map((item) => (
+                {liveGoldKaratRates.map((item) => (
                   <div
                     key={item.id}
                     className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between ${
                       (prefs.goldUnit === item.id || (prefs.goldUnit === 'all' && ['24', '21', 'pound'].includes(item.id)))
-                        ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 shadow-xs'
+                        ? 'bg-accent-50/60 dark:bg-accent-950/30 border-accent-300 dark:border-accent-800 shadow-xs'
                         : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-800'
                     }`}
                   >
@@ -936,7 +1022,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                           {isAr ? item.nameAr : item.nameEn}
                         </span>
                         {(prefs.goldUnit === item.id) && (
-                          <span className="text-[9px] bg-amber-500 text-white font-bold px-1.5 py-0.2 rounded-md">
+                          <span className="text-[9px] bg-accent-500 text-white font-bold px-1.5 py-0.2 rounded-md">
                             {isAr ? 'المختار' : 'Active'}
                           </span>
                         )}
@@ -947,7 +1033,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                     </div>
 
                     <div className="text-end">
-                      <span className="font-mono font-extrabold text-xs text-amber-600 dark:text-amber-400 block">
+                      <span className="font-mono font-extrabold text-xs text-accent-600 dark:text-accent-400 block">
                         {item.priceEgp ? `${item.priceEgp.toLocaleString()} ج.م` : `$${item.priceUsd}`}
                       </span>
                       <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
@@ -984,7 +1070,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
           >
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-accent-500/15 text-accent-600 dark:text-accent-400 flex items-center justify-center font-bold">
                   <Bitcoin className="w-6 h-6" />
                 </div>
                 <div>
@@ -1026,7 +1112,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                       key={coin.id}
                       className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
                         isSelectedInTicker
-                          ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-300/80 dark:border-amber-800/80 shadow-xs'
+                          ? 'bg-accent-50/50 dark:bg-accent-950/20 border-accent-300/80 dark:border-accent-800/80 shadow-xs'
                           : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-800'
                       }`}
                     >
@@ -1043,7 +1129,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                               {isAr ? coin.nameAr : coin.nameEn}
                             </span>
                             {isSelectedInTicker && (
-                              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.2 rounded-md">
+                              <span className="text-[9px] bg-accent-500/20 text-accent-700 dark:text-accent-300 font-bold px-1.5 py-0.2 rounded-md">
                                 {isAr ? 'في الشريط' : 'On Ticker'}
                               </span>
                             )}
@@ -1074,7 +1160,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
               })()}
             </div>
 
-            <div className="mt-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-900 dark:text-amber-200 flex items-center justify-between">
+            <div className="mt-4 p-2.5 rounded-xl bg-accent-500/10 border border-accent-500/20 text-[10px] text-accent-900 dark:text-accent-200 flex items-center justify-between">
               <span>
                 {isAr
                   ? '💡 يمكنك تخصيص العملات المشفرة التي تظهر في شريط الأخبار من نافذة الإعدادات.'
@@ -1097,7 +1183,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             dir={isAr ? 'rtl' : 'ltr'}
           >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
-              <span className="font-bold text-xs text-amber-600">
+              <span className="font-bold text-xs text-accent-600">
                 {isAr ? 'تفاصيل أسعار الذهب والعملات' : 'Gold & Currency Rates'}
               </span>
               <button
@@ -1111,13 +1197,13 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">{isAr ? 'الذهب عيار 24' : 'Gold 24K'}</span>
-                <span className="font-mono font-bold text-amber-600">
+                <span className="font-mono font-bold text-accent-600">
                   {MOCK_GOLD_KARAT_RATES[0].rateEgp} {MOCK_GOLD_KARAT_RATES[0].unitAr}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">{isAr ? 'الذهب عيار 21' : 'Gold 21K'}</span>
-                <span className="font-mono font-bold text-amber-600">
+                <span className="font-mono font-bold text-accent-600">
                   {MOCK_GOLD_KARAT_RATES[2].rateEgp} {MOCK_GOLD_KARAT_RATES[2].unitAr}
                 </span>
               </div>
@@ -1127,7 +1213,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">Bitcoin (BTC)</span>
-                <span className="font-mono font-bold text-amber-500">
+                <span className="font-mono font-bold text-accent-500">
                   ${MOCK_CRYPTO_RATES[0].priceUsd.toLocaleString()} (+{MOCK_CRYPTO_RATES[0].change24h}%)
                 </span>
               </div>
@@ -1166,7 +1252,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             dir={isAr ? 'rtl' : 'ltr'}
           >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
-              <span className="font-bold text-xs text-amber-600">
+              <span className="font-bold text-xs text-accent-600">
                 {isAr ? 'الوقت والتقويم' : 'Time & Calendar'}
               </span>
               <button
@@ -1184,7 +1270,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">{isAr ? 'التاريخ الهجري' : 'Hijri'}</span>
-                <span className="font-bold text-amber-600">{hijri}</span>
+                <span className="font-bold text-accent-600">{hijri}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">{isAr ? 'التاريخ الميلادي' : 'Gregorian'}</span>
@@ -1225,15 +1311,23 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">{isAr ? 'الحرارة' : 'Temperature'}</span>
-                <span className="font-mono font-bold text-sky-600">29°C</span>
+                <span className="font-mono font-bold text-sky-600">{weatherIsLive ? `${Math.round(liveWeather!.temperatureC)}°C` : '—'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">{isAr ? 'الحالة' : 'Condition'}</span>
-                <span className="font-bold">{isAr ? 'مشمس وصافٍ' : 'Sunny & Clear'}</span>
+                <span className="font-bold">{weatherIsLive ? weatherLabel(liveWeather!.weatherCode) : (isAr ? 'غير متاح حالياً' : 'Unavailable')}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">{isAr ? 'الرطوبة' : 'Humidity'}</span>
-                <span className="font-mono font-bold">45%</span>
+                <span className="font-mono font-bold">{weatherIsLive ? `${Math.round(liveWeather!.humidity)}%` : '—'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">{isAr ? 'الرياح' : 'Wind'}</span>
+                <span className="font-mono font-bold">{weatherIsLive ? `${Math.round(liveWeather!.windKmh)} كم/س` : '—'}</span>
+              </div>
+              <div className="pt-1 text-[9px] text-slate-400 flex items-center justify-between">
+                <span>{weatherIsLive ? 'LIVE · Open-Meteo' : (isAr ? 'لا توجد بيانات حية' : 'No live data')}</span>
+                {weatherIsLive && <span>{new Date(liveWeather!.fetchedAt).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>}
               </div>
             </div>
           </div>
@@ -1246,7 +1340,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 // مساعدة لتمييز اسم الفريق المفضل
 function highlightMatchStyles(teamName: string, favTeam: string): string {
   if (teamName.includes(favTeam)) {
-    return 'text-amber-600 dark:text-amber-400 font-black';
+    return 'text-accent-600 dark:text-accent-400 font-black';
   }
   return 'text-slate-800 dark:text-slate-200 font-bold';
 }

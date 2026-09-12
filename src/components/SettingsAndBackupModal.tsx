@@ -36,11 +36,18 @@ import {
   Globe2,
   Loader2,
   Star,
+  Volume2,
+  VolumeX,
+  Play,
+  PhoneCall,
 } from 'lucide-react';
+import { PhonePermissionsManager } from './PhonePermissionsManager';
 import {
   UserProfile,
   Language,
   ThemeMode,
+  ColorTheme,
+  IconStyle,
   CurrencyType,
   ReligiousPreference,
   TickerPreferences,
@@ -51,7 +58,7 @@ import {
   EducationPreferences,
 } from '../types';
 import { translations } from '../services/i18n';
-import { BackupRepository, UserRepository } from '../services';
+import { BackupRepository, UserRepository, NotificationSoundService, NotificationSoundSettings } from '../services';
 import {
   calculateUserAge,
   getUserZodiac,
@@ -72,6 +79,10 @@ interface SettingsAndBackupModalProps {
   onClose: () => void;
   language: Language;
   theme: ThemeMode;
+  colorTheme?: ColorTheme;
+  onColorThemeChange?: (colorTheme: ColorTheme) => void;
+  iconStyle?: IconStyle;
+  onIconStyleChange?: (iconStyle: IconStyle) => void;
   userProfile: UserProfile;
   onUpdateProfile: (profile: UserProfile) => void;
   onLanguageChange: (lang: Language) => void;
@@ -109,6 +120,10 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   onClose,
   language,
   theme,
+  colorTheme = 'ocean',
+  onColorThemeChange,
+  iconStyle = 'classic',
+  onIconStyleChange,
   userProfile,
   onUpdateProfile,
   onLanguageChange,
@@ -119,7 +134,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   const isAr = language === 'ar';
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'ticker' | 'sections' | 'preferences' | 'backup'
+    'profile' | 'ticker' | 'sections' | 'preferences' | 'notifications' | 'permissions' | 'backup'
   >('profile');
 
   // 1. البيانات الشخصية
@@ -136,6 +151,9 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   const [currency, setCurrency] = useState<CurrencyType>(userProfile.currency || 'EGP');
   const [pin, setPin] = useState(userProfile.pin || '1234');
   const [relPref, setRelPref] = useState<ReligiousPreference>(userProfile.religiousPreference || 'islam');
+
+  const [notificationSound, setNotificationSound] = useState<NotificationSoundSettings>(() => NotificationSoundService.getSettings());
+  const notificationSoundInputRef = useRef<HTMLInputElement>(null);
 
   // مرجع إدخال ملف الصورة وتحميلها من الهاتف
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -336,6 +354,30 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+
+  const saveNotificationSound = (next: NotificationSoundSettings) => {
+    setNotificationSound(next);
+    NotificationSoundService.saveSettings(next);
+  };
+
+  const handleNotificationSoundFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) { showToast(isAr ? 'اختَر ملف صوتي صالح.' : 'Choose a valid audio file.'); return; }
+    if (file.size > 3 * 1024 * 1024) { showToast(isAr ? 'حجم النغمة يجب ألا يتجاوز 3 ميجابايت.' : 'Sound file must be under 3 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => saveNotificationSound({ ...notificationSound, id: 'custom', customDataUrl: String(reader.result) });
+    reader.readAsDataURL(file);
+  };
+
+  const resetSettingsOnly = () => {
+    onThemeChange('light');
+    onColorThemeChange?.('ocean');
+    onIconStyleChange?.('soft');
+    onLanguageChange('ar');
+    saveNotificationSound({ id: 'soft', volume: 0.65 });
+    showToast(isAr ? 'تمت إعادة ضبط إعدادات التطبيق فقط.' : 'App settings were reset.');
+  };
+
   // Handle Export Backup
   const handleExportBackup = () => {
     const jsonString = BackupRepository.exportFullBackupJSON();
@@ -402,13 +444,13 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-fadeIn">
       <div
-        className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 max-h-[92vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-3xl w-full p-4 sm:p-5 space-y-3 max-h-[90vh] flex flex-col overflow-hidden"
         dir={isAr ? 'rtl' : 'ltr'}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-2xl bg-amber-500 text-slate-950 font-black shadow-xs shadow-amber-500/20">
+            <div className="p-2 rounded-2xl bg-accent-500 text-slate-950 font-black shadow-xs shadow-accent-500/20">
               <Settings className="w-5 h-5" />
             </div>
             <div>
@@ -437,7 +479,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
             onClick={() => setActiveTab('profile')}
             className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'profile'
-                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                ? 'bg-white dark:bg-slate-900 text-accent-600 dark:text-accent-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -473,7 +515,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
             onClick={() => setActiveTab('preferences')}
             className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'preferences'
-                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                ? 'bg-white dark:bg-slate-900 text-accent-600 dark:text-accent-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -482,10 +524,34 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('notifications')}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'notifications'
+                ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5 text-rose-500" />
+            <span>{isAr ? 'الإشعارات' : 'Notifications'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('permissions')}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'permissions'
+                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <PhoneCall className="w-3.5 h-3.5 text-emerald-500" />
+            <span>{isAr ? 'أذونات وصلاحيات الهاتف' : 'Phone Permissions'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('backup')}
             className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'backup'
-                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                ? 'bg-white dark:bg-slate-900 text-accent-600 dark:text-accent-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -525,7 +591,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                 }}
                 className={`p-4 rounded-2xl border transition-all ${
                   isDragging
-                    ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/30'
+                    ? 'bg-accent-500/10 border-accent-500 ring-2 ring-accent-500/30'
                     : 'bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-800'
                 } flex flex-col sm:flex-row items-center gap-4`}
               >
@@ -534,12 +600,12 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                   <img
                     src={avatarUrl}
                     alt={name}
-                    className="w-20 h-20 rounded-2xl object-cover ring-2 ring-amber-500 shadow-md transition-transform group-hover:scale-105"
+                    className="w-20 h-20 rounded-2xl object-cover ring-2 ring-accent-500 shadow-md transition-transform group-hover:scale-105"
                   />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute -bottom-1.5 -end-1.5 p-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl shadow-md transition-all active:scale-90 border-2 border-white dark:border-slate-900"
+                    className="absolute -bottom-1.5 -end-1.5 p-1.5 bg-accent-500 hover:bg-accent-600 text-slate-950 font-bold rounded-xl shadow-md transition-all active:scale-90 border-2 border-white dark:border-slate-900"
                     title={isAr ? 'اختر صورة من هاتفك' : 'Upload from device'}
                   >
                     <Camera className="w-4 h-4" />
@@ -576,7 +642,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition-all active:scale-95 shadow-xs"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-slate-950 font-bold text-xs transition-all active:scale-95 shadow-xs"
                       >
                         <ImagePlus className="w-3.5 h-3.5" />
                         <span>{isAr ? 'اختيار صورة من هاتفك' : 'Choose from Phone'}</span>
@@ -614,7 +680,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                         onClick={() => setAvatarUrl(url)}
                         className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all ${
                           avatarUrl === url
-                            ? 'border-amber-500 scale-105 shadow-xs ring-1 ring-amber-500'
+                            ? 'border-accent-500 scale-105 shadow-xs ring-1 ring-accent-500'
                             : 'border-transparent opacity-60 hover:opacity-100'
                         }`}
                       >
@@ -720,7 +786,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
               </div>
 
               {/* ربط المعلومات: تاريخ الميلاد وحساب البرج والعمر تلقائياً وبدقة */}
-              <div className="p-4 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-amber-500/10 dark:from-purple-950/40 dark:via-indigo-950/20 dark:to-amber-950/30 rounded-2xl border border-purple-200/80 dark:border-purple-800/80 space-y-3 shadow-xs">
+              <div className="p-4 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-accent-500/10 dark:from-purple-950/40 dark:via-indigo-950/20 dark:to-accent-950/30 rounded-2xl border border-purple-200/80 dark:border-purple-800/80 space-y-3 shadow-xs">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-xl bg-purple-500 text-white shadow-xs">
@@ -794,12 +860,12 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
 
                   {/* بطاقة العمر الدقيق المحسوب تلقائياً */}
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-purple-200 dark:border-purple-800 shadow-xs flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                    <div className="w-12 h-12 rounded-xl bg-accent-500/15 border border-accent-500/30 flex items-center justify-center text-2xl shrink-0 shadow-xs">
                       🎂
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                        <span className="text-[10px] text-accent-600 dark:text-accent-400 font-bold">
                           {isAr ? 'العمر الدقيق' : 'Exact Age'}
                         </span>
                         <span className="text-[10px] text-slate-400 font-medium">
@@ -834,7 +900,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
           {/* ======================================================== */}
           {activeTab === 'ticker' && (
             <div className="space-y-4 text-xs">
-              <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-900 dark:text-amber-200">
+              <div className="p-3 bg-accent-500/10 rounded-2xl border border-accent-500/20 text-accent-900 dark:text-accent-200">
                 <span className="font-bold block mb-0.5">
                   {isAr ? '🎯 تخصيص عناصر شريط الأخبار المباشرة' : 'Live Ticker Elements Customization'}
                 </span>
@@ -846,7 +912,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
               </div>
 
               {/* اختيار سرعة حركة شريط الأخبار */}
-              <div className="p-3.5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="p-3.5 rounded-2xl bg-accent-500/5 dark:bg-accent-500/10 border border-accent-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <span className="text-xl">⏱️</span>
                   <div>
@@ -871,7 +937,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       onClick={() => setTickerPrefs({ ...tickerPrefs, speed: s.id as any })}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                         (tickerPrefs.speed || 'slow') === s.id
-                          ? 'bg-amber-500 text-white shadow-xs'
+                          ? 'bg-accent-500 text-white shadow-xs'
                           : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                       }`}
                     >
@@ -948,7 +1014,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       onChange={(e) =>
                         setTickerPrefs({ ...tickerPrefs, showGold: e.target.checked })
                       }
-                      className="w-4 h-4 rounded text-amber-600 cursor-pointer accent-amber-500"
+                      className="w-4 h-4 rounded text-accent-600 cursor-pointer accent-accent-500"
                     />
                   </div>
 
@@ -981,16 +1047,16 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
 
                       {/* شارة توضيحية للعيار المختار */}
                       {tickerPrefs.goldUnit !== 'all' && (
-                        <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between text-[10px]">
+                        <div className="p-2 rounded-xl bg-accent-50 dark:bg-accent-950/30 border border-accent-200 dark:border-accent-800/60 flex items-center justify-between text-[10px]">
                           {(() => {
                             const found = MOCK_GOLD_KARAT_RATES.find((g) => g.id === (tickerPrefs.goldUnit || '24'));
                             if (!found) return null;
                             return (
                               <>
-                                <span className="font-bold text-amber-900 dark:text-amber-200 truncate">
+                                <span className="font-bold text-accent-900 dark:text-accent-200 truncate">
                                   {isAr ? found.nameAr : found.nameEn}
                                 </span>
-                                <span className="font-mono font-extrabold text-amber-700 dark:text-amber-300">
+                                <span className="font-mono font-extrabold text-accent-700 dark:text-accent-300">
                                   {found.priceEgp ? `${found.priceEgp.toLocaleString()} ج.م` : `$${found.priceUsd}`}
                                   <span className="text-[9px] text-emerald-600 dark:text-emerald-400 ms-1 font-sans">
                                     (+{found.change24h} ج.م)
@@ -1162,7 +1228,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                     onChange={(e) =>
                       setTickerPrefs({ ...tickerPrefs, showTimeAndDate: e.target.checked })
                     }
-                    className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                    className="w-4 h-4 rounded cursor-pointer accent-accent-500"
                   />
                 </div>
 
@@ -1193,7 +1259,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 flex flex-col justify-between gap-3 sm:col-span-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shadow-xs">
+                      <div className="w-8 h-8 rounded-xl bg-accent-500/15 text-accent-600 dark:text-accent-400 flex items-center justify-center font-bold shadow-xs">
                         <Bitcoin className="w-5 h-5" />
                       </div>
                       <div>
@@ -1213,7 +1279,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       onChange={(e) =>
                         setTickerPrefs({ ...tickerPrefs, showCrypto: e.target.checked })
                       }
-                      className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                      className="w-4 h-4 rounded cursor-pointer accent-accent-500"
                     />
                   </div>
 
@@ -1225,7 +1291,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                           <div className="relative flex-1">
                             <div className="absolute inset-y-0 start-0 flex items-center ps-2.5 pointer-events-none text-slate-400">
                               {isSearchingCryptoOnline ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                                <Loader2 className="w-4 h-4 animate-spin text-accent-500" />
                               ) : (
                                 <Search className="w-4 h-4" />
                               )}
@@ -1245,7 +1311,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                                   ? 'ابحث بالاسم أو الرمز (مثال: SOL, PEPE, SUI, DOGE, NEAR, RENDER...)'
                                   : 'Search crypto by symbol/name (e.g. SOL, PEPE, SUI...)'
                               }
-                              className="w-full ps-8 pe-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                              className="w-full ps-8 pe-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/40"
                             />
                             {cryptoSearchQuery && (
                               <button
@@ -1265,7 +1331,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                             type="button"
                             onClick={() => handleSearchCrypto(cryptoSearchQuery || 'SOL')}
                             disabled={isSearchingCryptoOnline}
-                            className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0"
+                            className="px-3 py-2 rounded-xl bg-accent-500 hover:bg-accent-600 active:scale-95 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0"
                           >
                             <Globe2 className="w-3.5 h-3.5" />
                             <span>{isAr ? 'بحث عبر النت' : 'Search Web'}</span>
@@ -1302,8 +1368,8 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
 
                         {/* نتائج البحث المباشرة عبر الإنترنت في بطاقة منسدلة */}
                         {cryptoSearchResults.length > 0 && (
-                          <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-amber-400/50 dark:border-amber-500/30 shadow-lg space-y-1.5 max-h-56 overflow-y-auto">
-                            <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800 text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                          <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-accent-400/50 dark:border-accent-500/30 shadow-lg space-y-1.5 max-h-56 overflow-y-auto">
+                            <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800 text-[10px] text-accent-600 dark:text-accent-400 font-bold">
                               <span>
                                 {isAr
                                   ? `نتائج البحث عن "${cryptoSearchQuery}" (${cryptoSearchResults.length} عملة):`
@@ -1359,8 +1425,8 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                                       }}
                                       className={`px-2 py-1 rounded-md text-[10px] font-extrabold transition-all shrink-0 ${
                                         isSelected
-                                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-400/50'
-                                          : 'bg-amber-500 text-slate-950 hover:bg-amber-600'
+                                          ? 'bg-accent-500/20 text-accent-700 dark:text-accent-300 border border-accent-400/50'
+                                          : 'bg-accent-500 text-slate-950 hover:bg-accent-600'
                                       }`}
                                     >
                                       {isSelected ? (isAr ? '✓ مضافة' : '✓ Added') : (isAr ? '+ إضافة' : '+ Add')}
@@ -1396,7 +1462,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                                   ],
                                 })
                               }
-                              className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold hover:bg-amber-500/25 transition-all"
+                              className="px-2 py-0.5 rounded-lg bg-accent-500/15 text-accent-700 dark:text-accent-300 font-bold hover:bg-accent-500/25 transition-all"
                             >
                               {isAr ? 'تحديد الكل' : 'Select All'}
                             </button>
@@ -1424,7 +1490,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                             return (
                               <div
                                 key={sym}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 border border-amber-400/40 text-slate-800 dark:text-white text-xs font-bold shadow-xs animate-fadeIn"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent-500/10 dark:bg-accent-500/20 border border-accent-400/40 text-slate-800 dark:text-white text-xs font-bold shadow-xs animate-fadeIn"
                               >
                                 <span>{coin?.iconSymbol || '🪙'}</span>
                                 <span className="font-extrabold">{sym}</span>
@@ -1469,7 +1535,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                                 }}
                                 className={`p-2 rounded-xl border flex items-center justify-between text-start transition-all active:scale-95 ${
                                   isSelected
-                                    ? 'bg-amber-500/15 dark:bg-amber-500/20 border-amber-500 text-slate-900 dark:text-white shadow-xs'
+                                    ? 'bg-accent-500/15 dark:bg-accent-500/20 border-accent-500 text-slate-900 dark:text-white shadow-xs'
                                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 opacity-60 hover:opacity-90'
                                 }`}
                               >
@@ -1539,7 +1605,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                     onChange={(e) =>
                       setTickerPrefs({ ...tickerPrefs, showCustomMessage: e.target.checked })
                     }
-                    className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                    className="w-4 h-4 rounded cursor-pointer accent-accent-500"
                   />
                 </div>
 
@@ -1551,7 +1617,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       setTickerPrefs({ ...tickerPrefs, customMessage: e.target.value })
                     }
                     placeholder={isAr ? 'اكتب عبارتك لتظهر على شريط الأخبار...' : 'Type your banner phrase...'}
-                    className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-amber-700 dark:text-amber-400"
+                    className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-accent-700 dark:text-accent-400"
                   />
                 )}
               </div>
@@ -1576,7 +1642,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
 
               {/* 1. قسم السيارات والمركبات */}
               <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold">
+                <div className="flex items-center gap-2 text-accent-600 dark:text-accent-400 font-bold">
                   <Car className="w-4 h-4" />
                   <span>{isAr ? 'قسم السيارات والمركبات' : 'Vehicles Module'}</span>
                 </div>
@@ -1831,7 +1897,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       onClick={() => onLanguageChange(l)}
                       className={`p-3 rounded-2xl border text-center font-bold transition-all ${
                         language === l
-                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-xs'
+                          ? 'border-accent-500 bg-accent-50 dark:bg-accent-950/40 text-accent-600 dark:text-accent-400 shadow-xs'
                           : 'border-slate-200 dark:border-slate-800'
                       }`}
                     >
@@ -1848,7 +1914,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                     onClick={() => onThemeChange('light')}
                     className={`p-3 rounded-2xl border text-center font-bold transition-all ${
                       theme === 'light'
-                        ? 'border-amber-500 bg-amber-50 text-amber-600 shadow-xs'
+                        ? 'border-accent-500 bg-accent-50 text-accent-600 shadow-xs'
                         : 'border-slate-200 dark:border-slate-800'
                     }`}
                   >
@@ -1858,7 +1924,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                     onClick={() => onThemeChange('dark')}
                     className={`p-3 rounded-2xl border text-center font-bold transition-all ${
                       theme === 'dark'
-                        ? 'border-amber-500 bg-amber-950/40 text-amber-400 shadow-xs'
+                        ? 'border-accent-500 bg-accent-950/40 text-accent-400 shadow-xs'
                         : 'border-slate-200 dark:border-slate-800'
                     }`}
                   >
@@ -1866,7 +1932,121 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block font-bold mb-1">
+                  {isAr ? 'ثيمات التطبيق' : 'App Themes'}
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  {isAr ? 'غيّر شخصية الألوان والأيقونات بدون تغيير بنية البرنامج أو وظائفه.' : 'Change the visual identity without changing the app structure or features.'}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {(
+                    [
+                      { id: 'ocean', label: isAr ? 'الأزرق الهادئ' : 'Calm Ocean', emoji: '🌊', swatch: '#20B8D6' },
+                      { id: 'facebook', label: isAr ? 'وضع فيسبوك' : 'Facebook Mode', emoji: '📘', swatch: '#1877F2' },
+                      { id: 'whatsapp', label: isAr ? 'وضع واتساب' : 'WhatsApp Mode', emoji: '💬', swatch: '#25D366' },
+                      { id: 'telegram', label: isAr ? 'وضع تيليجرام' : 'Telegram Mode', emoji: '✈️', swatch: '#229ED9' },
+                      { id: 'instagram', label: isAr ? 'وضع انستغرام' : 'Instagram Mode', emoji: '📸', swatch: '#E1306C' },
+                      { id: 'youtube', label: isAr ? 'وضع يوتيوب' : 'YouTube Mode', emoji: '▶️', swatch: '#FF0000' },
+                    ] as { id: ColorTheme; label: string; emoji: string; swatch: string }[]
+                  ).map((ct) => (
+                    <button
+                      key={ct.id}
+                      onClick={() => onColorThemeChange?.(ct.id)}
+                      className={`p-3 rounded-2xl border text-center font-bold transition-all flex flex-col items-center gap-1.5 ${
+                        colorTheme === ct.id
+                          ? 'border-accent-500 bg-accent-50 dark:bg-accent-950/40 text-accent-600 dark:text-accent-400 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      <span
+                        className="w-7 h-7 rounded-full shadow-inner border border-black/10 flex items-center justify-center text-sm"
+                        style={{ backgroundColor: ct.swatch }}
+                      >
+                        {ct.emoji}
+                      </span>
+                      <span className="text-[11px]">{ct.label}</span>
+                      {colorTheme === ct.id && <Check className="w-3 h-3" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">
+                  {isAr ? 'أشكال الأيقونات' : 'Icon Style'}
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  {isAr ? 'غيّر شخصية الأيقونات والحاويات بدون تغيير بنية البرنامج.' : 'Change icon personality without changing the app structure.'}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    { id: 'classic', label: isAr ? 'كلاسيكي' : 'Classic', emoji: '◌' },
+                    { id: 'soft', label: isAr ? 'ناعم' : 'Soft', emoji: '◉' },
+                    { id: 'bold', label: isAr ? 'قوي' : 'Bold', emoji: '⬢' },
+                    { id: 'glow', label: isAr ? 'متوهج' : 'Glow', emoji: '✦' },
+                  ] as { id: IconStyle; label: string; emoji: string }[]).map((it) => (
+                    <button
+                      key={it.id}
+                      onClick={() => onIconStyleChange?.(it.id)}
+                      className={`p-3 rounded-2xl border text-center font-bold transition-all ${iconStyle === it.id
+                        ? 'border-accent-500 bg-accent-50 dark:bg-accent-950/40 text-accent-600 dark:text-accent-400 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'}`}
+                    >
+                      <span className="mx-auto mb-1 w-8 h-8 rounded-xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center text-lg">{it.emoji}</span>
+                      <span className="text-[11px]">{it.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* TAB: الإشعارات والنغمات */}
+          {/* ======================================================== */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center"><Bell className="w-5 h-5 text-rose-500" /></div>
+                <div><b className="block text-sm">{isAr ? 'نغمة الإشعارات' : 'Notification sound'}</b><span className="text-[10px] text-slate-500">{isAr ? 'اختر نغمة هادئة أو نغمة من هاتفك.' : 'Choose a calm preset or a sound from your phone.'}</span></div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
+                  {(Object.entries(NotificationSoundService.presets) as [string, any][]).map(([id, preset]) => (
+                    <button key={id} type="button" onClick={() => saveNotificationSound({ ...notificationSound, id: id as any })} className={`p-2.5 rounded-xl border text-center transition ${notificationSound.id === id ? 'border-rose-500 bg-rose-500/10' : 'border-slate-200 dark:border-slate-700 hover:border-rose-400/50'}`}>
+                      <span className="text-lg block mb-1">🔔</span><b className="text-[10px]">{isAr ? preset.nameAr : preset.nameEn}</b>
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => saveNotificationSound({ ...notificationSound, id: 'off' })} className={`p-2.5 rounded-xl border text-center transition ${notificationSound.id === 'off' ? 'border-slate-500 bg-slate-500/10' : 'border-slate-200 dark:border-slate-700'}`}><VolumeX className="w-5 h-5 mx-auto mb-1 text-slate-500"/><b className="text-[10px]">{isAr ? 'بدون نغمة' : 'Off'}</b></button>
+                </div>
+
+                <div className="px-3 pb-3 flex flex-col sm:flex-row gap-2">
+                  <input ref={notificationSoundInputRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a" className="hidden" onChange={e => { handleNotificationSoundFile(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+                  <button type="button" onClick={() => notificationSoundInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold"><Upload className="w-4 h-4"/>{isAr ? 'اختيار نغمة من الهاتف' : 'Choose from phone'}</button>
+                  <button type="button" onClick={() => NotificationSoundService.play(notificationSound)} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-rose-500/30 text-rose-500 font-bold"><Play className="w-4 h-4"/>{isAr ? 'تجربة النغمة' : 'Test sound'}</button>
+                </div>
+                <div className="px-3 pb-3">
+                  <div className="flex items-center justify-between mb-1"><span className="font-bold">{isAr ? 'مستوى الصوت' : 'Volume'}</span><span className="text-[10px] text-slate-500">{Math.round(notificationSound.volume * 100)}%</span></div>
+                  <input type="range" min="0" max="1" step="0.05" value={notificationSound.volume} onChange={e => saveNotificationSound({ ...notificationSound, volume: Number(e.target.value) })} className="w-full accent-rose-500" />
+                </div>
+              </div>
+
+              <button type="button" onClick={resetSettingsOnly} className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-start hover:border-rose-400/50 transition flex items-center gap-3"><RotateCcw className="w-4 h-4 text-slate-500"/><span><b className="block text-xs">{isAr ? 'إعادة ضبط إعدادات التطبيق' : 'Reset app settings'}</b><span className="text-[10px] text-slate-500">{isAr ? 'يعيد المظهر واللغة والأيقونات ونغمة الإشعارات فقط، بدون حذف بياناتك.' : 'Resets appearance, language, icons and notification sound without deleting your data.'}</span></span></button>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* TAB: أذونات وصلاحيات الهاتف والنظام                      */}
+          {/* ======================================================== */}
+          {activeTab === 'permissions' && (
+            <PhonePermissionsManager
+              language={language}
+              theme={theme}
+              onShowToast={(msg) => showToast(msg)}
+            />
           )}
 
           {/* ======================================================== */}
@@ -1885,7 +2065,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                 </p>
                 <button
                   onClick={handleExportBackup}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold transition-all shadow-xs"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-slate-950 font-bold transition-all shadow-xs"
                 >
                   <Download className="w-4 h-4" />
                   <span>{isAr ? 'تصدير النسخة (Export JSON)' : 'Export JSON'}</span>
@@ -1932,7 +2112,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
           <button
             type="button"
             onClick={() => handleSaveAll()}
-            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-98 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-slate-950 font-black text-xs shadow-md shadow-accent-500/20 active:scale-98 transition-all flex items-center justify-center gap-2"
           >
             <Check className="w-4 h-4" />
             <span>{isAr ? 'حفظ كافة التعديلات وربطها بشريط الأخبار' : 'Save & Sync to Ticker'}</span>

@@ -18,7 +18,7 @@ export class BackupRepository {
     const fullBackup = {
       exportDate: new Date().toISOString(),
       app: 'SMART TIME — وقتك من ذهب',
-      version: '5.0.0',
+      version: '6.0.0',
       data: {
         profile: UserRepository.getProfile(),
         notes: NotesRepository.getNotes(),
@@ -27,6 +27,8 @@ export class BackupRepository {
         calcHistory: NotesRepository.getCalculatorHistory(),
         expenses: ExpensesRepository.getExpenses(),
         budget: ExpensesRepository.getBudget(),
+        monthlyIncome: ExpensesRepository.getMonthlyIncome(),
+        bankCertificates: ExpensesRepository.getBankCertificates(),
         vehicles: VehiclesRepository.getVehicles(),
         fuelRecords: VehiclesRepository.getFuelRecords(),
         maintenanceRecords: VehiclesRepository.getMaintenanceRecords(),
@@ -63,6 +65,8 @@ export class BackupRepository {
       if (d.calcHistory) NotesRepository.saveCalculatorHistory(d.calcHistory);
       if (d.expenses) ExpensesRepository.saveExpenses(d.expenses);
       if (d.budget) ExpensesRepository.saveBudget(d.budget);
+      if (d.monthlyIncome) ExpensesRepository.saveMonthlyIncome(d.monthlyIncome);
+      if (d.bankCertificates) ExpensesRepository.saveBankCertificates(d.bankCertificates);
       if (d.vehicles) VehiclesRepository.saveVehicles(d.vehicles);
       if (d.fuelRecords) VehiclesRepository.saveFuelRecords(d.fuelRecords);
       if (d.maintenanceRecords) VehiclesRepository.saveMaintenanceRecords(d.maintenanceRecords);

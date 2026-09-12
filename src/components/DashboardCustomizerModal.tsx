@@ -139,7 +139,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
         {/* Header */}
         <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center">
               <Sliders className="w-5 h-5" />
             </div>
             <div>
@@ -167,7 +167,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
           <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4 text-amber-500" />
+                <LayoutGrid className="w-4 h-4 text-accent-500" />
                 {isAr ? 'كثافة عرض البطاقات (الأعمدة)' : 'Grid Density'}
               </span>
               <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">
@@ -182,7 +182,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
                     }
                     className={`px-2.5 py-1 rounded-lg transition-all ${
                       localSettings.columns === col
-                        ? 'bg-amber-500 text-white font-bold shadow-sm'
+                        ? 'bg-accent-500 text-white font-bold shadow-sm'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
@@ -204,7 +204,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
                       showHeroBanner: e.target.checked,
                     }))
                   }
-                  className="rounded text-amber-500 focus:ring-amber-500 w-4 h-4"
+                  className="rounded text-accent-500 focus:ring-accent-500 w-4 h-4"
                 />
                 <span>{isAr ? 'بانر الترحيب وشعار البرنامج' : 'Hero Welcome Banner & Logo'}</span>
               </label>
@@ -219,7 +219,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
                       showHeroSearch: e.target.checked,
                     }))
                   }
-                  className="rounded text-amber-500 focus:ring-amber-500 w-4 h-4"
+                  className="rounded text-accent-500 focus:ring-accent-500 w-4 h-4"
                 />
                 <span>{isAr ? 'شريط البحث السريع والبحث الصوتي' : 'Quick Search & Voice'}</span>
               </label>
@@ -253,7 +253,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
                         {index + 1}
                       </span>
 
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center shrink-0">
                         {getModuleIcon(mod.iconName)}
                       </div>
 
@@ -263,7 +263,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
                             {isAr ? mod.nameAr : mod.nameEn}
                           </h4>
                           {mod.category === 'featured' && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent-500/15 text-accent-600 dark:text-accent-400">
                               {isAr ? 'مميز' : 'Featured'}
                             </span>
                           )}
@@ -358,7 +358,7 @@ export const DashboardCustomizerModal: React.FC<DashboardCustomizerModalProps> =
             </button>
             <button
               onClick={handleSaveAndApply}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-yellow-500 text-white font-bold text-xs shadow-lg shadow-amber-500/25 active:scale-95 transition-all"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-yellow-500 text-white font-bold text-xs shadow-lg shadow-accent-500/25 active:scale-95 transition-all"
             >
               <Check className="w-4 h-4" />
               <span>{isAr ? 'حفظ وتطبيق' : 'Save & Apply'}</span>

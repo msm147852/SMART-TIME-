@@ -473,19 +473,19 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
   const getModalIcon = () => {
     switch (editItem.kind) {
       case 'house':
-        return <Home className="w-5 h-5 text-[#D4AF37]" />;
+        return <Home className="w-5 h-5 text-accent-500" />;
       case 'work':
-        return <Briefcase className="w-5 h-5 text-[#D4AF37]" />;
+        return <Briefcase className="w-5 h-5 text-accent-500" />;
       case 'fuel':
-        return <Fuel className="w-5 h-5 text-[#D4AF37]" />;
+        return <Fuel className="w-5 h-5 text-accent-500" />;
       case 'maintenance':
-        return <Wrench className="w-5 h-5 text-[#D4AF37]" />;
+        return <Wrench className="w-5 h-5 text-accent-500" />;
       case 'accident':
         return <AlertTriangle className="w-5 h-5 text-rose-500" />;
       case 'student':
-        return <GraduationCap className="w-5 h-5 text-[#D4AF37]" />;
+        return <GraduationCap className="w-5 h-5 text-accent-500" />;
       case 'studentExpense':
-        return <BookOpen className="w-5 h-5 text-[#D4AF37]" />;
+        return <BookOpen className="w-5 h-5 text-accent-500" />;
     }
   };
 
@@ -495,14 +495,14 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
       dir={isAr ? 'rtl' : 'ltr'}
     >
       <div
-        className={`bg-[#181818] border border-[#D4AF37]/50 w-full ${
+        className={`bg-[#181818] border border-accent-500/50 w-full ${
           editItem.kind === 'student' ? 'max-w-2xl' : 'max-w-lg'
         } rounded-3xl shadow-2xl text-white overflow-hidden my-6 transition-all`}
       >
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-[#1c1c1c] to-slate-900 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#D4AF37]/15 border border-[#D4AF37]/30 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-accent-500/15 border border-accent-500/30 flex items-center justify-center">
               {getModalIcon()}
             </div>
             <div>
@@ -539,7 +539,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                 <select
                   value={houseType}
                   onChange={(e) => setHouseType(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-[#D4AF37]"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-accent-500"
                 >
                   {[
                     isAr ? 'فطار' : 'Breakfast',
@@ -616,7 +616,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       onClick={() => setHousePaymentType(pt.id as any)}
                       className={`p-2 rounded-xl font-bold border transition-all text-center ${
                         housePaymentType === pt.id
-                          ? 'bg-[#D4AF37] text-slate-950 border-[#D4AF37]'
+                          ? 'bg-accent-500 text-slate-950 border-accent-500'
                           : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
                       }`}
                     >
@@ -638,7 +638,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                 <select
                   value={workType}
                   onChange={(e) => setWorkType(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-[#D4AF37]"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-accent-500"
                 >
                   {[
                     isAr ? 'أدوات مكتبية' : 'Office Supplies',
@@ -710,7 +710,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       onClick={() => setFuelType(ft)}
                       className={`p-2 rounded-xl font-bold border transition-all text-center text-xs ${
                         fuelType === ft
-                          ? 'bg-[#D4AF37] text-slate-950 border-[#D4AF37]'
+                          ? 'bg-accent-500 text-slate-950 border-accent-500'
                           : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
                       }`}
                     >
@@ -772,7 +772,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                 <select
                   value={maintType}
                   onChange={(e) => setMaintType(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-[#D4AF37]"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-accent-500"
                 >
                   {[
                     'دهان', 'سمكرة', 'كهرباء', 'عفشة', 'نظام التبريد', 'نظام التكييف',
@@ -859,7 +859,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                     required
                     value={maintTotal}
                     onChange={(e) => setMaintTotal(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-[#D4AF37]/50 text-[#D4AF37] font-mono-num font-bold"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-accent-500/50 text-accent-500 font-mono-num font-bold"
                   />
                 </div>
                 <div>
@@ -951,7 +951,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                   id="acc-vault-check"
                   checked={accidentVault}
                   onChange={(e) => setAccidentVault(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#D4AF37] focus:ring-0 bg-slate-950 border-slate-700"
+                  className="w-4 h-4 rounded text-accent-500 focus:ring-0 bg-slate-950 border-slate-700"
                 />
                 <label htmlFor="acc-vault-check" className="text-xs text-slate-300 font-bold cursor-pointer">
                   {isAr ? 'حفظ ومزامنة مع الخزنة الرقمية المشفرة' : 'Sync with Digital Secure Vault'}
@@ -970,7 +970,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                   onClick={() => setStudentActiveTab('profile')}
                   className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
                     studentActiveTab === 'profile'
-                      ? 'bg-[#D4AF37] text-slate-950 shadow-md font-black'
+                      ? 'bg-accent-500 text-slate-950 shadow-md font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -982,7 +982,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                   onClick={() => setStudentActiveTab('addExpense')}
                   className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
                     studentActiveTab === 'addExpense'
-                      ? 'bg-[#D4AF37] text-slate-950 shadow-md font-black'
+                      ? 'bg-accent-500 text-slate-950 shadow-md font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -994,7 +994,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                   onClick={() => setStudentActiveTab('expensesList')}
                   className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
                     studentActiveTab === 'expensesList'
-                      ? 'bg-[#D4AF37] text-slate-950 shadow-md font-black'
+                      ? 'bg-accent-500 text-slate-950 shadow-md font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -1019,7 +1019,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       required
                       value={studentName}
                       onChange={(e) => setStudentName(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-bold focus:border-[#D4AF37]"
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-bold focus:border-accent-500"
                     />
                   </div>
 
@@ -1032,7 +1032,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                         type="number"
                         value={studentAge}
                         onChange={(e) => setStudentAge(e.target.value)}
-                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono-num focus:border-[#D4AF37]"
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono-num focus:border-accent-500"
                       />
                     </div>
                     <div>
@@ -1042,7 +1042,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       <select
                         value={studentStage}
                         onChange={(e) => setStudentStage(e.target.value)}
-                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-[#D4AF37]"
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-accent-500"
                       >
                         {[
                           isAr ? 'ابتدائي' : 'Primary',
@@ -1066,24 +1066,24 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       type="text"
                       value={studentNationalId}
                       onChange={(e) => setStudentNationalId(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono-num focus:border-[#D4AF37]"
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono-num focus:border-accent-500"
                     />
                   </div>
 
                   {/* Financial Summary Card for Student */}
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900/80 to-amber-500/5 border border-[#D4AF37]/30 flex items-center justify-between">
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-accent-500/10 via-slate-900/80 to-accent-500/5 border border-accent-500/30 flex items-center justify-between">
                     <div>
                       <p className="text-[11px] text-slate-400">
                         {isAr ? 'إجمالي المصروفات المسجلة لهذا الطالب' : 'Total Expenses Logged'}
                       </p>
-                      <p className="text-lg font-black text-[#D4AF37] font-mono-num">
+                      <p className="text-lg font-black text-accent-500 font-mono-num">
                         {currentStudentTotal.toLocaleString()} {currency}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setStudentActiveTab('addExpense')}
-                      className="px-3.5 py-2 rounded-xl bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] border border-[#D4AF37]/40 font-bold text-xs flex items-center gap-1.5 transition-all"
+                      className="px-3.5 py-2 rounded-xl bg-accent-500/20 hover:bg-accent-500/30 text-accent-500 border border-accent-500/40 font-bold text-xs flex items-center gap-1.5 transition-all"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{isAr ? 'إضافة مصروف' : 'Add Expense'}</span>
@@ -1104,10 +1104,10 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
 
                   <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <GraduationCap className="w-4 h-4 text-[#D4AF37]" />
+                      <GraduationCap className="w-4 h-4 text-accent-500" />
                       <span className="font-bold text-white text-xs">
                         {isAr ? `إضافة مصروف مباشر لحساب الطالب:` : 'Adding expense for:'}{' '}
-                        <span className="text-[#D4AF37] font-black">{studentName || editItem.item.name}</span>
+                        <span className="text-accent-500 font-black">{studentName || editItem.item.name}</span>
                       </span>
                     </div>
                     <span className="text-[11px] text-slate-400 font-mono-num">
@@ -1133,7 +1133,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                           onClick={() => setNewExpCategory(sub.id as any)}
                           className={`p-2.5 rounded-xl font-bold border transition-all text-center text-xs ${
                             newExpCategory === sub.id
-                              ? 'bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-md font-black'
+                              ? 'bg-accent-500 text-slate-950 border-accent-500 shadow-md font-black'
                               : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-850'
                           }`}
                         >
@@ -1156,7 +1156,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                           ? 'مثال: اشتراك شهر أكتوبر، مذكرة لغة عربية، قسط الباص، مصروف يومي...'
                           : 'e.g. October private lesson, Arabic book, bus fee...'
                       }
-                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-[#D4AF37] placeholder:text-slate-600 text-xs"
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-accent-500 placeholder:text-slate-600 text-xs"
                     />
                   </div>
 
@@ -1171,7 +1171,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                         value={newExpAmount}
                         onChange={(e) => setNewExpAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono-num font-bold focus:border-[#D4AF37] text-sm"
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono-num font-bold focus:border-accent-500 text-sm"
                       />
                     </div>
                     <div>
@@ -1182,7 +1182,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                         type="date"
                         value={newExpDate}
                         onChange={(e) => setNewExpDate(e.target.value)}
-                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-[#D4AF37] text-xs"
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:border-accent-500 text-xs"
                       />
                     </div>
                   </div>
@@ -1192,7 +1192,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       type="button"
                       onClick={handleAddNewStudentExpense}
                       disabled={!newExpTitle.trim() || !newExpAmount || parseFloat(newExpAmount) <= 0}
-                      className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#b39127] hover:from-[#c29e2f] hover:to-[#967923] disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all active:scale-95"
+                      className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-accent-500 to-[#b39127] hover:from-accent-600 hover:to-accent-800 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-accent-500/20 transition-all active:scale-95"
                     >
                       <Plus className="w-4 h-4" />
                       <span>{isAr ? 'حفظ وإضافة المصروف لحساب الطالب فوراً' : 'Add Expense To Student'}</span>
@@ -1218,7 +1218,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       <span className="text-[11px] text-slate-400">
                         {isAr ? 'إجمالي المصروفات:' : 'Total Spent:'}
                       </span>
-                      <span className="mr-2 ml-2 font-mono-num font-black text-[#D4AF37] text-sm">
+                      <span className="mr-2 ml-2 font-mono-num font-black text-accent-500 text-sm">
                         {currentStudentTotal.toLocaleString()} {currency}
                       </span>
                       <span className="text-[11px] text-slate-500">
@@ -1228,7 +1228,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setStudentActiveTab('addExpense')}
-                      className="px-3 py-1.5 rounded-xl bg-[#D4AF37] text-slate-950 font-bold text-xs flex items-center gap-1 hover:bg-[#c49e28] transition-all"
+                      className="px-3 py-1.5 rounded-xl bg-accent-500 text-slate-950 font-bold text-xs flex items-center gap-1 hover:bg-[#c49e28] transition-all"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{isAr ? 'إضافة مصروف' : 'Add'}</span>
@@ -1244,7 +1244,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setStudentActiveTab('addExpense')}
-                        className="mt-3 px-4 py-2 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold text-xs hover:bg-[#D4AF37]/30 transition-all inline-flex items-center gap-1.5"
+                        className="mt-3 px-4 py-2 rounded-xl bg-accent-500/20 border border-accent-500/40 text-accent-500 font-bold text-xs hover:bg-accent-500/30 transition-all inline-flex items-center gap-1.5"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>{isAr ? 'إضافة أول مصروف للطالب' : 'Add First Expense'}</span>
@@ -1266,9 +1266,9 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                           return (
                             <div
                               key={rec.id}
-                              className="p-3 rounded-2xl bg-slate-900 border border-[#D4AF37] space-y-2.5 animate-fade-in"
+                              className="p-3 rounded-2xl bg-slate-900 border border-accent-500 space-y-2.5 animate-fade-in"
                             >
-                              <div className="text-[11px] font-bold text-[#D4AF37]">
+                              <div className="text-[11px] font-bold text-accent-500">
                                 {isAr ? 'تعديل المصروف' : 'Edit Expense Record'}
                               </div>
 
@@ -1286,7 +1286,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                                     onClick={() => setInlineExpCategory(sub.id as any)}
                                     className={`py-1 px-2 rounded-lg text-[10px] font-bold border transition-all ${
                                       inlineExpCategory === sub.id
-                                        ? 'bg-[#D4AF37] text-slate-950 border-[#D4AF37]'
+                                        ? 'bg-accent-500 text-slate-950 border-accent-500'
                                         : 'bg-slate-950 text-slate-400 border-slate-800'
                                     }`}
                                   >
@@ -1300,7 +1300,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                                 value={inlineExpTitle}
                                 onChange={(e) => setInlineExpTitle(e.target.value)}
                                 placeholder={isAr ? 'بيان المصروف' : 'Description'}
-                                className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-[#D4AF37]"
+                                className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-accent-500"
                               />
 
                               <div className="grid grid-cols-2 gap-2">
@@ -1310,13 +1310,13 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                                   value={inlineExpAmount}
                                   onChange={(e) => setInlineExpAmount(e.target.value)}
                                   placeholder={isAr ? 'المبلغ' : 'Amount'}
-                                  className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono-num font-bold text-xs focus:border-[#D4AF37]"
+                                  className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono-num font-bold text-xs focus:border-accent-500"
                                 />
                                 <input
                                   type="date"
                                   value={inlineExpDate}
                                   onChange={(e) => setInlineExpDate(e.target.value)}
-                                  className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-[#D4AF37]"
+                                  className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-accent-500"
                                 />
                               </div>
 
@@ -1357,7 +1357,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                             </div>
 
                             <div className="flex items-center gap-3 shrink-0">
-                              <span className="font-mono-num font-black text-sm text-[#D4AF37]">
+                              <span className="font-mono-num font-black text-sm text-accent-500">
                                 -{rec.amount.toLocaleString()} {currency}
                               </span>
                               <button
@@ -1410,7 +1410,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                       onClick={() => setStdExpSubCategory(sub.id as any)}
                       className={`p-2 rounded-xl font-bold border transition-all text-center text-xs ${
                         stdExpSubCategory === sub.id
-                          ? 'bg-[#D4AF37] text-slate-950 border-[#D4AF37]'
+                          ? 'bg-accent-500 text-slate-950 border-accent-500'
                           : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
                       }`}
                     >
@@ -1467,7 +1467,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
             <div className="text-xs text-slate-400">
               {editItem.kind === 'student' && (
-                <span className="font-mono-num text-[#D4AF37] font-bold">
+                <span className="font-mono-num text-accent-500 font-bold">
                   {isAr ? 'إجمالي حساب الطالب:' : 'Total:'} {currentStudentTotal.toLocaleString()} {currency}
                 </span>
               )}
@@ -1485,7 +1485,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
               {editItem.kind !== 'student' || studentActiveTab === 'profile' ? (
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#aa8c2c] hover:from-[#c29e2f] hover:to-[#967923] text-slate-950 font-black shadow-lg shadow-[#D4AF37]/20 transition-all active:scale-95 text-xs"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-accent-500 to-accent-700 hover:from-accent-600 hover:to-accent-800 text-slate-950 font-black shadow-lg shadow-accent-500/20 transition-all active:scale-95 text-xs"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isAr ? 'حفظ التعديلات' : 'Save Changes'}</span>
@@ -1495,7 +1495,7 @@ export const ExpenseEditModal: React.FC<ExpenseEditModalProps> = ({
                   type="button"
                   onClick={handleAddNewStudentExpense}
                   disabled={!newExpTitle.trim() || !newExpAmount || parseFloat(newExpAmount) <= 0}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#aa8c2c] hover:from-[#c29e2f] hover:to-[#967923] disabled:opacity-50 text-slate-950 font-black shadow-lg shadow-[#D4AF37]/20 transition-all active:scale-95 text-xs"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-accent-500 to-accent-700 hover:from-accent-600 hover:to-accent-800 disabled:opacity-50 text-slate-950 font-black shadow-lg shadow-accent-500/20 transition-all active:scale-95 text-xs"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{isAr ? 'إضافة المصروف' : 'Add Expense'}</span>

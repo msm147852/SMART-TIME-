@@ -214,7 +214,7 @@ export const EducationView: React.FC<EducationViewProps> = ({
 
         <div className="bg-white dark:bg-slate-850 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="text-xs text-slate-500">{language === 'ar' ? 'المصاريف والكتب الإضافية' : 'Books & Extra Expenses'}</div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono-num mt-1">
+          <div className="text-2xl font-black text-accent-600 dark:text-accent-400 font-mono-num mt-1">
             {totalEduExpenses.toLocaleString()} <span className="text-xs font-normal">{currency}</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-1">

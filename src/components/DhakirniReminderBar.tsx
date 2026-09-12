@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   BellRing,
   CheckCircle2,
@@ -115,7 +116,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
       case 'medium':
         return {
           label: isAr ? 'مهم' : 'Important',
-          bg: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+          bg: 'bg-accent-500/10 text-accent-700 dark:text-accent-400 border-accent-500/20',
         };
       case 'low':
       default:
@@ -131,7 +132,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
       {/* شريط ذكرني بعرض الشاشة تحت شريط الأخبار وبارتفاع ضعف شريط الأخبار تقريباً (h-14 / ~56px) */}
       <div
         id="dhakirni-reminder-bar"
-        className="w-full min-h-[54px] sm:min-h-[58px] bg-gradient-to-r from-amber-500/10 via-white to-amber-500/5 dark:from-amber-950/40 dark:via-slate-900/90 dark:to-slate-900 border-t border-b border-amber-500/25 dark:border-amber-500/20 px-2 sm:px-3 flex items-center justify-between gap-2 select-none shadow-xs transition-colors"
+        className="w-full min-h-[54px] sm:min-h-[58px] bg-gradient-to-r from-accent-500/10 via-white to-accent-500/5 dark:from-accent-950/40 dark:via-slate-900/90 dark:to-slate-900 border-t border-b border-accent-500/25 dark:border-accent-500/20 px-2 sm:px-3 flex items-center justify-between gap-2 select-none shadow-xs transition-colors"
         dir={isAr ? 'rtl' : 'ltr'}
       >
         {/* 1. بادج وعنوان "ذكرني" (Dhakirni Badge) */}
@@ -139,7 +140,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
           <button
             type="button"
             onClick={() => setIsListModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-600 active:scale-95 transition-all shadow-xs group"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-accent-500 text-slate-950 hover:bg-accent-600 active:scale-95 transition-all shadow-xs group"
             title={isAr ? 'ذكرني — اضغط لعرض جميع المهام اليومية' : 'Dhakirni — Click to view all daily tasks'}
           >
             <BellRing className="w-3.5 h-3.5 animate-wiggle text-slate-950" />
@@ -193,7 +194,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
 
                 <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                   {activeTask.dueTime && (
-                    <span className="flex items-center gap-1 font-mono text-amber-600 dark:text-amber-400 font-bold">
+                    <span className="flex items-center gap-1 font-mono text-accent-600 dark:text-accent-400 font-bold">
                       <Clock className="w-2.5 h-2.5" />
                       <span>{activeTask.dueTime}</span>
                     </span>
@@ -266,7 +267,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 flex items-center justify-center active:scale-95 transition-all border border-amber-500/25"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-accent-500/15 hover:bg-accent-500/25 text-accent-800 dark:text-accent-300 flex items-center justify-center active:scale-95 transition-all border border-accent-500/25"
             title={isAr ? 'إضافة مهمة سريعة في ذكرني' : 'Add quick task'}
           >
             <Plus className="w-4 h-4" />
@@ -296,13 +297,13 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-xs">
+                <div className="w-9 h-9 rounded-2xl bg-accent-500 text-slate-950 flex items-center justify-center font-bold shadow-xs">
                   <BellRing className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span>{isAr ? 'ذكرني — مهمات اليوم' : 'Remind Me — Daily Tasks'}</span>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] bg-accent-500/20 text-accent-700 dark:text-accent-300 font-mono px-2 py-0.5 rounded-full">
                       {completedCount}/{tasks.length}
                     </span>
                   </h3>
@@ -326,7 +327,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
             <div className="flex-1 overflow-y-auto space-y-2 py-1 pe-1">
               {tasks.length === 0 ? (
                 <div className="text-center py-8 text-slate-400">
-                  <Sparkles className="w-8 h-8 mx-auto text-amber-400 mb-2" />
+                  <Sparkles className="w-8 h-8 mx-auto text-accent-400 mb-2" />
                   <p className="font-bold text-sm text-slate-600 dark:text-slate-300">
                     {isAr ? 'لا توجد مهمات مسجلة بعد' : 'No tasks added yet'}
                   </p>
@@ -335,80 +336,95 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
                   </p>
                 </div>
               ) : (
-                tasks.map((task) => {
-                  const pBadge = getPriorityBadge(task.priority);
-                  return (
-                    <div
-                      key={task.id}
-                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-2.5 ${
-                        task.completed
-                          ? 'bg-slate-50 dark:bg-slate-850/40 border-slate-200/60 dark:border-slate-800/60 opacity-75'
-                          : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-750 shadow-xs'
-                      }`}
-                    >
-                      {/* Checkbox */}
-                      <button
-                        type="button"
-                        onClick={() => onToggleTask(task.id)}
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-500 shrink-0"
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {tasks.map((task) => {
+                    const pBadge = getPriorityBadge(task.priority);
+                    return (
+                      <motion.div
+                        key={task.id}
+                        layout
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{
+                          opacity: 0,
+                          x: isAr ? 45 : -45,
+                          scale: 0.92,
+                          height: 0,
+                          marginBottom: 0,
+                          filter: 'blur(2px)',
+                          transition: { duration: 0.22, ease: 'easeInOut' },
+                        }}
+                        transition={{ layout: { duration: 0.2 } }}
+                        className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-2.5 ${
+                          task.completed
+                            ? 'bg-slate-50 dark:bg-slate-850/40 border-slate-200/60 dark:border-slate-800/60 opacity-75'
+                            : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-750 shadow-xs'
+                        }`}
                       >
-                        {task.completed ? (
-                          <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/20" />
-                        ) : (
-                          <Circle className="w-5 h-5" />
-                        )}
-                      </button>
+                        {/* Checkbox */}
+                        <button
+                          type="button"
+                          onClick={() => onToggleTask(task.id)}
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-500 active:scale-80 transition-transform shrink-0"
+                        >
+                          {task.completed ? (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/20" />
+                          ) : (
+                            <Circle className="w-5 h-5" />
+                          )}
+                        </button>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`text-xs font-bold ${
-                              task.completed
-                                ? 'line-through text-slate-400 dark:text-slate-500'
-                                : 'text-slate-900 dark:text-white'
-                            }`}
-                          >
-                            {task.title}
-                          </span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${pBadge.bg}`}>
-                            {pBadge.label}
-                          </span>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`text-xs font-bold transition-all ${
+                                task.completed
+                                  ? 'line-through text-slate-400 dark:text-slate-500'
+                                  : 'text-slate-900 dark:text-white'
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${pBadge.bg}`}>
+                              {pBadge.label}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                            {task.dueTime && (
+                              <span className="flex items-center gap-1 font-mono text-accent-600 dark:text-accent-400 font-bold">
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>{task.dueTime}</span>
+                              </span>
+                            )}
+                            {task.noteId && (
+                              <span className="flex items-center gap-0.5 text-slate-400">
+                                <span>📝</span>
+                                <span>{isAr ? 'مرتبطة بملاحظة' : 'Linked Note'}</span>
+                              </span>
+                            )}
+                            {task.completed && task.completedAt && (
+                              <span className="text-emerald-600 dark:text-emerald-400 text-[9px]">
+                                {isAr ? 'تم الإنجاز بنجاح' : 'Done'}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                          {task.dueTime && (
-                            <span className="flex items-center gap-1 font-mono text-amber-600 dark:text-amber-400 font-bold">
-                              <Clock className="w-2.5 h-2.5" />
-                              <span>{task.dueTime}</span>
-                            </span>
-                          )}
-                          {task.noteId && (
-                            <span className="flex items-center gap-0.5 text-slate-400">
-                              <span>📝</span>
-                              <span>{isAr ? 'مرتبطة بملاحظة' : 'Linked Note'}</span>
-                            </span>
-                          )}
-                          {task.completed && task.completedAt && (
-                            <span className="text-emerald-600 dark:text-emerald-400 text-[9px]">
-                              {isAr ? 'تم الإنجاز بنجاح' : 'Done'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Delete */}
-                      <button
-                        type="button"
-                        onClick={() => onDeleteTask(task.id)}
-                        className="p-1.5 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors shrink-0"
-                        title={isAr ? 'حذف المهمة' : 'Delete task'}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteTask(task.id)}
+                          className="p-1.5 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 active:scale-85 transition-all shrink-0"
+                          title={isAr ? 'حذف المهمة' : 'Delete task'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
               )}
             </div>
 
@@ -421,7 +437,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
                     setIsListModalOpen(false);
                     setIsAddModalOpen(true);
                   }}
-                  className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                  className="px-3 py-2 rounded-xl bg-accent-500 hover:bg-accent-600 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{isAr ? 'إضافة مهمة جديدة' : 'Add New Task'}</span>
@@ -467,7 +483,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
           >
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-accent-500 text-slate-950 flex items-center justify-center font-bold">
                   <Plus className="w-4 h-4" />
                 </div>
                 <div>
@@ -504,7 +520,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
                       ? 'مثال: مراجعة خطة العمل، حجز موعد، سداد فاتورة...'
                       : 'e.g., Review plan, doctor appointment...'
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500/40"
                   autoFocus
                 />
               </div>
@@ -589,7 +605,7 @@ export const DhakirniReminderBar: React.FC<DhakirniReminderBarProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs shadow-xs active:scale-95 transition-all"
+                  className="px-4 py-2 rounded-xl bg-accent-500 hover:bg-accent-600 text-slate-950 font-extrabold text-xs shadow-xs active:scale-95 transition-all"
                 >
                   {isAr ? 'إضافة لـ "ذكرني"' : 'Add to Remind Me'}
                 </button>

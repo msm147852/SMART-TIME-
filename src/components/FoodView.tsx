@@ -223,7 +223,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-850 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20">
+            <span className="p-2 rounded-xl bg-gradient-to-tr from-orange-500 to-accent-500 text-white shadow-md shadow-orange-500/20">
               <UtensilsCrossed className="w-5 h-5" />
             </span>
             <span>{language === 'ar' ? 'الوصفات الغذائية وقائمة المشتريات' : 'Diet Recipes & Shopping List'}</span>
@@ -388,7 +388,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
                           {recipe.prepTimeMinutes + recipe.cookTimeMinutes} دقيقة
                         </span>
                         <span className="flex items-center gap-1">
-                          <Flame className="w-3 h-3 text-amber-500" />
+                          <Flame className="w-3 h-3 text-accent-500" />
                           {recipe.calories} سعرة
                         </span>
                       </div>
@@ -444,9 +444,9 @@ export const FoodView: React.FC<FoodViewProps> = ({
                       {selectedRecipe.carbs}g
                     </span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/40">
+                  <div className="p-3 rounded-2xl bg-accent-50 dark:bg-accent-950/40 border border-accent-200/60 dark:border-accent-900/40">
                     <span className="text-[10px] text-slate-400 block">{language === 'ar' ? 'الدهون الصحية' : 'Healthy Fat'}</span>
-                    <span className="font-mono-num font-black text-sm text-amber-600 dark:text-amber-400">
+                    <span className="font-mono-num font-black text-sm text-accent-600 dark:text-accent-400">
                       {selectedRecipe.fat}g
                     </span>
                   </div>

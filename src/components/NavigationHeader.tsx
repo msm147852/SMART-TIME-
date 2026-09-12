@@ -11,14 +11,13 @@ import {
   ArrowRight,
   ArrowLeft,
   MoreVertical,
-  Sparkles,
   Clock,
+  LogOut,
 } from 'lucide-react';
 import { Language, ThemeMode, UserProfile, AppNotification, DailyTask, Note } from '../types';
 import { translations } from '../services/i18n';
 import { LiveHeaderWidgets } from './LiveHeaderWidgets';
 import { DhakirniReminderBar } from './DhakirniReminderBar';
-import smartTimeLogo from '../assets/images/smart_time_logo_1788556138099.jpg';
 
 interface NavigationHeaderProps {
   user: UserProfile;
@@ -42,6 +41,7 @@ interface NavigationHeaderProps {
   onToggleDailyTask?: (id: string) => void;
   onAddDailyTask?: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
   onDeleteDailyTask?: (id: string) => void;
+  onLogout?: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -64,6 +64,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onToggleDailyTask,
   onAddDailyTask,
   onDeleteDailyTask,
+  onLogout,
 }) => {
   const t = translations[language];
   const isAr = language === 'ar';
@@ -117,7 +118,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           {!isHomeActive && (
             <button
               onClick={handleBackClick}
-              className="w-8 h-8 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center font-bold transition-all active:scale-95 border border-amber-500/20 shrink-0"
+              className="w-8 h-8 rounded-xl bg-accent-500/10 hover:bg-accent-500/20 text-accent-700 dark:text-accent-400 flex items-center justify-center font-bold transition-all active:scale-95 border border-accent-500/20 shrink-0"
               title={isAr ? 'رجوع للخلف' : 'Back'}
               id="android-back-btn"
             >
@@ -135,7 +136,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               <img
                 src={user.avatarUrl}
                 alt={user.name}
-                className="w-8 h-8 rounded-xl object-cover ring-2 ring-amber-500/80 shadow-xs"
+                className="w-8 h-8 rounded-xl object-cover ring-2 ring-accent-500/80 shadow-xs"
               />
               <span className="absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
             </div>
@@ -143,7 +144,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                 {user.name}
               </span>
-              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold truncate">
+              <span className="text-[10px] text-accent-600 dark:text-accent-400 font-semibold truncate">
                 {user.occupation || (isAr ? 'الحساب الشخصي' : 'Personal')}
               </span>
             </div>
@@ -158,7 +159,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             title={isAr ? 'الساعة الثابتة — الوقت الحالي' : 'Live Clock — Current Time'}
             id="android-fixed-clock"
           >
-            <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" />
+            <Clock className="w-3.5 h-3.5 text-accent-500 animate-pulse shrink-0" />
             <span className="font-mono font-black text-xs tracking-tight">
               {timeFormatted}
             </span>
@@ -187,7 +188,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           {/* Voice Search Button */}
           <button
             onClick={onOpenVoiceSearch}
-            className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 active:scale-95 transition-colors"
+            className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-accent-600 dark:text-accent-400 hover:bg-accent-500/10 active:scale-95 transition-colors"
             title={isAr ? 'البحث الصوتي' : 'Voice Search'}
             id="android-mic-btn"
           >
@@ -213,7 +214,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-colors active:scale-95 ${
                 isMenuOpen
-                  ? 'bg-amber-500 text-slate-950'
+                  ? 'bg-accent-500 text-slate-950'
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
               title={isAr ? 'خيارات إضافية' : 'More Options'}
@@ -238,13 +239,13 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                 >
                   <span className="flex items-center gap-2">
                     {theme === 'dark' ? (
-                      <Sun className="w-4 h-4 text-amber-400" />
+                      <Sun className="w-4 h-4 text-accent-400" />
                     ) : (
                       <Moon className="w-4 h-4 text-slate-600" />
                     )}
                     <span>{isAr ? 'المظهر (داكن / فاتح)' : 'Theme Mode'}</span>
                   </span>
-                  <span className="text-[10px] text-amber-600 font-bold uppercase">
+                  <span className="text-[10px] text-accent-600 font-bold uppercase">
                     {theme === 'dark' ? (isAr ? 'داكن' : 'Dark') : (isAr ? 'فاتح' : 'Light')}
                   </span>
                 </button>
@@ -263,16 +264,27 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                         language === lang
-                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold'
+                          ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400 font-bold'
                           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span>
                         {lang === 'ar' ? 'العربية (RTL)' : lang === 'en' ? 'English (LTR)' : 'Français'}
                       </span>
-                      {language === lang && <span className="text-amber-500 text-xs">✓</span>}
+                      {language === lang && <span className="text-accent-500 text-xs">✓</span>}
                     </button>
                   ))}
+                </div>
+
+                {/* Logout */}
+                <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    onClick={() => { if (window.confirm(isAr ? 'هل تريد تسجيل الخروج من SMART TIME؟' : 'Sign out of SMART TIME?')) { onLogout?.(); setIsMenuOpen(false); } }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>{isAr ? 'تسجيل الخروج' : 'Sign out'}</span>
+                  </button>
                 </div>
 
                 {/* Settings Link */}
@@ -284,7 +296,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
-                    <SlidersHorizontal className="w-4 h-4 text-amber-500" />
+                    <SlidersHorizontal className="w-4 h-4 text-accent-500" />
                     <span>{t.backupAndSettings}</span>
                   </button>
                 </div>
@@ -296,20 +308,14 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
         {/* Side B (End): Official App Logo (بالجهة المقابلة لصورة المستخدم) */}
         <button
           onClick={() => onNavigate('dashboard')}
-          className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-amber-500/10 transition-all active:scale-95 group shrink-0"
-          title={isAr ? 'Smart Time — وقتك من ذهب' : 'Smart Time — Time Gold'}
+          className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-accent-500/10 transition-all active:scale-95 group shrink-0"
+          title={isAr ? 'SMART TIME — وقتك في مكان واحد' : 'SMART TIME — Your time, organized'}
           id="android-official-brand-logo-btn"
         >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-950 border border-amber-400/70 p-0.5 shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform relative overflow-hidden flex items-center justify-center">
-            <img
-              src={smartTimeLogo}
-              alt="Smart Time Logo"
-              className="w-full h-full object-contain rounded-lg"
-              referrerPolicy="no-referrer"
-            />
-            <span className="absolute -top-0.5 -end-0.5 pointer-events-none">
-              <Sparkles className="w-2 h-2 text-amber-300 animate-pulse" />
-            </span>
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-accent-400 via-accent-500 to-accent-700 border border-accent-300/60 p-1 shadow-md shadow-accent-500/20 group-hover:scale-105 transition-transform flex items-center justify-center text-white">
+            <div className="w-full h-full rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
+            </div>
           </div>
         </button>
 

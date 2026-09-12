@@ -436,7 +436,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
         onChange={handleFileUpload}
       />
 
-      <div className="bg-[#121212] border border-[#D4AF37]/40 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden relative">
+      <div className="bg-[#121212] border border-accent-500/40 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden relative">
         {/* Flash Effect Layer */}
         {triggerFlash && (
           <div className="absolute inset-0 bg-white z-50 pointer-events-none transition-opacity duration-200" />
@@ -449,7 +449,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
               className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-lg shadow-inner ${
                 mode === 'accident'
                   ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                  : 'bg-amber-500/20 text-[#D4AF37] border border-[#D4AF37]/40'
+                  : 'bg-accent-500/20 text-accent-500 border border-accent-500/40'
               }`}
             >
               {mode === 'accident' ? '🚨' : '📸'}
@@ -498,7 +498,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                   onClick={() => setMode('odometer')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                     mode === 'odometer'
-                      ? 'bg-[#D4AF37] text-slate-950 font-black'
+                      ? 'bg-accent-500 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -549,8 +549,8 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
 
                   {/* Center Target Rect for Odometer */}
                   {mode === 'odometer' && (
-                    <div className="self-center w-64 h-24 border-2 border-dashed border-[#D4AF37] rounded-xl flex items-center justify-center bg-[#D4AF37]/5 shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-                      <span className="text-xs text-[#D4AF37] font-mono font-bold">
+                    <div className="self-center w-64 h-24 border-2 border-dashed border-accent-500 rounded-xl flex items-center justify-center bg-accent-500/5 shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+                      <span className="text-xs text-accent-500 font-mono font-bold">
                         [ 0 0 0 0 0 0 KM ]
                       </span>
                     </div>
@@ -575,8 +575,8 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                 {/* Animated Countdown Overlay (عداد زمني للتصوير) */}
                 {isCountingDown && (
                   <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 animate-fade-in">
-                    <div className="w-28 h-28 rounded-full border-4 border-[#D4AF37] flex items-center justify-center animate-ping absolute opacity-30" />
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-[#D4AF37] to-amber-200 text-slate-950 font-black text-5xl flex items-center justify-center shadow-2xl font-mono">
+                    <div className="w-28 h-28 rounded-full border-4 border-accent-500 flex items-center justify-center animate-ping absolute opacity-30" />
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent-500 to-accent-200 text-slate-950 font-black text-5xl flex items-center justify-center shadow-2xl font-mono">
                       {countdownRemaining}
                     </div>
                     <p className="text-white font-bold text-sm mt-4 animate-pulse">
@@ -595,13 +595,13 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                 {/* Error / Fallback info */}
                 {cameraError && !stream && (
                   <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center z-20 space-y-3">
-                    <AlertTriangle className="w-10 h-10 text-amber-400" />
+                    <AlertTriangle className="w-10 h-10 text-accent-400" />
                     <p className="text-xs text-slate-300 max-w-sm">{cameraError}</p>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 rounded-xl bg-[#D4AF37] text-slate-950 font-bold text-xs flex items-center gap-1.5"
+                        className="px-4 py-2 rounded-xl bg-accent-500 text-slate-950 font-bold text-xs flex items-center gap-1.5"
                       >
                         <Upload className="w-4 h-4" />
                         <span>{isAr ? 'اختيار صورة من الجهاز' : 'Upload Image'}</span>
@@ -624,7 +624,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                 {/* Timer Duration Selection (العداد الزمني للتصوير) */}
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                   <div className="flex items-center gap-1.5 text-xs text-slate-300 font-bold">
-                    <Clock className="w-4 h-4 text-[#D4AF37]" />
+                    <Clock className="w-4 h-4 text-accent-500" />
                     <span>{isAr ? 'مؤقت التصوير:' : 'Timer:'}</span>
                   </div>
                   <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
@@ -640,7 +640,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                         onClick={() => setTimerDuration(t.val)}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                           timerDuration === t.val
-                            ? 'bg-[#D4AF37] text-slate-950'
+                            ? 'bg-accent-500 text-slate-950'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -679,8 +679,8 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                     disabled={isCountingDown}
                     className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all ${
                       mode === 'accident'
-                        ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 text-white shadow-rose-900/40 hover:brightness-110'
-                        : 'bg-gradient-to-r from-[#D4AF37] to-[#aa8c2c] text-slate-950 shadow-[#D4AF37]/30 hover:brightness-110'
+                        ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-accent-600 text-white shadow-rose-900/40 hover:brightness-110'
+                        : 'bg-gradient-to-r from-accent-500 to-accent-700 text-slate-950 shadow-accent-500/30 hover:brightness-110'
                     }`}
                   >
                     <Camera className="w-5 h-5" />
@@ -724,7 +724,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                   <span>{isAr ? 'إعادة التقاط الصورة' : 'Retake Photo'}</span>
                 </button>
 
-                <div className="absolute bottom-2 end-3 bg-black/70 px-2.5 py-1 rounded-lg text-[10px] text-[#D4AF37] font-mono flex items-center gap-1">
+                <div className="absolute bottom-2 end-3 bg-black/70 px-2.5 py-1 rounded-lg text-[10px] text-accent-500 font-mono flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>{isAr ? 'صورة موثقة بختم زمني' : 'Timestamped Evidence'}</span>
                 </div>
@@ -858,7 +858,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                       <label
                         className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
                           saveToVault
-                            ? 'bg-[#D4AF37]/10 border-[#D4AF37]/40 text-white'
+                            ? 'bg-accent-500/10 border-accent-500/40 text-white'
                             : 'bg-slate-900/50 border-slate-800 text-slate-400'
                         }`}
                       >
@@ -866,10 +866,10 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                           type="checkbox"
                           checked={saveToVault}
                           onChange={(e) => setSaveToVault(e.target.checked)}
-                          className="rounded text-[#D4AF37] focus:ring-0"
+                          className="rounded text-accent-500 focus:ring-0"
                         />
                         <div className="text-start">
-                          <div className="text-xs font-bold flex items-center gap-1 text-[#D4AF37]">
+                          <div className="text-xs font-bold flex items-center gap-1 text-accent-500">
                             <ShieldCheck className="w-3.5 h-3.5" />
                             <span>{isAr ? 'حفظ في الخزنة الرقمية' : 'Save to Secure Vault'}</span>
                           </div>
@@ -910,7 +910,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                     <button
                       type="button"
                       onClick={handleSaveAccident}
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold text-sm shadow-xl shadow-rose-900/30 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-accent-600 hover:from-rose-500 hover:to-accent-500 text-white font-extrabold text-sm shadow-xl shadow-rose-900/30 transition-all flex items-center justify-center gap-2"
                     >
                       <CheckCircle2 className="w-5 h-5" />
                       <span>{isAr ? 'حفظ وتوثيق صورة الحادث الآن' : 'Save & Document Accident Photo'}</span>
@@ -919,9 +919,9 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                 </div>
               ) : (
                 /* Odometer Review Screen */
-                <div className="space-y-4 bg-[#181818] p-5 rounded-2xl border border-amber-500/30">
+                <div className="space-y-4 bg-[#181818] p-5 rounded-2xl border border-accent-500/30">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <h4 className="font-black text-sm text-[#D4AF37] flex items-center gap-2">
+                    <h4 className="font-black text-sm text-accent-500 flex items-center gap-2">
                       <Gauge className="w-4 h-4" />
                       <span>{isAr ? 'نتيجة فحص وقراءة العداد' : 'Odometer Reading Result'}</span>
                     </h4>
@@ -943,7 +943,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                         value={detectedOdometer}
                         onChange={(e) => setDetectedOdometer(e.target.value)}
                         placeholder="e.g. 45200"
-                        className="w-full p-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-lg font-mono font-black text-center tracking-widest text-[#D4AF37]"
+                        className="w-full p-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-lg font-mono font-black text-center tracking-widest text-accent-500"
                       />
                       <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                         KM
@@ -961,7 +961,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                       type="checkbox"
                       checked={saveToVault}
                       onChange={(e) => setSaveToVault(e.target.checked)}
-                      className="rounded text-[#D4AF37]"
+                      className="rounded text-accent-500"
                     />
                     <span className="text-xs text-slate-300">
                       {isAr ? 'حفظ نسخة موثقة من صورة العداد بالخزنة الرقمية' : 'Save documented photo in vault'}
@@ -972,7 +972,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
                     type="button"
                     onClick={handleApplyOdometer}
                     disabled={!detectedOdometer}
-                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#aa8c2c] text-slate-950 font-black text-sm shadow-xl shadow-[#D4AF37]/20 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-accent-500 to-accent-700 text-slate-950 font-black text-sm shadow-xl shadow-accent-500/20 transition-all flex items-center justify-center gap-2"
                   >
                     <CheckCircle2 className="w-5 h-5" />
                     <span>{isAr ? 'اعتماد قراءة العداد وتطبيقها' : 'Apply Odometer Reading'}</span>

@@ -65,14 +65,14 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
         {/* Animated Voice Orb */}
         <div className="relative flex items-center justify-center">
           <div
-            className={`w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 via-amber-600 to-yellow-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/30 transition-transform ${
+            className={`w-24 h-24 rounded-full bg-gradient-to-tr from-accent-500 via-accent-600 to-yellow-500 text-white flex items-center justify-center shadow-xl shadow-accent-500/30 transition-transform ${
               isListening ? 'animate-pulse scale-110' : ''
             }`}
           >
             {isListening ? <Mic className="w-10 h-10 animate-bounce" /> : <MicOff className="w-10 h-10" />}
           </div>
           {isListening && (
-            <div className="absolute inset-0 rounded-full border-4 border-amber-400/40 animate-ping" />
+            <div className="absolute inset-0 rounded-full border-4 border-accent-400/40 animate-ping" />
           )}
         </div>
 
@@ -97,8 +97,8 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
         </div>
 
         {detectedIntent && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300 text-xs font-bold flex items-center justify-center gap-2 animate-fadeIn">
-            <Sparkles className="w-4 h-4 text-amber-500" />
+          <div className="p-3 bg-accent-50 dark:bg-accent-950/40 rounded-xl border border-accent-300 dark:border-accent-700/60 text-accent-800 dark:text-accent-300 text-xs font-bold flex items-center justify-center gap-2 animate-fadeIn">
+            <Sparkles className="w-4 h-4 text-accent-500" />
             <span>{detectedIntent}</span>
           </div>
         )}
@@ -107,7 +107,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
         <div className="flex gap-2 pt-2">
           <button
             onClick={() => handleExecuteVoiceAction('trips')}
-            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-bold text-xs shadow-md shadow-amber-500/25 active:scale-98 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-accent-500 to-yellow-600 hover:from-accent-600 hover:to-yellow-700 text-white font-bold text-xs shadow-md shadow-accent-500/25 active:scale-98 transition-all flex items-center justify-center gap-2"
           >
             <Navigation className="w-4 h-4" />
             <span>{language === 'ar' ? 'فتح شاشة الرحلات والمقارنة' : 'Go to Trips'}</span>

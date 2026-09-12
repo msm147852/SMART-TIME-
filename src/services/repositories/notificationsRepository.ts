@@ -2,6 +2,7 @@ import { AppNotification } from '../../types';
 import { STORAGE_KEYS } from '../storageKeys';
 import { StorageAdapter } from '../storageAdapter';
 import { DEFAULT_NOTIFICATIONS } from '../seedData';
+import { NotificationSoundService } from '../notificationSoundService';
 
 export class NotificationsRepository {
   static getNotifications(): AppNotification[] {
@@ -42,6 +43,7 @@ export class NotificationsRepository {
     const list = this.getNotifications();
     const updated = [notification, ...list];
     this.saveNotifications(updated);
+    NotificationSoundService.play();
     return updated;
   }
 }

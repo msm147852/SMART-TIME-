@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { Sparkles, Clock } from 'lucide-react';
+import React from 'react';
+import { Clock } from 'lucide-react';
 import { Language } from '../types';
-import smartTimeLogo from '../assets/images/smart_time_logo_1788556138099.jpg';
 
 interface BrandLogoProps {
   language?: Language;
@@ -20,8 +19,6 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   onClick,
   className = '',
 }) => {
-  const [imageError, setImageError] = useState(false);
-
   const isSmall = size === 'sm';
   const isLarge = size === 'lg';
   const isXLarge = size === 'xl';
@@ -50,26 +47,13 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       } ${className}`}
       id="brand-logo-component"
     >
-      {/* Luxury Gold Icon Emblem with Official Logo */}
+      {/* SMART TIME Ocean emblem — no gold/black logo treatment */}
       <div
-        className={`${containerSizes} rounded-2xl bg-slate-950 border-2 border-amber-400/80 p-0.5 shadow-lg shadow-amber-500/25 ring-2 ring-amber-400/30 group-hover:scale-105 transition-all shrink-0 relative overflow-hidden flex items-center justify-center`}
+        className={`${containerSizes} rounded-2xl bg-gradient-to-br from-accent-400 via-accent-500 to-accent-700 border border-accent-300/60 p-1 shadow-lg shadow-accent-500/20 group-hover:scale-105 transition-all shrink-0 flex items-center justify-center text-white`}
       >
-        {!imageError ? (
-          <img
-            src={smartTimeLogo}
-            alt="Logo"
-            onError={() => setImageError(true)}
-            className="w-full h-full object-contain rounded-xl"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-xl flex items-center justify-center text-slate-950">
-            <Clock className={`${isSmall ? 'w-4 h-4' : 'w-5 h-5'} font-bold`} />
-          </div>
-        )}
-        <span className="absolute -top-0.5 -end-0.5 pointer-events-none">
-          <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
-        </span>
+        <div className="w-full h-full rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
+          <Clock className={`${isSmall ? 'w-4 h-4' : 'w-5 h-5'} font-bold`} />
+        </div>
       </div>
 
       {/* Brand Typography (Only if showText is explicitly true) */}
@@ -77,14 +61,14 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5 leading-none">
             <span
-              className={`font-black tracking-tight ${titleSizes} text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors font-sans`}
+              className={`font-black tracking-tight ${titleSizes} text-slate-900 dark:text-white group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors font-sans`}
             >
-              Time Gold
+              SMART TIME
             </span>
           </div>
 
           {showSubtitle && (
-            <span className="text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-400/90 tracking-wide mt-0.5">
+            <span className="text-[11px] sm:text-xs font-bold text-accent-700 dark:text-accent-400/90 tracking-wide mt-0.5">
               {language === 'ar' ? 'الواجهة الشخصية' : 'Personal Cockpit'}
             </span>
           )}

@@ -261,7 +261,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
 
             <div className="bg-white dark:bg-slate-850 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="text-xs text-slate-500">{language === 'ar' ? 'إجمالي تكلفة الوقود' : 'Total Fuel Cost'}</div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono-num mt-1">
+              <div className="text-2xl font-black text-accent-600 dark:text-accent-400 font-mono-num mt-1">
                 {totalFuelCost.toLocaleString()} <span className="text-xs font-normal">{currency}</span>
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
@@ -348,7 +348,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
               <button
                 type="button"
                 onClick={openOdometerCamera}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs border border-amber-500/30 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-500/10 hover:bg-accent-500/20 text-accent-600 dark:text-accent-400 font-bold text-xs border border-accent-500/30 transition-all active:scale-95"
               >
                 <Gauge className="w-3.5 h-3.5" />
                 <span>{language === 'ar' ? '📸 تصوير العداد' : 'Odometer Scan'}</span>
@@ -383,7 +383,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                       key={sys.type}
                       className={`p-4 rounded-2xl border transition-all ${
                         isDueSoon
-                          ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500'
+                          ? 'bg-accent-50/70 dark:bg-accent-950/30 border-accent-400 dark:border-accent-500'
                           : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800'
                       }`}
                     >
@@ -398,7 +398,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                         </div>
                         <div
                           className={`font-extrabold text-sm ${
-                            isDueSoon ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                            isDueSoon ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'
                           }`}
                         >
                           {remainingKm.toLocaleString()} كم
@@ -420,7 +420,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                 </h3>
                 <button
                   onClick={() => setShowAddFuelModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white font-bold text-xs shadow-sm"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{language === 'ar' ? 'إضافة تفويلة' : 'Add Fuel'}</span>
@@ -439,7 +439,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                           {f.date} • عداد {f.mileage.toLocaleString()} كم
                         </div>
                       </div>
-                      <div className="font-bold font-mono-num text-amber-600 dark:text-amber-400 text-sm">
+                      <div className="font-bold font-mono-num text-accent-600 dark:text-accent-400 text-sm">
                         {f.totalCost.toLocaleString()} {currency}
                       </div>
                     </div>
@@ -489,7 +489,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
           {/* Accidents SubTab */}
           {activeSubTab === 'accidents' && (
             <div className="space-y-6 animate-fadeIn">
-              <div className="p-6 rounded-3xl bg-gradient-to-r from-red-500/10 via-slate-900/50 to-amber-500/10 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-red-500/10 via-slate-900/50 to-accent-500/10 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="space-y-1 text-center sm:text-start">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/30">
                     <AlertTriangle className="w-3.5 h-3.5" />
@@ -687,7 +687,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-              <Fuel className="w-5 h-5 text-amber-500" />
+              <Fuel className="w-5 h-5 text-accent-500" />
               <span>{language === 'ar' ? 'تسجيل تفويلة وقود' : 'Add Fuel Entry'}</span>
             </h3>
             <form onSubmit={handleSaveFuel} className="space-y-3 text-xs">
@@ -715,7 +715,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                   />
                 </div>
               </div>
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl text-amber-800 dark:text-amber-300 font-bold font-mono-num text-sm text-center">
+              <div className="p-3 bg-accent-50 dark:bg-accent-950/40 rounded-xl text-accent-800 dark:text-accent-300 font-bold font-mono-num text-sm text-center">
                 {language === 'ar' ? 'الإجمالي:' : 'Total:'}{' '}
                 {((parseFloat(fuelLiters) || 0) * (parseFloat(fuelPrice) || 0)).toFixed(2)} {currency}
               </div>
@@ -758,7 +758,7 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                 >
                   {t.cancel}
                 </button>
-                <button type="submit" className="px-5 py-2 rounded-xl bg-amber-500 text-white font-bold">
+                <button type="submit" className="px-5 py-2 rounded-xl bg-accent-500 text-white font-bold">
                   {t.save}
                 </button>
               </div>

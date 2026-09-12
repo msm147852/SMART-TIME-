@@ -39,7 +39,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
             {title || (isAr ? 'تأكيد حذف السجل' : 'Confirm Deletion')}
           </h3>
           {itemName && (
-            <p className="text-xs font-bold text-[#D4AF37] bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 line-clamp-2">
+            <p className="text-xs font-bold text-accent-500 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 line-clamp-2">
               {itemName}
             </p>
           )}

@@ -1,4 +1,4 @@
-import { Expense, BudgetSummary } from '../../types';
+import { Expense, BudgetSummary, MonthlyIncome, BankCertificate } from '../../types';
 import { STORAGE_KEYS } from '../storageKeys';
 import { StorageAdapter } from '../storageAdapter';
 import { DEFAULT_EXPENSES, DEFAULT_BUDGET } from '../seedData';
@@ -39,5 +39,21 @@ export class ExpensesRepository {
 
   static saveBudget(budget: BudgetSummary): void {
     StorageAdapter.setItem(STORAGE_KEYS.BUDGET, budget);
+  }
+
+  static getMonthlyIncome(): MonthlyIncome[] {
+    return StorageAdapter.getItem<MonthlyIncome[]>(STORAGE_KEYS.MONTHLY_INCOME, []);
+  }
+
+  static saveMonthlyIncome(items: MonthlyIncome[]): void {
+    StorageAdapter.setItem(STORAGE_KEYS.MONTHLY_INCOME, items);
+  }
+
+  static getBankCertificates(): BankCertificate[] {
+    return StorageAdapter.getItem<BankCertificate[]>(STORAGE_KEYS.BANK_CERTIFICATES, []);
+  }
+
+  static saveBankCertificates(items: BankCertificate[]): void {
+    StorageAdapter.setItem(STORAGE_KEYS.BANK_CERTIFICATES, items);
   }
 }

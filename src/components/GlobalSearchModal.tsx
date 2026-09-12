@@ -90,7 +90,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 ? 'ابحث في كل شيء: ملاحظات، مصاريف، سيارات، دروس، وصفات...'
                 : 'Search everything: notes, expenses, cars, lessons, recipes...'
             }
-            className="w-full ps-12 pe-10 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full ps-12 pe-10 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500"
             autoFocus
           />
           <button
@@ -105,7 +105,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         <div className="max-h-[420px] overflow-y-auto space-y-3 pe-1">
           {q === '' ? (
             <div className="py-12 text-center text-slate-400 space-y-2">
-              <Sparkles className="w-8 h-8 mx-auto text-amber-500/70" />
+              <Sparkles className="w-8 h-8 mx-auto text-accent-500/70" />
               <p className="text-xs font-semibold">
                 {language === 'ar' ? 'اكتب كلمة للبحث الفوري في جميع أقسام التطبيق' : 'Type to search across the entire Super App'}
               </p>
@@ -120,17 +120,17 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
               {matchingNotes.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-[11px] font-bold text-slate-400 px-2 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-amber-500" />
+                    <FileText className="w-3.5 h-3.5 text-accent-500" />
                     <span>{language === 'ar' ? 'الملاحظات' : 'Notes'}</span>
                   </div>
                   {matchingNotes.map((n) => (
                     <div
                       key={n.id}
                       onClick={() => handleSelectResult('notes')}
-                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-slate-100 dark:border-slate-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 hover:bg-accent-50 dark:hover:bg-accent-950/40 border border-slate-100 dark:border-slate-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
                     >
                       <span className="font-bold text-slate-900 dark:text-white">{n.title}</span>
-                      <span className="text-[11px] text-amber-600 font-semibold">{n.date}</span>
+                      <span className="text-[11px] text-accent-600 font-semibold">{n.date}</span>
                     </div>
                   ))}
                 </div>

@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   DAILY_TASKS: 'smart_time_daily_tasks',
   EXPENSES: 'smart_time_expenses',
   BUDGET: 'smart_time_budget',
+  MONTHLY_INCOME: 'smart_time_monthly_income',
+  BANK_CERTIFICATES: 'smart_time_bank_certificates',
   VEHICLES: 'smart_time_vehicles',
   FUEL_RECORDS: 'smart_time_fuel_records',
   MAINTENANCE_RECORDS: 'smart_time_maint_records',
@@ -26,4 +28,5 @@ export const STORAGE_KEYS = {
   NOTIFICATIONS: 'smart_time_notifications',
   ATHKAR_ITEMS: 'smart_time_athkar_items',
   AI_CHAT_HISTORY: 'smart_time_ai_chat_history',
+  NOTIFICATION_SOUND: 'smart_time_notification_sound',
 } as const;

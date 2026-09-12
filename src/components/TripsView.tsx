@@ -24,6 +24,7 @@ import {
   DownloadCloud,
   Check,
   RefreshCw,
+  Edit3,
 } from 'lucide-react';
 import {
   FavoritePlace,
@@ -36,6 +37,13 @@ import {
 } from '../types';
 import { translations } from '../services/i18n';
 import { TripsRepository } from '../services';
+import { TripsMap } from './trips/TripsMap';
+import { LocationPickerModal } from './trips/LocationPickerModal';
+import { VoiceTripModal } from './trips/VoiceTripModal';
+import { TripLocation, LocationPickerMode } from './trips/types';
+import { apiUrl } from '../services/apiConfig';
+import { authHeaders } from '../services/authService';
+import { WalletService } from '../services/walletService';
 
 interface TripsViewProps {
   language: Language;
@@ -43,6 +51,7 @@ interface TripsViewProps {
   favoritePlaces: FavoritePlace[];
   recentTrips: RecentTrip[];
   onOpenVoiceSearch: () => void;
+  onOpenWallet?: () => void;
 }
 
 export const TripsView: React.FC<TripsViewProps> = ({
@@ -51,12 +60,31 @@ export const TripsView: React.FC<TripsViewProps> = ({
   favoritePlaces,
   recentTrips,
   onOpenVoiceSearch,
+  onOpenWallet,
 }) => {
   const t = translations[language];
+  const isRtl = language === 'ar';
 
-  // Ride Search State
-  const [pickupText, setPickupText] = useState('المنزل (مدينة نصر، القاهرة)');
-  const [destinationText, setDestinationText] = useState('العمل (التجمع الخامس، القاهرة الجديدة)');
+  // Structured Location States
+  const [pickupLocation, setPickupLocation] = useState<TripLocation>({
+    address: 'مدينة نصر، القاهرة',
+    name: 'المنزل (مدينة نصر)',
+    latitude: 30.0561,
+    longitude: 31.3301,
+  });
+
+  const [dropoffLocation, setDropoffLocation] = useState<TripLocation>({
+    address: 'التجمع الخامس، القاهرة الجديدة',
+    name: 'العمل (التجمع الخامس)',
+    latitude: 30.0131,
+    longitude: 31.4289,
+  });
+
+  // Modals state
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<LocationPickerMode>('pickup');
+  const [isVoiceTripOpen, setIsVoiceTripOpen] = useState(false);
+
   const [selectedRideType, setSelectedRideType] = useState<RideType>('Comfort');
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonData, setComparisonData] = useState<TransportComparisonResult | null>(null);
@@ -70,40 +98,119 @@ export const TripsView: React.FC<TripsViewProps> = ({
   });
   const [showInstallAlert, setShowInstallAlert] = useState(true);
   const [verifiedFareDiscountActive, setVerifiedFareDiscountActive] = useState(true);
+  const [walletError, setWalletError] = useState<string>('');
+
+  // التحقق من الرصيد أول ما الشاشة تفتح - قبل ما نسمح بأي استخدام لقسم الرحلات
+  const [walletChecked, setWalletChecked] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [tripCost, setTripCost] = useState(5);
+  const [freeSearches, setFreeSearches] = useState(0);
+  const [walletLoadError, setWalletLoadError] = useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    WalletService.getMyWallet()
+      .then((w) => {
+        if (cancelled) return;
+        setWalletBalance(w.balance);
+        setTripCost(w.tripCost);
+        setFreeSearches(Math.max(0, Number(w.freeSearches || 0)));
+        setWalletChecked(true);
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        // لو المستخدم مش مسجل دخول أو حصل خطأ، نوريه رسالة مناسبة بدل ما نفتحله القسم
+        setWalletLoadError(e?.message || 'يجب تسجيل الدخول لاستخدام قسم الرحلات');
+        setWalletChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openPicker = (mode: LocationPickerMode) => {
+    setPickerMode(mode);
+    setIsLocationPickerOpen(true);
+  };
+
+  const handleLocationPicked = (loc: TripLocation) => {
+    if (pickerMode === 'pickup') {
+      setPickupLocation(loc);
+    } else {
+      setDropoffLocation(loc);
+    }
+  };
+
+  const handleVoiceTripConfirmed = (p: TripLocation, d: TripLocation) => {
+    setPickupLocation(p);
+    setDropoffLocation(d);
+  };
 
   // Quick preset locations
   const handleSelectFavorite = (place: FavoritePlace, target: 'pickup' | 'dest') => {
-    const text = `${place.title} - ${place.point.address}`;
+    const loc: TripLocation = {
+      address: place.point.address || place.title,
+      name: place.title,
+      latitude: place.point.lat || (target === 'pickup' ? 30.0561 : 30.0131),
+      longitude: place.point.lng || (target === 'pickup' ? 31.3301 : 31.4289),
+    };
     if (target === 'pickup') {
-      setPickupText(text);
+      setPickupLocation(loc);
     } else {
-      setDestinationText(text);
+      setDropoffLocation(loc);
     }
   };
 
   const handleSwapLocations = () => {
-    const temp = pickupText;
-    setPickupText(destinationText);
-    setDestinationText(temp);
+    const temp = pickupLocation;
+    setPickupLocation(dropoffLocation);
+    setDropoffLocation(temp);
   };
 
   const handleRunComparison = async () => {
-    if (!pickupText.trim() || !destinationText.trim()) return;
+    if (!pickupLocation.address.trim() || !dropoffLocation.address.trim()) return;
 
     setIsComparing(true);
+    setWalletError('');
     try {
-      const res = await fetch('/api/transport/compare', {
+      const res = await fetch(apiUrl('/api/transport/compare'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          pickup: { name: pickupText, address: pickupText, lat: 30.0561, lng: 31.3301 },
-          destination: { name: destinationText, address: destinationText, lat: 30.0131, lng: 31.4289 },
+          pickup: {
+            name: pickupLocation.name || pickupLocation.address,
+            address: pickupLocation.address,
+            lat: pickupLocation.latitude,
+            lng: pickupLocation.longitude,
+            latitude: pickupLocation.latitude,
+            longitude: pickupLocation.longitude,
+          },
+          destination: {
+            name: dropoffLocation.name || dropoffLocation.address,
+            address: dropoffLocation.address,
+            lat: dropoffLocation.latitude,
+            lng: dropoffLocation.longitude,
+            latitude: dropoffLocation.latitude,
+            longitude: dropoffLocation.longitude,
+          },
           rideType: selectedRideType,
         }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        if (data.code === 'INSUFFICIENT_BALANCE') {
+          setWalletError(data.error || 'رصيدك غير كافٍ، من فضلك اشحن رصيدك أولاً');
+          if (typeof data.balance === 'number') setWalletBalance(data.balance);
+          if (typeof data.freeSearches === 'number') setFreeSearches(Math.max(0, data.freeSearches));
+        } else if (res.status === 401) {
+          setWalletError('يجب تسجيل الدخول أولاً لاستخدام خدمة مقارنة الرحلات');
+        }
+        return;
+      }
       if (data.success && data.result) {
         setComparisonData(data.result);
+        if (typeof data.walletBalance === 'number') setWalletBalance(data.walletBalance);
+        if (typeof data.freeSearchesRemaining === 'number') setFreeSearches(Math.max(0, data.freeSearchesRemaining));
       }
     } catch (e) {
       console.error('Transport comparison failed:', e);
@@ -112,10 +219,8 @@ export const TripsView: React.FC<TripsViewProps> = ({
     }
   };
 
-  // Initial trigger
-  React.useEffect(() => {
-    handleRunComparison();
-  }, [selectedRideType]);
+  // مهم: لا يتم تنفيذ المقارنة تلقائيًا عند تغيير الموقع أو نوع الرحلة،
+  // لأن كل مقارنة مدفوعة. الخصم يتم فقط بعد ضغط المستخدم على زر المقارنة ونجاح الطلب.
 
   const toggleAppInstalled = (appKey: string) => {
     setInstalledApps((prev) => ({
@@ -137,33 +242,122 @@ export const TripsView: React.FC<TripsViewProps> = ({
     }
   };
 
+  // شاشة الانتظار لحد ما نتأكد من الرصيد
+  if (!walletChecked) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <span className="text-slate-400 text-sm">جارٍ التحقق من رصيدك...</span>
+      </div>
+    );
+  }
+
+  // لو مش مسجل دخول أو حصل خطأ في جلب الرصيد
+  if (walletLoadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center px-6">
+        <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
+          <Navigation className="w-10 h-10 text-red-400" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-700">مفيش وصول لقسم الرحلات</h2>
+        <p className="text-sm text-slate-500 max-w-xs">{walletLoadError}</p>
+      </div>
+    );
+  }
+
+  // لو الرصيد أقل من تكلفة رحلة واحدة، نقفل القسم كله ونطلب الشحن أولاً
+  if (walletBalance < tripCost && freeSearches <= 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-5 text-center px-6">
+        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
+          <Navigation className="w-12 h-12 text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-800 mb-2">
+            رجاء الشحن يا حبيبي 🙏
+          </h2>
+          <p className="text-sm text-slate-500 max-w-sm">
+            رصيدك الحالي {walletBalance.toFixed(2)} ج.م، وتكلفة كل بحث عن رحلة {tripCost} ج.م.
+            اشحن رصيدك أولاً عشان تقدر تستخدم قسم الرحلات.
+          </p>
+        </div>
+        {onOpenWallet && (
+          <button
+            onClick={onOpenWallet}
+            className="bg-accent-600 hover:bg-accent-700 text-white font-bold px-8 py-3 rounded-2xl shadow-lg transition-colors"
+          >
+            اشحن رصيدك الآن
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" id="trips-transport-module">
+      {freeSearches > 0 && (
+        <div className="rounded-3xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-cyan-50 to-sky-50 dark:from-emerald-950/40 dark:via-cyan-950/30 dark:to-sky-950/30 p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-xl shadow-md">🎁</div>
+            <div className="min-w-0">
+              <div className="font-black text-emerald-800 dark:text-emerald-200">هدية ترحيبية يا نور عنيا ❤️</div>
+              <div className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">لديك {freeSearches} {freeSearches === 1 ? 'بحث مجاني' : 'أبحاث مجانية'} لاستخدام البحث في قسم الرحلات. بعد انتهاء الهدية يتم الخصم من المحفظة.</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {walletError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 flex items-center justify-between gap-3">
+          <span className="text-sm font-medium">{walletError}</span>
+          {onOpenWallet && (
+            <button
+              onClick={onOpenWallet}
+              className="shrink-0 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-xl"
+            >
+              {isRtl ? 'اشحن رصيدك' : 'Top up wallet'}
+            </button>
+          )}
+        </div>
+      )}
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-white p-6 rounded-3xl shadow-lg shadow-amber-500/20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-accent-500 via-accent-600 to-yellow-600 text-white p-6 rounded-3xl shadow-lg shadow-accent-500/20">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/20 text-amber-100 text-xs font-bold mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/20 text-accent-100 text-xs font-bold mb-2">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{language === 'ar' ? 'محرك المقارنة والأسعار الحية' : 'Live Transport Price Comparison'}</span>
+            <span>{isRtl ? 'محرك مقارنة الرحلات الذكي' : 'Smart Transport Comparison'}</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold flex items-center gap-2.5">
             <Navigation className="w-6 h-6" />
             <span>{t.trips}</span>
           </h1>
-          <p className="text-xs sm:text-sm text-amber-100 mt-1 max-w-xl">
-            {language === 'ar'
-              ? 'قارن الأسعار فورياً بين Uber و Careem و inDrive و DiDi و التاكسي، واحصل على السعر الحقيقي المؤكد.'
-              : 'Real-time fare and ETA comparison across Uber, Careem, inDrive, DiDi and Taxi.'}
+          <p className="text-xs sm:text-sm text-accent-100 mt-1 max-w-xl">
+            {isRtl
+              ? 'حدد نقطة الانطلاق والوصول من الخريطة، كتابة العنوان، أو بالصوت للمقارنة فوراً بين أوبر، إن درايف، وديدي.'
+              : 'Set pickup and destination via Map, Address Search, or Voice to compare Uber, inDrive, and DiDi fares.'}
           </p>
         </div>
 
         <button
-          onClick={onOpenVoiceSearch}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white text-amber-800 hover:bg-amber-50 font-bold text-xs shadow-md transition-all self-start sm:self-auto"
+          onClick={() => setIsVoiceTripOpen(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white text-accent-800 hover:bg-accent-50 font-bold text-xs shadow-md transition-all self-start sm:self-auto active:scale-95"
+          id="voice-trip-start-btn"
+          aria-label={isRtl ? 'طلب مشوار بالصوت' : 'Voice Ride Request'}
         >
-          <Mic className="w-4 h-4 text-amber-600" />
-          <span>{language === 'ar' ? 'طلب مشوار بالصوت' : 'Voice Ride Request'}</span>
+          <Mic className="w-4 h-4 text-accent-600 animate-pulse" />
+          <span>{isRtl ? 'طلب مشوار بالصوت 🎙️' : 'Voice Ride Request 🎙️'}</span>
         </button>
+      </div>
+
+      {/* ========================================================= */}
+      {/* INTERACTIVE TRIPS GOOGLE MAP (TOP OF PAGE) */}
+      {/* ========================================================= */}
+      <div id="trips-main-interactive-map">
+        <TripsMap
+          pickup={pickupLocation}
+          dropoff={dropoffLocation}
+          onSelectPickup={() => openPicker('pickup')}
+          onSelectDropoff={() => openPicker('dropoff')}
+          language={language}
+        />
       </div>
 
       {/* ========================================================= */}
@@ -171,29 +365,29 @@ export const TripsView: React.FC<TripsViewProps> = ({
       {/* ========================================================= */}
       {showInstallAlert && (
         <div
-          className="p-5 rounded-3xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-slate-850 dark:to-slate-900 border-2 border-amber-400 dark:border-amber-500/50 shadow-md space-y-3"
+          className="p-5 rounded-3xl bg-gradient-to-r from-accent-50 to-orange-50 dark:from-slate-850 dark:to-slate-900 border-2 border-accent-400 dark:border-accent-500/50 shadow-md space-y-3"
           id="app-install-verification-notice"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-3.5">
-              <span className="p-2.5 rounded-2xl bg-amber-500 text-white shrink-0 shadow-md shadow-amber-500/30">
+              <span className="p-2.5 rounded-2xl bg-accent-500 text-white shrink-0 shadow-md shadow-accent-500/30">
                 <Smartphone className="w-6 h-6" />
               </span>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h3 className="font-black text-sm text-slate-900 dark:text-white">
-                    {language === 'ar'
-                      ? '📱 تأكيد تثبيت التطبيقات على الهاتف للحصول على السعر الحقيقي'
-                      : 'App Installation Verification for True Live Fares'}
+                    {isRtl
+                      ? '📱 فتح تطبيقات النقل ومراجعة حالة التكامل'
+                      : 'Transport App & Integration Status'}
                   </h3>
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black">
                     مؤكد وموثق
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl font-arabic">
-                  {language === 'ar'
-                    ? 'للحصول على تسعير فوري حقيقي وتفعيل الخصومات اللحظية، يرجى التأكد من أن تطبيقات التوصيل مثبتة على هاتفك لفتح المشوار بنقرة واحدة مباشرة:'
-                    : 'To fetch true real-time pricing and coupon discounts, ensure the corresponding apps are installed on your phone.'}
+                  {isRtl
+                    ? 'يمكن فتح تطبيقات النقل المثبتة مباشرة، والأسعار دقيقة وفق المسافة المحددة على الخريطة:'
+                    : 'Installed apps can be opened directly with accurate fare estimates based on map distance:'}
                 </p>
               </div>
             </div>
@@ -233,24 +427,24 @@ export const TripsView: React.FC<TripsViewProps> = ({
         {/* Input Panel (5 cols) */}
         <div className="lg:col-span-5 bg-white dark:bg-slate-850 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
           <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-            <Compass className="w-4 h-4 text-amber-500" />
-            <span>{language === 'ar' ? 'تحديد نقاط المشوار' : 'Plan Your Ride'}</span>
+            <Compass className="w-4 h-4 text-accent-500" />
+            <span>{isRtl ? 'تحديد نقاط المشوار' : 'Plan Your Ride'}</span>
           </h3>
 
           {/* Quick Favorites Pills */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-slate-400">
-              {language === 'ar' ? 'الأماكن المفضلة:' : 'Favorite Shortcuts:'}
+              {isRtl ? 'الأماكن المفضلة:' : 'Favorite Shortcuts:'}
             </label>
             <div className="flex flex-wrap items-center gap-2">
               {favoritePlaces.map((fav) => (
                 <button
                   key={fav.id}
                   onClick={() => handleSelectFavorite(fav, 'dest')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-accent-50 dark:hover:bg-accent-950/40 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
                 >
                   {fav.type === 'home' && <Home className="w-3.5 h-3.5 text-blue-500" />}
-                  {fav.type === 'work' && <Briefcase className="w-3.5 h-3.5 text-amber-500" />}
+                  {fav.type === 'work' && <Briefcase className="w-3.5 h-3.5 text-accent-500" />}
                   {fav.type === 'family' && <Users className="w-3.5 h-3.5 text-emerald-500" />}
                   <span>{fav.title}</span>
                 </button>
@@ -258,60 +452,105 @@ export const TripsView: React.FC<TripsViewProps> = ({
             </div>
           </div>
 
-          {/* Location Inputs with Swap Button */}
+          {/* Location Selection Cards with 3 Options Trigger */}
           <div className="relative space-y-3 pt-2">
-            {/* Pickup */}
+            {/* Pickup Location Card */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                <span>{t.pickupLocation}</span>
+              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                  <span>{t.pickupLocation}</span>
+                </span>
+                <span className="text-[11px] text-accent-600 dark:text-accent-400 font-semibold">
+                  {isRtl ? 'خريطة • كتابة • صوت' : 'Map • Search • Voice'}
+                </span>
               </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-emerald-500 absolute start-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={pickupText}
-                  onChange={(e) => setPickupText(e.target.value)}
-                  placeholder={language === 'ar' ? 'موقعك الحالي أو نقطة التحرك...' : 'Pickup address or landmark...'}
-                  className="w-full ps-9 pe-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
+
+              <button
+                type="button"
+                onClick={() => openPicker('pickup')}
+                className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 text-start flex items-center justify-between gap-3 group transition-all shadow-sm"
+                id="trips-pickup-picker-btn"
+                aria-label={isRtl ? 'نقطة الانطلاق، اضغط لتحديد مكان الانطلاق' : 'Pickup location, click to choose'}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-500 shrink-0 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div className="truncate">
+                    <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                      {pickupLocation.name || pickupLocation.address.split(',')[0]}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {pickupLocation.address}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 shrink-0 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-xl border border-emerald-500/30">
+                  <Edit3 className="w-3 h-3" />
+                  <span>{isRtl ? 'تحديد' : 'Pick'}</span>
+                </div>
+              </button>
             </div>
 
             {/* Swap Button */}
             <div className="flex justify-end pe-4 -my-1">
               <button
                 onClick={handleSwapLocations}
-                className="p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-500 hover:scale-110 transition-transform shadow-sm"
+                className="p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-accent-500 hover:scale-110 transition-transform shadow-sm"
                 title="تبديل النقطتين"
+                aria-label="تبديل نقطتي الانطلاق والوصول"
               >
-                <ArrowUpDown className="w-3.5 h-3.5" />
+                <ArrowUpDown className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Destination */}
+            {/* Destination Location Card */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                <span>{t.destinationLocation}</span>
+              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                  <span>{t.destinationLocation}</span>
+                </span>
+                <span className="text-[11px] text-accent-600 dark:text-accent-400 font-semibold">
+                  {isRtl ? 'خريطة • كتابة • صوت' : 'Map • Search • Voice'}
+                </span>
               </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-rose-500 absolute start-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={destinationText}
-                  onChange={(e) => setDestinationText(e.target.value)}
-                  placeholder={language === 'ar' ? 'إلى أين تريد الذهاب؟' : 'Where to?'}
-                  className="w-full ps-9 pe-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
+
+              <button
+                type="button"
+                onClick={() => openPicker('dropoff')}
+                className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 hover:border-rose-500 dark:hover:border-rose-500 text-start flex items-center justify-between gap-3 group transition-all shadow-sm"
+                id="trips-dropoff-picker-btn"
+                aria-label={isRtl ? 'نقطة النزول، اضغط لتحديد مكان الوصول' : 'Dropoff location, click to choose'}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-xl bg-rose-500/15 text-rose-500 shrink-0 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div className="truncate">
+                    <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                      {dropoffLocation.name || dropoffLocation.address.split(',')[0]}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {dropoffLocation.address}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 shrink-0 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-xl border border-rose-500/30">
+                  <Edit3 className="w-3 h-3" />
+                  <span>{isRtl ? 'تحديد' : 'Pick'}</span>
+                </div>
+              </button>
             </div>
           </div>
 
           {/* Ride Type Selection */}
           <div className="space-y-2 pt-2">
             <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
-              {language === 'ar' ? 'فئة المشوار:' : 'Ride Category:'}
+              {isRtl ? 'فئة المشوار:' : 'Ride Category:'}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(['Economy', 'Comfort', 'Scooter', 'Taxi'] as RideType[]).map((type) => (
@@ -320,7 +559,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                   onClick={() => setSelectedRideType(type)}
                   className={`p-2.5 rounded-xl border text-center transition-all ${
                     selectedRideType === type
-                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold shadow-sm'
+                      ? 'border-accent-500 bg-accent-50 dark:bg-accent-950/40 text-accent-700 dark:text-accent-300 font-bold shadow-sm'
                       : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                   }`}
                 >
@@ -335,7 +574,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
           <button
             onClick={handleRunComparison}
             disabled={isComparing}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-bold text-sm shadow-lg shadow-amber-500/25 active:scale-98 transition-all flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-accent-500 via-accent-600 to-yellow-600 hover:from-accent-600 hover:to-yellow-700 text-white font-bold text-sm shadow-lg shadow-accent-500/25 active:scale-98 transition-all flex items-center justify-center gap-2"
             id="run-compare-btn"
           >
             {isComparing ? (
@@ -343,7 +582,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
             ) : (
               <Car className="w-4 h-4" />
             )}
-            <span>{t.comparePrices}</span>
+            <span>{freeSearches > 0 ? `🎁 بحث مجاني (${freeSearches} متبقي)` : `${t.comparePrices} · ${tripCost.toFixed(2)} ج.م`}</span>
           </button>
         </div>
 
@@ -354,16 +593,16 @@ export const TripsView: React.FC<TripsViewProps> = ({
             <div className="bg-slate-900 text-white p-5 rounded-3xl border border-slate-800 shadow-md">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-amber-400 font-bold uppercase tracking-wider">
-                    {language === 'ar' ? 'بيانات المسار التقديرية' : 'Route Summary'}
+                  <div className="text-xs text-accent-400 font-bold uppercase tracking-wider">
+                    {isRtl ? 'بيانات المسار الفعلية على الخريطة' : 'Route Summary'}
                   </div>
                   <div className="text-lg font-extrabold mt-0.5">
                     {comparisonData.distanceKm} كم • حوالي {comparisonData.estimatedDurationMins} دقيقة
                   </div>
                 </div>
-                <div className="p-2.5 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-1.5">
+                <div className="p-2.5 rounded-2xl bg-accent-500/20 border border-accent-500/30 text-accent-300 font-bold text-xs flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>{language === 'ar' ? 'تسعير حي مؤكد عبر التطبيق' : 'App Verified Live'}</span>
+                  <span>{isRtl ? 'تسعير حي مؤكد عبر التطبيق' : 'App Verified Live'}</span>
                 </div>
               </div>
             </div>
@@ -382,8 +621,8 @@ export const TripsView: React.FC<TripsViewProps> = ({
                   key={opt.providerId}
                   className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                     isBest
-                      ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 shadow-md ring-1 ring-amber-400/40'
-                      : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800 hover:border-amber-300'
+                      ? 'bg-accent-50/70 dark:bg-accent-950/30 border-accent-400 dark:border-accent-500 shadow-md ring-1 ring-accent-400/40'
+                      : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800 hover:border-accent-300'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -402,7 +641,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
 
                           {/* Smart Badges */}
                           {isBest && (
-                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-500 text-white shadow-sm flex items-center gap-1">
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-accent-500 text-white shadow-sm flex items-center gap-1">
                               <Award className="w-3 h-3" />
                               {t.bestPrice}
                             </span>
@@ -423,7 +662,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                           <span>{opt.vehicleType}</span>
                           <span>•</span>
                           <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                            <Clock className="w-3.5 h-3.5 text-amber-500" />
+                            <Clock className="w-3.5 h-3.5 text-accent-500" />
                             {opt.etaMinutes} {t.minutes}
                           </span>
                           <span>•</span>
@@ -446,11 +685,11 @@ export const TripsView: React.FC<TripsViewProps> = ({
                         rel="noreferrer"
                         className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-transform active:scale-95 ${
                           isBest
-                            ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
+                            ? 'bg-accent-500 hover:bg-accent-600 text-white shadow-accent-500/20'
                             : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90'
                         }`}
                       >
-                        <span>{language === 'ar' ? 'فتح التطبيق والحجز' : 'Open & Book'}</span>
+                        <span>{isRtl ? 'فتح التطبيق والحجز' : 'Open & Book'}</span>
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </div>
@@ -463,8 +702,8 @@ export const TripsView: React.FC<TripsViewProps> = ({
           {/* Recent Trips History */}
           <div className="bg-white dark:bg-slate-850 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mt-4">
             <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <History className="w-4 h-4 text-amber-500" />
-              <span>{language === 'ar' ? 'سجل المشاوير السابقة' : 'Recent Rides'}</span>
+              <History className="w-4 h-4 text-accent-500" />
+              <span>{isRtl ? 'سجل المشاوير السابقة' : 'Recent Rides'}</span>
             </h3>
 
             <div className="space-y-2.5">
@@ -481,7 +720,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                       {rt.date} • {rt.provider} ({rt.rideType})
                     </div>
                   </div>
-                  <div className="font-bold font-mono-num text-amber-600 dark:text-amber-400">
+                  <div className="font-bold font-mono-num text-accent-600 dark:text-accent-400">
                     {rt.fare} {currency}
                   </div>
                 </div>
@@ -490,6 +729,29 @@ export const TripsView: React.FC<TripsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* 3-OPTIONS LOCATION PICKER MODAL (MAP / SEARCH / VOICE) */}
+      {/* ========================================================= */}
+      <LocationPickerModal
+        isOpen={isLocationPickerOpen}
+        onClose={() => setIsLocationPickerOpen(false)}
+        mode={pickerMode}
+        currentLocation={pickerMode === 'pickup' ? pickupLocation : dropoffLocation}
+        onSelectLocation={handleLocationPicked}
+        language={language}
+      />
+
+      {/* ========================================================= */}
+      {/* FULL VOICE TRIP MODAL */}
+      {/* ========================================================= */}
+      <VoiceTripModal
+        isOpen={isVoiceTripOpen}
+        onClose={() => setIsVoiceTripOpen(false)}
+        onConfirmTrip={handleVoiceTripConfirmed}
+        language={language}
+      />
     </div>
   );
 };
+

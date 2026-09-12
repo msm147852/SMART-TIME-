@@ -3,6 +3,8 @@ import {
   AppView,
   Language,
   ThemeMode,
+  ColorTheme,
+  IconStyle,
   UserProfile,
   Note,
   NoteFolder,
@@ -51,6 +53,8 @@ import { DashboardView } from './components/DashboardView';
 import { NotesAndAccountingView } from './components/NotesAndAccountingView';
 import { ExpensesView } from './components/ExpensesView';
 import { TripsView } from './components/TripsView';
+import WalletView from './components/WalletView';
+import AdminWalletPanel from './components/AdminWalletPanel';
 import { VehiclesView } from './components/VehiclesView';
 import { EducationView } from './components/EducationView';
 import { FoodView } from './components/FoodView';
@@ -64,6 +68,9 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
+import { LiveNewsPanel } from './components/LiveNewsPanel';
+import { AuthView } from './components/AuthView';
+import { restoreSession, logout } from './services/authService';
 
 // Icons
 import {
@@ -76,10 +83,17 @@ import {
 
 export default function App() {
   // Global App State
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [guestMode, setGuestMode] = useState(false);
+  const [loginNotice, setLoginNotice] = useState('');
+  const [requireTripPhoneVerification, setRequireTripPhoneVerification] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [viewHistory, setViewHistory] = useState<AppView[]>([]);
   const [language, setLanguage] = useState<Language>('ar');
-  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [theme, setTheme] = useState<ThemeMode>(() => UserRepository.getProfile().theme || 'light');
+  const [colorTheme, setColorTheme] = useState<ColorTheme>('ocean');
+  const [iconStyle, setIconStyle] = useState<IconStyle>(() => UserRepository.getProfile().iconStyle || 'classic');
 
   const handleNavigate = (nextView: AppView) => {
     if (nextView !== currentView) {
@@ -133,6 +147,44 @@ export default function App() {
   const [recentTrips, setRecentTrips] = useState<RecentTrip[]>(() => TripsRepository.getRecentTrips());
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
+  useEffect(() => {
+    restoreSession().then((session) => {
+      setAuthenticated(!!session);
+    setGuestMode(false);
+      setGuestMode(false);
+      if (session) setUserProfile(UserRepository.getProfile());
+      setAuthChecked(true);
+    });
+  }, []);
+
+  const handleAuthenticated = async () => {
+    setLoginNotice('');
+    setRequireTripPhoneVerification(false);
+    const session = await restoreSession();
+    setAuthenticated(!!session);
+    setGuestMode(false);
+    if (session) setUserProfile(UserRepository.getProfile());
+  };
+
+  const handleGuest = () => { setLoginNotice(''); setRequireTripPhoneVerification(false); setGuestMode(true); setAuthenticated(true); };
+
+  const handleNavigateSafe = (nextView: AppView) => {
+    // Guests can browse the app, but Trips requires an authenticated account.
+    if (nextView === 'trips' && guestMode) {
+      setRequireTripPhoneVerification(false);
+      setLoginNotice('قسم الرحلات متاح بعد تسجيل الدخول أو إنشاء حساب جديد. اضغط الزر للانتقال إلى شاشة الدخول.');
+      setAuthenticated(false);
+      setGuestMode(false);
+      return;
+    }
+    // TEMPORARY (testing phase): Trips no longer requires phone verification to enter —
+    // it opens immediately for any logged-in account. To bring the gate back later, restore the
+    // `if (nextView === 'trips' && authenticated) { ... requiresPhoneVerification ... }` block
+    // that used to sit here (still available in the project's git history).
+    handleNavigate(nextView);
+  };
+
+
 
   const handleToggleDailyTask = (id: string) => {
     const updated = NotesRepository.toggleDailyTask(id);
@@ -164,6 +216,18 @@ export default function App() {
     }
   }, [theme]);
 
+  // Load saved color theme once, then apply the "app style" accent theme class to <html>
+  useEffect(() => {
+    if (userProfile.colorTheme) setColorTheme(userProfile.colorTheme === 'gold' ? 'ocean' : userProfile.colorTheme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('theme-ocean', 'theme-gold', 'theme-facebook', 'theme-whatsapp', 'theme-telegram', 'theme-instagram', 'theme-youtube');
+    root.classList.add(`theme-${colorTheme === 'gold' ? 'ocean' : colorTheme}`);
+  }, [colorTheme]);
+
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('dir', language === 'ar' ? 'rtl' : 'ltr');
@@ -180,6 +244,20 @@ export default function App() {
   const handleThemeChange = (newTheme: ThemeMode) => {
     setTheme(newTheme);
     const updated = { ...userProfile, theme: newTheme };
+    setUserProfile(updated);
+    UserRepository.saveProfile(updated);
+  };
+
+  const handleIconStyleChange = (newIconStyle: IconStyle) => {
+    setIconStyle(newIconStyle);
+    const updated = { ...userProfile, iconStyle: newIconStyle };
+    setUserProfile(updated);
+    UserRepository.saveProfile(updated);
+  };
+
+  const handleColorThemeChange = (newColorTheme: ColorTheme) => {
+    setColorTheme(newColorTheme);
+    const updated = { ...userProfile, colorTheme: newColorTheme };
     setUserProfile(updated);
     UserRepository.saveProfile(updated);
   };
@@ -204,8 +282,11 @@ export default function App() {
     { view: 'notes' as AppView, label: language === 'ar' ? 'الملاحظات' : 'Notes', icon: FileText },
   ];
 
+  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تأمين الجلسة…</div>;
+  if (!authenticated) return <AuthView onAuthenticated={handleAuthenticated} onGuest={handleGuest} loginNotice={loginNotice} requireTripPhoneVerification={requireTripPhoneVerification} />;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-amber-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-accent-500 selection:text-white">
       {/* Authentic Android Mobile Smartphone Shell */}
       <div className="relative w-full sm:max-w-[430px] h-screen sm:h-[93vh] sm:max-h-[915px] bg-white dark:bg-slate-900 sm:rounded-[44px] shadow-2xl sm:ring-1 sm:ring-slate-800 sm:border-[8px] sm:border-slate-800 flex flex-col overflow-hidden">
         
@@ -214,13 +295,14 @@ export default function App() {
           language={language}
           unreadNotifications={notifications.filter((n) => !n.isRead).length}
           onOpenNotifications={() => setIsNotificationsOpen(true)}
+          onOpenPermissions={() => setIsSettingsOpen(true)}
         />
 
         {/* 2. Top Android App Toolbar & Live Header Widgets Ribbon */}
         <NavigationHeader
           user={userProfile}
           activeTab={currentView}
-          onNavigate={(tab) => handleNavigate(tab as AppView)}
+          onNavigate={(tab) => handleNavigateSafe(tab as AppView)}
           onBack={handleBack}
           language={language}
           onLanguageChange={handleLanguageChange}
@@ -237,6 +319,7 @@ export default function App() {
           onToggleDailyTask={handleToggleDailyTask}
           onAddDailyTask={handleAddDailyTask}
           onDeleteDailyTask={handleDeleteDailyTask}
+          onLogout={async () => { if (!guestMode) await logout(); setAuthenticated(false); setGuestMode(false); }}
         />
 
         {/* 3. Main Android Viewport Container (Scrollable) */}
@@ -249,7 +332,7 @@ export default function App() {
               recipes={recipes}
               vehicles={vehicles}
               chatRooms={chatRooms}
-              onNavigate={(tab) => handleNavigate(tab as AppView)}
+              onNavigate={(tab) => handleNavigateSafe(tab as AppView)}
               onOpenSearch={() => setIsSearchOpen(true)}
               onOpenVoiceSearch={() => setIsVoiceOpen(true)}
             />
@@ -311,8 +394,15 @@ export default function App() {
               favoritePlaces={favoritePlaces}
               recentTrips={recentTrips}
               onOpenVoiceSearch={() => setIsVoiceOpen(true)}
+              onOpenWallet={() => handleNavigateSafe('wallet' as AppView)}
             />
           )}
+
+          {currentView === 'wallet' && (
+            <WalletView onOpenAdmin={() => handleNavigateSafe('admin-wallet' as AppView)} />
+          )}
+
+          {currentView === 'admin-wallet' && <AdminWalletPanel />}
 
           {currentView === 'vehicles' && (
             <VehiclesView
@@ -402,7 +492,10 @@ export default function App() {
             <AiCenterView language={language} onOpenVoiceSearch={() => setIsVoiceOpen(true)} />
           )}
 
-          {currentView === 'chat' && <HotChatView language={language} />}
+          {currentView === 'chat' && (
+            <HotChatView language={language} theme={theme} iconStyle={iconStyle} onNavigateHome={() => handleNavigate('dashboard')} />
+          )}
+
 
           {currentView === 'media' && (
             <MediaCenterView
@@ -419,6 +512,12 @@ export default function App() {
           {currentView === 'sports' && (
             <SportsView user={userProfile} />
           )}
+
+          {currentView === 'dashboard' && (
+            <div className="mt-4">
+              <LiveNewsPanel language={language} compact />
+            </div>
+          )}
         </main>
 
         {/* 4. Android Bottom Navigation Bar (Always visible inside Android container) */}
@@ -429,12 +528,12 @@ export default function App() {
             return (
               <button
                 key={item.view}
-                onClick={() => handleNavigate(item.view)}
+                onClick={() => handleNavigateSafe(item.view)}
                 className={`flex flex-col items-center justify-center p-1.5 rounded-2xl transition-all active:scale-95 ${
                   item.highlight
                     ? 'bg-gradient-to-tr from-purple-600 to-indigo-600 text-white px-3.5 py-1.5 shadow-md shadow-purple-500/25 -mt-3 ring-3 ring-white dark:ring-slate-900'
                     : isActive
-                    ? 'text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 dark:bg-amber-500/15 px-3'
+                    ? 'text-accent-600 dark:text-accent-400 font-bold bg-accent-500/10 dark:bg-accent-500/15 px-3'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                 }`}
               >
@@ -460,7 +559,7 @@ export default function App() {
           vehicles={vehicles}
           lessons={lessons}
           recipes={recipes}
-          onNavigate={(view) => handleNavigate(view)}
+          onNavigate={(view) => handleNavigateSafe(view)}
         />
 
         {/* Voice Search Modal */}
@@ -468,7 +567,7 @@ export default function App() {
           isOpen={isVoiceOpen}
           onClose={() => setIsVoiceOpen(false)}
           language={language}
-          onNavigate={(view) => handleNavigate(view)}
+          onNavigate={(view) => handleNavigateSafe(view)}
         />
 
         {/* Settings & Backup Modal */}
@@ -477,6 +576,10 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
           language={language}
           theme={theme}
+          colorTheme={colorTheme}
+          iconStyle={iconStyle}
+          onIconStyleChange={handleIconStyleChange}
+          onColorThemeChange={handleColorThemeChange}
           userProfile={userProfile}
           onUpdateProfile={(updated) => {
             setUserProfile(updated);

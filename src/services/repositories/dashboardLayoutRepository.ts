@@ -131,30 +131,6 @@ export const DEFAULT_DASHBOARD_MODULES: DashboardModuleItem[] = [
     descriptionAr: 'مقارنة أسعار أوبر وكريم وإندرايف، التوصية الذكية، والمحطات السريعة.',
     descriptionEn: 'Compare live fares across Uber, Careem, inDrive & DiDi.',
   },
-  {
-    id: 'vehicles',
-    nameAr: 'السيارات وسجل الوقود والصيانة',
-    nameEn: 'Vehicles & Fleet',
-    category: 'secondary',
-    visible: true,
-    order: 9,
-    iconName: 'Car',
-    color: 'sky',
-    descriptionAr: 'إدارة سياراتك، حساب استهلاك الوقود، مواعيد الصيانة الدورية والتأمين.',
-    descriptionEn: 'Vehicle logs, fuel efficiency analytics & maintenance reminders.',
-  },
-  {
-    id: 'education',
-    nameAr: 'التعليم ومتابعة الأبناء',
-    nameEn: 'Education & Academy',
-    category: 'secondary',
-    visible: true,
-    order: 10,
-    iconName: 'GraduationCap',
-    color: 'emerald',
-    descriptionAr: 'متابعة الأبناء، جداول الدروس، الواجبات، والمصاريف المدرسية.',
-    descriptionEn: 'Student tracker, lesson timetables, tutors and school budgets.',
-  },
 ];
 
 export const DEFAULT_DASHBOARD_SETTINGS: DashboardLayoutSettings = {

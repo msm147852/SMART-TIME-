@@ -183,7 +183,7 @@ export const SecureVaultView: React.FC<SecureVaultViewProps> = ({
       case 'document':
         return { label: language === 'ar' ? 'ملف ووثيقة 📁' : 'Document', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' };
       case 'password':
-        return { label: language === 'ar' ? 'كلمة سر 🔑' : 'Password', color: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' };
+        return { label: language === 'ar' ? 'كلمة سر 🔑' : 'Password', color: 'bg-accent-100 text-accent-700 dark:bg-accent-950 dark:text-accent-300' };
       case 'bank_card':
       case 'code':
         return { label: language === 'ar' ? 'بطاقة بنك 💳' : 'Bank Card', color: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' };
@@ -202,7 +202,7 @@ export const SecureVaultView: React.FC<SecureVaultViewProps> = ({
       case 'document':
         return <FileText className="w-4 h-4 text-emerald-500" />;
       case 'password':
-        return <KeyRound className="w-4 h-4 text-amber-500" />;
+        return <KeyRound className="w-4 h-4 text-accent-500" />;
       case 'bank_card':
       case 'code':
         return <CreditCard className="w-4 h-4 text-blue-500" />;
