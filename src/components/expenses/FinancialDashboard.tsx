@@ -11,7 +11,7 @@ import {
   Sparkles,
   PieChart,
   Home,
-  Briefcase,
+  UserRound,
   Car,
   BookOpen,
   DollarSign,
@@ -25,7 +25,7 @@ import { Language } from '../../types';
 
 export interface RecentTransactionItem {
   id: string;
-  section: 'house' | 'work' | 'vehicle' | 'education';
+  section: 'house' | 'work' | 'personal' | 'vehicle' | 'education';
   title: string;
   amount: number;
   date: string;
@@ -51,8 +51,8 @@ interface FinancialDashboardProps {
   educationCount?: number;
   certsCount?: number;
   onOpenSectionsMenu: () => void;
-  onSelectSection?: (section: 'house' | 'work' | 'vehicle' | 'education' | 'income_certs' | 'reports') => void;
-  onOpenSection?: (section: 'house' | 'work' | 'vehicle' | 'education' | 'income_certs' | 'reports') => void;
+  onSelectSection?: (section: 'house' | 'work' | 'personal' | 'vehicle' | 'education' | 'income_certs' | 'reports') => void;
+  onOpenSection?: (section: 'house' | 'work' | 'personal' | 'vehicle' | 'education' | 'income_certs' | 'reports') => void;
   onOpenAddExpense: () => void;
   recentTransactions?: RecentTransactionItem[];
 }
@@ -317,15 +317,15 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
             </div>
           </div>
 
-          {/* Work */}
+          {/* Personal */}
           <div
-            onClick={() => handleNavigateSection('work')}
+            onClick={() => handleNavigateSection('personal')}
             className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-cyan-50/50 dark:hover:bg-cyan-950/30 border border-slate-200/80 dark:border-slate-700/60 cursor-pointer transition-all hover:border-cyan-300"
           >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                <Briefcase className="w-3.5 h-3.5 text-cyan-600" />
-                {isAr ? 'العمل' : 'Work'}
+                <UserRound className="w-3.5 h-3.5 text-cyan-600" />
+                {isAr ? 'المصروفات الشخصية' : 'Personal'}
               </span>
             </div>
             <div className="text-sm font-black text-slate-900 dark:text-slate-100">

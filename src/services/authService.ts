@@ -57,6 +57,16 @@ function applyUserToProfile(user: AuthUser): UserProfile {
   return updated;
 }
 
+export async function startTrialSession(): Promise<AuthSession> {
+  const res = await fetch(apiUrl('/api/trial/session'));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.token) throw new Error(data.error || 'تعذر بدء النسخة التجريبية');
+  const session: AuthSession = { token: data.token, user: data.user };
+  saveSession(session);
+  applyUserToProfile(session.user);
+  return session;
+}
+
 export async function loginWithIdentifier(identifier: string, password: string): Promise<AuthSession> {
   const data = await request('/api/auth/login', { identifier, password });
   const session: AuthSession = { token: data.token, user: data.user };

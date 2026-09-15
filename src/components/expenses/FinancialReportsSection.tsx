@@ -1,278 +1,36 @@
-import React, { useState } from 'react';
-import {
-  ArrowRight,
-  ArrowLeft,
-  BarChart3,
-  PieChart,
-  TrendingUp,
-  TrendingDown,
-  FileSpreadsheet,
-  FileText,
-  Printer,
-  Calendar,
-  Layers,
-  Sparkles,
-  Download,
-} from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, ArrowLeft, BarChart3, FileSpreadsheet, FileText, Printer, Home, UserRound, Users, Car, GraduationCap, WalletCards, Layers, X, Eye } from 'lucide-react';
 import { formatMoney } from '../../services/financeCalculations';
 import { Language } from '../../types';
 
-interface FinancialReportsSectionProps {
-  language: Language;
-  currency: string;
-  selectedMonth: string;
-  onSelectMonth: (month: string) => void;
-  onBack: () => void;
-  monthlyIncome: number;
-  monthlyExpenses: number;
-  netIncome: number;
-  houseTotal: number;
-  workTotal: number;
-  vehicleTotal: number;
-  educationTotal: number;
-}
-
-export const FinancialReportsSection: React.FC<FinancialReportsSectionProps> = ({
-  language,
-  currency,
-  selectedMonth,
-  onSelectMonth,
-  onBack,
-  monthlyIncome,
-  monthlyExpenses,
-  netIncome,
-  houseTotal,
-  workTotal,
-  vehicleTotal,
-  educationTotal,
-}) => {
-  const isAr = language === 'ar';
-  const BackIcon = isAr ? ArrowRight : ArrowLeft;
-  const isSurplus = netIncome >= 0;
-
-  const totalCalculated = houseTotal + workTotal + vehicleTotal + educationTotal || 1;
-  const housePct = Math.round((houseTotal / totalCalculated) * 100);
-  const workPct = Math.round((workTotal / totalCalculated) * 100);
-  const vehiclePct = Math.round((vehicleTotal / totalCalculated) * 100);
-  const educationPct = Math.round((educationTotal / totalCalculated) * 100);
-
-  const expenseRatio = monthlyIncome > 0 ? Math.round((monthlyExpenses / monthlyIncome) * 100) : 100;
-
-  const exportExcel = () => {
-    const headers = ['البيان / القسم', 'المبلغ بالجنيه', 'النسبة من إجمالي المصروفات'];
-    const rows = [
-      ['إجمالي الدخل الشهري', monthlyIncome, '100%'],
-      ['إجمالي المصروفات الشهرية', monthlyExpenses, `${expenseRatio}% من الدخل`],
-      ['صافي الفائض / العجز', netIncome, `${100 - expenseRatio}%`],
-      ['---', '---', '---'],
-      ['مصروفات المنزل', houseTotal, `${housePct}%`],
-      ['مصروفات العمل والمكتب', workTotal, `${workPct}%`],
-      ['مصروفات المركبة والوقود', vehicleTotal, `${vehiclePct}%`],
-      ['مصروفات التعليم والطلاب', educationTotal, `${educationPct}%`],
-    ];
-
-    const csvContent =
-      '\uFEFF' +
-      [headers.join(','), ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join(
-        '\n'
-      );
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `financial-report-${selectedMonth}.csv`;
-    a.click();
-  };
-
-  const exportWord = () => {
-    const content = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><title>تقرير المصروفات</title><meta charset='utf-8'></head>
-      <body dir='rtl' style='font-family: Arial, sans-serif; padding: 20px;'>
-        <h1 style='color: #0891b2;'>تقرير الدخل والمصروفات - Smart Time Gold</h1>
-        <p><strong>الشهر المالي:</strong> ${selectedMonth}</p>
-        <hr/>
-        <h3>الملخص المالي الرئيسي:</h3>
-        <ul>
-          <li><strong>إجمالي الدخل:</strong> ${formatMoney(monthlyIncome)} ${currency}</li>
-          <li><strong>إجمالي المصروفات:</strong> ${formatMoney(monthlyExpenses)} ${currency}</li>
-          <li><strong>صافي الدخل:</strong> ${formatMoney(netIncome)} ${currency}</li>
-        </ul>
-        <hr/>
-        <h3>توزيع أقسام المصروفات:</h3>
-        <table border='1' cellspacing='0' cellpadding='8' style='width:100%; border-collapse: collapse;'>
-          <tr style='background-color: #f1f5f9;'>
-            <th>القسم</th>
-            <th>المبلغ</th>
-            <th>النسبة</th>
-          </tr>
-          <tr><td>مصروفات المنزل</td><td>${formatMoney(houseTotal)} ${currency}</td><td>${housePct}%</td></tr>
-          <tr><td>مصروفات العمل والمكتب</td><td>${formatMoney(workTotal)} ${currency}</td><td>${workPct}%</td></tr>
-          <tr><td>مصروفات المركبة والوقود</td><td>${formatMoney(vehicleTotal)} ${currency}</td><td>${vehiclePct}%</td></tr>
-          <tr><td>مصروفات التعليم والطلاب</td><td>${formatMoney(educationTotal)} ${currency}</td><td>${educationPct}%</td></tr>
-        </table>
-      </body>
-      </html>
-    `;
-    const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `financial-report-${selectedMonth}.doc`;
-    a.click();
-  };
-
-  return (
-    <div className="space-y-4" dir={isAr ? 'rtl' : 'ltr'}>
-      {/* 1. Header with Back Button */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 text-slate-700 dark:text-slate-200 hover:text-cyan-600 flex items-center justify-center transition-all active:scale-95"
-            title={isAr ? 'رجوع' : 'Back'}
-          >
-            <BackIcon className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">
-                {isAr ? 'التقارير المالية والتحليلات' : 'Financial Reports & Analytics'}
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {isAr ? 'مقارنات بيانية وتصدير للبيانات المالية' : 'Visual breakdown and comprehensive data exports'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={exportExcel}
-            className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Excel</span>
-          </button>
-          <button
-            onClick={exportWord}
-            className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all"
-          >
-            <FileText className="w-3.5 h-3.5 text-blue-600" />
-            <span>Word</span>
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all"
-          >
-            <Printer className="w-3.5 h-3.5 text-cyan-600" />
-            <span>{isAr ? 'طباعة' : 'Print'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Primary Financial Balance Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-bold text-slate-500 block mb-1">{isAr ? 'إجمالي الدخل الشهري' : 'Total Monthly Income'}</span>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            {formatMoney(monthlyIncome)} <span className="text-xs font-semibold text-slate-500">{currency}</span>
-          </div>
-          <span className="text-[11px] text-emerald-600 mt-1 block flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" />
-            {isAr ? 'شامل أرباح الشهادات' : 'Includes cert profits'}
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-bold text-slate-500 block mb-1">{isAr ? 'إجمالي المصروفات' : 'Total Expenses'}</span>
-          <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
-            {formatMoney(monthlyExpenses)} <span className="text-xs font-semibold text-slate-500">{currency}</span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
-            {expenseRatio}% {isAr ? 'من إجمالي الدخل' : 'of monthly income'}
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-bold text-slate-500 block mb-1">{isAr ? 'صافي الدخل / الفائض' : 'Net Surplus'}</span>
-          <div className={`text-2xl font-black ${isSurplus ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-            {isSurplus ? '+' : ''}{formatMoney(netIncome)} <span className="text-xs font-semibold text-slate-500">{currency}</span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
-            {isSurplus ? (isAr ? 'فائض مالي إيجابي ممتاز' : 'Positive surplus') : (isAr ? 'عجز يتطلب مراجعة المصروفات' : 'Deficit')}
-          </span>
-        </div>
-      </div>
-
-      {/* 3. Visual Breakdown Progress Bars */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <PieChart className="w-4 h-4 text-cyan-600" />
-            <span>{isAr ? 'توزيع المصروفات حسب الأقسام' : 'Expense Distribution by Section'}</span>
-          </h2>
-          <span className="text-xs font-bold text-slate-500">{formatMoney(monthlyExpenses)} {currency}</span>
-        </div>
-
-        {/* Multi-color segment bar */}
-        <div className="w-full h-3.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-          <div style={{ width: `${housePct}%` }} className="bg-cyan-500 h-full transition-all" title={`المنزل: ${housePct}%`} />
-          <div style={{ width: `${workPct}%` }} className="bg-sky-500 h-full transition-all" title={`العمل: ${workPct}%`} />
-          <div style={{ width: `${vehiclePct}%` }} className="bg-teal-500 h-full transition-all" title={`المركبة: ${vehiclePct}%`} />
-          <div style={{ width: `${educationPct}%` }} className="bg-indigo-500 h-full transition-all" title={`التعليم: ${educationPct}%`} />
-        </div>
-
-        {/* Section Breakdown Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-md bg-cyan-500"></span>
-              <div>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">{isAr ? 'مصروفات المنزل' : 'Home'}</span>
-                <span className="text-[10px] text-slate-400">{housePct}% {isAr ? 'من الإجمالي' : 'of total'}</span>
-              </div>
-            </div>
-            <span className="text-xs font-black text-slate-900 dark:text-slate-100">{formatMoney(houseTotal)} {currency}</span>
-          </div>
-
-          <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-md bg-sky-500"></span>
-              <div>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">{isAr ? 'مصروفات العمل والمكتب' : 'Work'}</span>
-                <span className="text-[10px] text-slate-400">{workPct}% {isAr ? 'من الإجمالي' : 'of total'}</span>
-              </div>
-            </div>
-            <span className="text-xs font-black text-slate-900 dark:text-slate-100">{formatMoney(workTotal)} {currency}</span>
-          </div>
-
-          <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-md bg-teal-500"></span>
-              <div>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">{isAr ? 'مصروفات المركبة والوقود' : 'Vehicle'}</span>
-                <span className="text-[10px] text-slate-400">{vehiclePct}% {isAr ? 'من الإجمالي' : 'of total'}</span>
-              </div>
-            </div>
-            <span className="text-xs font-black text-slate-900 dark:text-slate-100">{formatMoney(vehicleTotal)} {currency}</span>
-          </div>
-
-          <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-md bg-indigo-500"></span>
-              <div>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">{isAr ? 'مصروفات التعليم والطلاب' : 'Education'}</span>
-                <span className="text-[10px] text-slate-400">{educationPct}% {isAr ? 'من الإجمالي' : 'of total'}</span>
-              </div>
-            </div>
-            <span className="text-xs font-black text-slate-900 dark:text-slate-100">{formatMoney(educationTotal)} {currency}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+interface Props { language:Language; currency:string; selectedMonth:string; onSelectMonth:(month:string)=>void; onBack:()=>void; monthlyIncome:number; monthlyExpenses:number; netIncome:number; houseTotal:number; workTotal:number; vehicleTotal:number; educationTotal:number; houseList?:any[]; medicalList?:any[]; personalList?:any[]; associationsList?:any[]; fuelList?:any[]; maintList?:any[]; oilFilterList?:any[]; accidentList?:any[]; studentExpensesList?:any[]; students?:any[]; incomeList?:any[]; }
+type ReportType='day'|'week'|'month'; type SectionKey='all'|'income'|'house'|'personal'|'associations'|'vehicle'|'education';
+interface Row{date:string;section:string;item:string;amount:number;details?:string;}
+const addMonths=(date:string,n:number)=>{const d=new Date(date+'T12:00:00');const x=new Date(d.getFullYear(),d.getMonth()+n,d.getDate());return x.toISOString().slice(0,10)};
+const monthDiff=(a:string,b:string)=>{const x=new Date(a+'T12:00:00'),y=new Date(b+'T12:00:00');return (y.getFullYear()-x.getFullYear())*12+y.getMonth()-x.getMonth()};
+const assocRows=(a:any,from:string,to:string,add:(d:string,s:string,i:string,v:number,det?:string)=>void)=>{if(!a.startDate)return;const start=a.startDate.slice(0,10),payout=(a.payoutDate||'').slice(0,10);let d=start;let count=0;while(d<=to && count<Math.max(1,Number(a.memberCount)||1)){if(d>=from)add(d,'جمعياتى',`${a.name} - القسط رقم ${count+1}`,-(Number(a.installment)||0),`من بداية الأقساط ${start}`);count++;d=addMonths(start,count);}if(payout>=from&&payout<=to)add(payout,'جمعياتى',`${a.name} - قبض الجمعية`,Number(a.value)||0,`استحقاق الدور رقم ${a.roleNumber||''}`)};
+export const FinancialReportsSection:React.FC<Props>=p=>{
+ const {language,currency,onBack,monthlyIncome,monthlyExpenses,netIncome,houseTotal,workTotal,vehicleTotal,educationTotal,houseList=[],medicalList=[],personalList=[],associationsList=[],fuelList=[],maintList=[],oilFilterList=[],accidentList=[],studentExpensesList=[],students=[],incomeList=[]}=p;
+ const isAr=language==='ar',BackIcon=isAr?ArrowRight:ArrowLeft; const [section,setSection]=useState<SectionKey>('all'); const [reportType,setReportType]=useState<ReportType>('month'); const [fromDate,setFromDate]=useState(`${new Date().getFullYear()}-01-01`); const [toDate,setToDate]=useState(new Date().toISOString().slice(0,10)); const [dayDate,setDayDate]=useState(''); const [previewOpen,setPreviewOpen]=useState(false);
+ const cards=[{id:'income' as const,title:'الدخل الشهري',icon:WalletCards,total:monthlyIncome,desc:'تفاصيل مصادر الدخل'},{id:'house' as const,title:'مصروفات منزلية والقسم الطبي',icon:Home,total:houseTotal,desc:'المنزل والكشوفات والأدوية'},{id:'personal' as const,title:'الإنفاق الشخصى',icon:UserRound,total:workTotal,desc:'تفاصيل الإنفاق الشخصي'},{id:'associations' as const,title:'جمعياتى',icon:Users,total:0,desc:'كل الأقساط والقبض'},{id:'vehicle' as const,title:'سيارتى',icon:Car,total:vehicleTotal,desc:'وقود وصيانة وزيوت وحوادث'},{id:'education' as const,title:'التعليم',icon:GraduationCap,total:educationTotal,desc:'تفاصيل مصروفات الطلاب'},{id:'all' as const,title:'التقرير الشامل',icon:Layers,total:netIncome,desc:'كل الحركات المالية بالتفصيل'}];
+ const effectiveFrom=reportType==='day'&&dayDate?dayDate:fromDate; const effectiveTo=reportType==='day'&&dayDate?dayDate:toDate;
+ const daysInRange=useMemo(()=>{const arr:string[]=[];let d=effectiveFrom;let guard=0;while(d<=effectiveTo&&guard<370){arr.push(d);d=addMonths(d,0);const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+1);d=x.toISOString().slice(0,10);guard++}return arr},[effectiveFrom,effectiveTo]);
+ const rows=useMemo<Row[]>(()=>{const out:Row[]=[];const from=effectiveFrom,to=effectiveTo;const add=(date:string,s:string,i:string,v:number,details?:string)=>{const d=(date||'').slice(0,10);if(d>=from&&d<=to)out.push({date:d,section:s,item:i,amount:Number(v)||0,details});};
+  if(section==='house'||section==='all'){houseList.forEach(x=>add(x.date,'مصروفات منزلية',x.type||'مصروف منزلي',-Math.abs(Number(x.amount)||0),x.notes));medicalList.forEach(x=>add(x.date,'القسم الطبي',`${x.familyMember||'فرد الأسرة'} - ${x.facilityType||'كشف'}`,-((Number(x.examinationCost)||0)+(Number(x.medicationCost)||0)),`الحالة: ${x.conditionDescription||'—'} • التشخيص: ${x.doctorDiagnosis||'—'} • الجهة: ${x.facilityName||'—'}`));}
+  if(section==='personal'||section==='all')personalList.forEach(x=>add(x.date,'الإنفاق الشخصى',x.type||'إنفاق شخصي',-Math.abs(Number(x.amount)||0),x.notes));
+  if(section==='associations'||section==='all')associationsList.forEach(a=>assocRows(a,from,to,add));
+  if(section==='vehicle'||section==='all'){fuelList.forEach(x=>add(x.dateTime,'سيارتى - الوقود',x.fuelType||'وقود',-Math.abs(Number(x.price)||0),x.odometer?`عداد ${x.odometer}`:''));maintList.forEach(x=>add(x.date,'سيارتى - الصيانة',x.maintenanceType||'صيانة',-Math.abs(Number(x.total)||0),x.description));oilFilterList.forEach(x=>add(x.date,'سيارتى - الزيوت والفلاتر',x.serviceType||'خدمة',-Math.abs(Number(x.price)||0),x.productName));accidentList.forEach(x=>add(x.date,'سيارتى - الحوادث','حادث / إصلاح',-Math.abs(Number(x.estimatedDamage)||0),x.description));}
+  if(section==='education'||section==='all')studentExpensesList.forEach(x=>{const s=students.find(st=>st.id===x.studentId);add(x.date,'التعليم',`${s?.name||'طالب'} - ${x.title||x.subCategory||'مصروف تعليمي'}`,-Math.abs(Number(x.amount)||0),s?`المرحلة: ${s.stage} • العمر: ${s.age}`:'')});
+  if(section==='income'||section==='all')incomeList.forEach(x=>{const d=`${x.month}-01`;add(d,'الدخل الشهري','الراتب',Number(x.salary)||0);add(d,'الدخل الشهري','المكافآت',Number(x.bonuses)||0);add(d,'الدخل الشهري','دخل آخر',Number(x.otherIncome)||0);(x.sources||[]).forEach((src:any)=>{if(src.type==='current_deposit'||src.type==='current_withdrawal')add(src.date||d,'الحساب الجاري',src.source||'معاملة بنكية',Number(src.amount)||0,src.notes)});});
+  return out.sort((a,b)=>b.date.localeCompare(a.date));},[section,effectiveFrom,effectiveTo,houseList,medicalList,personalList,associationsList,fuelList,maintList,oilFilterList,accidentList,studentExpensesList,students,incomeList]);
+ const title=reportType==='day'?'تقرير يومى':reportType==='week'?'تقرير أسبوعى':'تقرير شهرى'; const total=rows.reduce((s,r)=>s+r.amount,0);
+ const csv=()=>{const data=[['التاريخ','القسم','البيان','المبلغ','التفاصيل'],...rows.map(r=>[r.date,r.section,r.item,String(r.amount),r.details||''])];const blob=new Blob(['\uFEFF'+data.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`smart-time-${section}-${reportType}-${effectiveFrom}-${effectiveTo}.csv`;a.click()};
+ const word=()=>{const html=`<html dir="rtl"><meta charset="utf-8"><body><h1>SMART TIME - ${title}</h1><p>القسم: ${cards.find(c=>c.id===section)?.title}</p><p>الفترة: ${effectiveFrom} إلى ${effectiveTo}</p><table border="1" cellpadding="7" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><th>التاريخ</th><th>القسم</th><th>البيان</th><th>المبلغ</th><th>التفاصيل</th></tr>${rows.map(r=>`<tr><td>${r.date}</td><td>${r.section}</td><td>${r.item}</td><td>${formatMoney(r.amount)} ${currency}</td><td>${r.details||'—'}</td></tr>`).join('')}</table><h3>إجمالي الحركات: ${formatMoney(total)} ${currency}</h3></body></html>`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff',html],{type:'application/msword'}));a.download=`smart-time-${section}-${reportType}.doc`;a.click()};
+ return <div className="space-y-4" dir={isAr?'rtl':'ltr'}><div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm flex items-center gap-3"><button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><BackIcon/></button><div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center"><BarChart3/></div><div><h1 className="text-lg font-black">تقاريرى</h1><p className="text-xs text-slate-500">اختر القسم والفترة ونوع التقرير ثم عاين التفاصيل قبل التصدير</p></div></div>
+ <div className="grid grid-cols-2 sm:grid-cols-4 gap-2"><div className="sm:col-span-2"><label className="text-xs font-bold block mb-1">من تاريخ</label><input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-full p-3 rounded-xl border bg-white dark:bg-slate-900"/></div><div className="sm:col-span-2"><label className="text-xs font-bold block mb-1">إلى تاريخ</label><input type="date" value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)} className="w-full p-3 rounded-xl border bg-white dark:bg-slate-900"/></div></div>
+ <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm"><label className="text-xs font-bold block mb-2">نوع التقرير</label><select value={reportType} onChange={e=>setReportType(e.target.value as ReportType)} className="w-full p-3 rounded-xl border bg-slate-50 dark:bg-slate-800"><option value="day">تقرير يومى</option><option value="week">تقرير أسبوعى</option><option value="month">تقرير شهرى</option></select>{reportType==='day'&&<><label className="text-xs font-bold block mt-3 mb-2">اختر اليوم داخل الفترة</label><select value={dayDate||fromDate} onChange={e=>setDayDate(e.target.value)} className="w-full p-3 rounded-xl border bg-slate-50 dark:bg-slate-800">{daysInRange.map(d=><option key={d} value={d}>{d}</option>)}</select></>}</div>
+ <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{cards.map(c=>{const I=c.icon;return <button key={c.id} onClick={()=>setSection(c.id)} className={`text-right bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm ${section===c.id?'border-cyan-500 ring-2 ring-cyan-100':'border-slate-200 dark:border-slate-800'}`}><div className="flex items-center gap-3"><div className="w-11 h-11 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center"><I/></div><div><b className="text-sm block">{c.title}</b><span className="text-[10px] text-slate-500">{c.desc}</span></div></div></button>})}</div>
+ <button onClick={()=>setPreviewOpen(true)} className="w-full py-3 rounded-2xl bg-slate-900 text-white font-black flex items-center justify-center gap-2"><Eye/>معاينة التقرير بالتفصيل</button>
+ {previewOpen&&<div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-6xl max-h-[92vh] overflow-hidden"><div className="p-4 border-b flex justify-between items-center"><div><b>{title} — {cards.find(c=>c.id===section)?.title}</b><div className="text-xs text-slate-500 mt-1">الفترة: {effectiveFrom} إلى {effectiveTo} • {rows.length} حركة</div></div><button onClick={()=>setPreviewOpen(false)}><X/></button></div><div className="p-4 overflow-auto max-h-[68vh]">{rows.length===0?<div className="p-12 text-center text-slate-400">لا توجد حركات تفصيلية في الفترة المحددة.</div>:<table className="w-full text-xs border-collapse"><thead><tr className="bg-slate-100 dark:bg-slate-800"><th className="p-2 text-right">التاريخ</th><th className="p-2 text-right">القسم</th><th className="p-2 text-right">البيان</th><th className="p-2 text-right">المبلغ</th><th className="p-2 text-right">التفاصيل</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.date}</td><td className="p-2">{r.section}</td><td className="p-2 font-bold">{r.item}</td><td className={`p-2 font-black ${r.amount>=0?'text-emerald-600':'text-rose-600'}`}>{r.amount>=0?'+':''}{formatMoney(r.amount)} {currency}</td><td className="p-2 text-slate-500">{r.details||'—'}</td></tr>)}</tbody></table>}</div><div className="p-4 border-t flex flex-wrap gap-2"><div className="px-4 py-3 rounded-xl bg-slate-100 font-black text-xs">إجمالي الحركات: {formatMoney(total)} {currency}</div><button onClick={csv} className="px-4 py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs"><FileSpreadsheet className="inline w-4 h-4 ml-1"/>Excel</button><button onClick={word} className="px-4 py-3 rounded-xl bg-blue-600 text-white font-bold text-xs"><FileText className="inline w-4 h-4 ml-1"/>Word</button><button onClick={()=>window.print()} className="px-4 py-3 rounded-xl bg-slate-800 text-white font-bold text-xs"><Printer className="inline w-4 h-4 ml-1"/>طباعة / PDF</button></div></div></div>}
+ </div>;
 };

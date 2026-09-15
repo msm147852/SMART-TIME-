@@ -3,7 +3,7 @@ import {
   X,
   Plus,
   Home,
-  Briefcase,
+  UserRound,
   Car,
   BookOpen,
   DollarSign,
@@ -20,7 +20,7 @@ interface AddExpenseModalProps {
   currency: string;
   selectedMonth: string;
   onAddExpense: (data: {
-    section: 'house' | 'work' | 'vehicle' | 'education';
+    section: 'house' | 'work' | 'personal' | 'vehicle' | 'education';
     category: string;
     amount: number;
     date: string;
@@ -39,7 +39,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 }) => {
   const isAr = language === 'ar';
 
-  const [section, setSection] = useState<'house' | 'work' | 'vehicle' | 'education'>('house');
+  const [section, setSection] = useState<'house' | 'work' | 'personal' | 'vehicle' | 'education'>('house');
   const [category, setCategory] = useState('فطار');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -50,7 +50,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const sectionOptions = [
     { id: 'house' as const, label: isAr ? 'مصروفات المنزل' : 'Home', icon: Home },
-    { id: 'work' as const, label: isAr ? 'مصروفات العمل' : 'Work', icon: Briefcase },
+    { id: 'personal' as const, label: isAr ? 'المصروفات الشخصية' : 'Personal', icon: UserRound },
     { id: 'vehicle' as const, label: isAr ? 'المركبة والوقود' : 'Vehicle', icon: Car },
     { id: 'education' as const, label: isAr ? 'التعليم والطلاب' : 'Education', icon: BookOpen },
   ];
@@ -78,6 +78,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       'شحن وتوصيل',
       'أخرى',
     ],
+    personal: [
+      'طعام ومشروبات',
+      'مواصلات وتنقلات',
+      'ملابس ومستلزمات شخصية',
+      'صحة وعناية شخصية',
+      'ترفيه وخروج',
+      'هدايا ومناسبات',
+      'اشتراكات شخصية',
+      'فواتير واتصالات شخصية',
+      'أخرى',
+    ],
     vehicle: [
       'وقود وبنزين 92',
       'وقود وبنزين 95',
@@ -100,7 +111,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     ],
   };
 
-  const handleSectionChange = (sec: 'house' | 'work' | 'vehicle' | 'education') => {
+  const handleSectionChange = (sec: 'house' | 'work' | 'personal' | 'vehicle' | 'education') => {
     setSection(sec);
     setCategory(categoryMap[sec][0]);
   };

@@ -5,10 +5,12 @@ import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import crypto from "node:crypto";
+import { Buffer } from "node:buffer";
 import { db, seedDefaultChatRooms } from "./backend/database.js";
 import { getCache, setCache } from "./backend/cache.js";
 import { getServiceStatuses, seedServiceStatuses, setServiceStatus } from "./backend/serviceStatus.js";
 import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
+import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 
 dotenv.config();
 
@@ -35,6 +37,68 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // Mount Chat API
 app.use("/api/chat", chatRouter);
 
+
+// ----------------------------------------------------
+// AI-generated food images
+// Each dish gets a dedicated image based on its exact Arabic name/category.
+// Images are generated server-side so GEMINI_API_KEY never reaches the browser.
+// ----------------------------------------------------
+const foodImageCache = new Map<string, Buffer>();
+
+function foodImagePrompt(title: string, category: string, group: string) {
+  const t = `${title} ${category} ${group}`.toLowerCase();
+  const drink = /مشروب|عصير|شاي|قهوة|كركديه|سحلب|ليمون|تمر هندي|كوكتيل|سوبيا|drink|juice|tea|coffee/.test(t);
+  const dessert = /حلويات|حلو|كنافة|بسبوسة|كيك|كيكة|أم علي|بتي فور|dessert|cake|kunafa/.test(t);
+  const promptType = drink ? 'Egyptian beverage photography' : dessert ? 'Egyptian dessert photography' : 'Egyptian food photography';
+  return `Create one highly realistic ${promptType} image for a recipe app.\n` +
+    `The exact dish is: "${title}". Category: "${category}". Group: "${group}".\n` +
+    `Show ONLY the actual dish or beverage named above, prepared in authentic Egyptian style. ` +
+    `Make the ingredients, color, texture and serving vessel match the dish. ` +
+    `For drinks, show the exact beverage in a clear or appropriate Egyptian serving glass/cup; do not substitute food. ` +
+    `For desserts, show the exact named dessert; do not substitute cake or another sweet. ` +
+    `For savory food, show the exact named recipe; do not use a generic mixed dish. ` +
+    `Natural appetizing restaurant-quality daylight, clean light background, close three-quarter food photograph, ` +
+    `no people, no hands, no logos, no text, no labels, no collage, no multiple dishes, no watermark. ` +
+    `Square composition suitable for a recipe card.`;
+}
+
+app.get('/api/food/generated-image', async (req, res) => {
+  try {
+    const title = String(req.query.title || '').trim();
+    const category = String(req.query.category || '').trim();
+    const group = String(req.query.group || '').trim();
+    if (!title) return res.status(400).json({ error: 'Food title is required' });
+
+    const cacheKey = `${title}|${category}|${group}`.toLowerCase();
+    const cached = foodImageCache.get(cacheKey);
+    if (cached) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.type('png').send(cached);
+    }
+
+    const gemini = getGemini();
+    const response = await gemini.models.generateContent({
+      model: 'gemini-3.1-flash-image',
+      contents: foodImagePrompt(title, category, group),
+      config: { responseModalities: ['IMAGE'] } as any,
+    });
+
+    const imagePart = response.parts?.find((part: any) => part.inlineData?.data);
+    const base64 = imagePart?.inlineData?.data;
+    if (!base64) return res.status(502).json({ error: 'Image generation returned no image' });
+
+    const buffer = Buffer.from(base64, 'base64');
+    foodImageCache.set(cacheKey, buffer);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.type(imagePart?.inlineData?.mimeType || 'png').send(buffer);
+  } catch (err: any) {
+    console.error('[FOOD IMAGE]', err?.message || err);
+    return res.status(503).json({ error: 'Unable to generate food image' });
+  }
+});
+
+const TRIAL_MODE = String(process.env.TRIAL_MODE || 'true').trim().toLowerCase() !== 'false';
+const TRIAL_USER_ID = 'smart-time-trial-user';
 const AUTH_SESSION_DAYS = 30;
 const PASSWORD_RESET_MINUTES = 15;
 const PROGRAM_OWNER_EMAIL = String(process.env.PROGRAM_OWNER_EMAIL || '').trim().toLowerCase();
@@ -202,6 +266,28 @@ async function sendPasswordResetEmail(email:string, code:string){
 }
 
 
+app.get('/api/trial/session', (req,res) => {
+  if (!TRIAL_MODE) return res.status(404).json({ error: 'Trial mode is disabled' });
+  try {
+    const now = new Date().toISOString();
+    let row = db.prepare('SELECT * FROM users WHERE id=?').get(TRIAL_USER_ID) as any;
+    if (!row) {
+      const email = 'trial@smart-time.local';
+      const username = 'smart_time_trial';
+      db.prepare(
+        "INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,trip_free_searches,wallet_balance) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+      ).run(TRIAL_USER_ID, email, username, hashPassword(crypto.randomBytes(24).toString('hex')), 'SMART TIME', now, null, 0, 'active', TRIP_WELCOME_FREE_SEARCHES, 10000);
+      row = db.prepare('SELECT * FROM users WHERE id=?').get(TRIAL_USER_ID) as any;
+    } else {
+      db.prepare("UPDATE users SET activation_status='active', phone_verified=0, phone=NULL WHERE id=?").run(TRIAL_USER_ID);
+    }
+    const token = createSession(TRIAL_USER_ID);
+    res.json({ token, user: publicUser({ ...row, name: row.display_name, phoneVerified: false, activation_status: 'active' }) });
+  } catch (e:any) {
+    res.status(500).json({ error: e.message || 'تعذر بدء النسخة التجريبية' });
+  }
+});
+
 app.post('/api/auth/register', async (req,res)=>{
   try{
     const name=String(req.body.name||'').trim(), username=normalizeUsername(req.body.username), email=String(req.body.email||'').trim().toLowerCase(), password=String(req.body.password||'');
@@ -292,7 +378,7 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     app: "SMART TIME — وقتك من ذهب",
-    version: "8.3.14",
+    version: "25.7",
     database: "sqlite",
     timestamp: new Date().toISOString(),
   });
@@ -302,7 +388,7 @@ app.get("/api/health", (req, res) => {
 // 1B. V8 Real Services Foundation
 // ----------------------------------------------------
 app.get("/api/services/status", (_req, res) => {
-  res.json({ version: "8.3.14", services: getServiceStatuses(), timestamp: new Date().toISOString() });
+  res.json({ version: "25.7", services: getServiceStatuses(), timestamp: new Date().toISOString() });
 });
 
 app.get("/api/database/health", (_req, res) => {
@@ -457,7 +543,46 @@ function computeCoordinatesDistanceKm(lat1: number, lon1: number, lat2: number, 
   return Math.max(1.0, Math.round(roadDist * 10) / 10);
 }
 
-const handleTripCompare = (req: express.Request, res: express.Response) => {
+async function resolveTripMetrics(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+  const fallbackDistance = computeCoordinatesDistanceKm(fromLat, fromLng, toLat, toLng);
+  const fallbackDuration = Math.max(5, Math.round(fallbackDistance * 2.2 + 4));
+  const tomtomKey = process.env.TOMTOM_API_KEY;
+
+  if (tomtomKey) {
+    try {
+      const points = `${fromLat},${fromLng}:${toLat},${toLng}`;
+      const url = `https://api.tomtom.com/routing/1/calculateRoute/${encodeURIComponent(points)}/json?key=${encodeURIComponent(tomtomKey)}&routeType=fastest&traffic=true&travelMode=car&language=ar`;
+      const rr = await fetch(url);
+      const data = await rr.json();
+      const summary = data?.routes?.[0]?.summary;
+      const distanceKm = Number(summary?.lengthInMeters || 0) / 1000;
+      const durationMinutes = Number(summary?.travelTimeInSeconds || 0) / 60;
+      if (rr.ok && distanceKm > 0 && durationMinutes > 0) {
+        return { distanceKm, durationMinutes, source: 'tomtom' };
+      }
+    } catch (error) {
+      console.warn('TomTom fare metrics unavailable:', error);
+    }
+  }
+
+  try {
+    const osrm = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=false&steps=false`;
+    const or = await fetch(osrm, { headers: { 'User-Agent': 'SMART-TIME/25.7' } });
+    const od = await or.json();
+    const route = od?.routes?.[0];
+    const distanceKm = Number(route?.distance || 0) / 1000;
+    const durationMinutes = Number(route?.duration || 0) / 60;
+    if (or.ok && distanceKm > 0 && durationMinutes > 0) {
+      return { distanceKm, durationMinutes, source: 'osrm' };
+    }
+  } catch (error) {
+    console.warn('OSRM fare metrics unavailable:', error);
+  }
+
+  return { distanceKm: fallbackDistance, durationMinutes: fallbackDuration, source: 'estimated-route' };
+}
+
+const handleTripCompare = async (req: express.Request, res: express.Response) => {
   try {
     // التحقق من تسجيل الدخول والرصيد قبل تنفيذ أي بحث (كل بحث يكلف TRIP_SEARCH_COST_EGP)
     const user = authUser(req);
@@ -476,170 +601,93 @@ const handleTripCompare = (req: express.Request, res: express.Response) => {
     }
 
     const { from, to, pickup, destination, rideTypeFilter, rideType } = req.body;
-    const filter = rideTypeFilter || (rideType ? String(rideType).toLowerCase() : "all");
-    
+    const filter = rideTypeFilter || (rideType ? String(rideType).toLowerCase() : 'all');
+
     const fromLat = from?.lat || pickup?.lat || pickup?.latitude || 30.0561;
     const fromLng = from?.lng || pickup?.lng || pickup?.longitude || 31.3301;
     const toLat = to?.lat || destination?.lat || destination?.latitude || 30.0131;
     const toLng = to?.lng || destination?.lng || destination?.longitude || 31.4289;
 
-    // Calculate realistic distance based on coordinates
-    const distanceKm = computeCoordinatesDistanceKm(fromLat, fromLng, toLat, toLng); 
-    const baseDurationMins = Math.max(5, Math.round(distanceKm * 2.2 + 4));
+    // المسافة والزمن من TomTom إن كان المفتاح متاحًا، ثم OSRM، ثم تقدير محلي كحل أخير.
+    const metrics = await resolveTripMetrics(fromLat, fromLng, toLat, toLng);
+    const distanceKm = Number(Number(metrics?.distanceKm || 0).toFixed(2));
+    const baseDurationMins = Math.max(1, Math.round(Number(metrics?.durationMinutes || 0)));
+    const category: RideCategory = filter === 'comfort' ? 'comfort' : filter === 'scooter' ? 'scooter' : 'economy';
 
-    // Dynamic providers comparison adhering to Provider Adapter pattern
-    const providers = [
-      {
-        providerId: "uber",
-        providerName: "Uber",
-        logoUrl: "https://images.unsplash.com/photo-1617788138017-80ad40651399?w=100&auto=format&fit=crop&q=80",
-        vehicleType: "Uber X (سيدان قياسية)",
-        rideType: "Uber X (Normal)",
-        typeCategory: "normal",
-        fare: Math.round(distanceKm * 9.5 + 25),
-        estimatedFareMin: Math.round(distanceKm * 9.5 + 20),
-        estimatedFareMax: Math.round(distanceKm * 9.5 + 30),
-        currency: "EGP",
-        etaMinutes: 4,
+    const carProviders = [
+      { providerId: 'uber', providerName: 'Uber', logoUrl: '/provider-logos/uber.svg', vehicleType: 'سيارة عادية', etaMinutes: 4, rating: 4.8, deepLink: `https://m.uber.com/ul/?action=setPickup&pickup[latitude]=${fromLat}&pickup[longitude]=${fromLng}&dropoff[latitude]=${toLat}&dropoff[longitude]=${toLng}` },
+      { providerId: 'careem', providerName: 'Careem', logoUrl: '/provider-logos/careem.svg', vehicleType: 'سيارة عادية', etaMinutes: 5, rating: 4.7, deepLink: 'https://www.careem.com/' },
+      { providerId: 'indrive', providerName: 'inDrive', logoUrl: '/provider-logos/indrive.svg', vehicleType: 'سيارة عادية', etaMinutes: 6, rating: 4.6, deepLink: `indrive://route?start_lat=${fromLat}&start_lng=${fromLng}&end_lat=${toLat}&end_lng=${toLng}` },
+      { providerId: 'didi', providerName: 'DiDi', logoUrl: '/provider-logos/didi.svg', vehicleType: 'سيارة عادية', etaMinutes: 5, rating: 4.7, deepLink: `didiglobal://trip?pick_lat=${fromLat}&pick_lng=${fromLng}&drop_lat=${toLat}&drop_lng=${toLng}` },
+      { providerId: 'bolt', providerName: 'Bolt', logoUrl: '/provider-logos/bolt.svg', vehicleType: 'سيارة عادية', etaMinutes: 6, rating: 4.6, deepLink: '#' },
+      { providerId: 'yalla-bina', providerName: 'Yalla Bina', logoUrl: '/provider-logos/yalla-bina.svg', vehicleType: 'سيارة عادية', etaMinutes: 7, rating: 4.5, deepLink: '#' },
+      { providerId: 'captain-egypt', providerName: 'كابتن مصر', logoUrl: '/provider-logos/captain-egypt.svg', vehicleType: 'سيارة عادية', etaMinutes: 7, rating: 4.5, deepLink: '#' },
+      { providerId: 'smart-line', providerName: 'Smart Line', logoUrl: '/provider-logos/smart-line.svg', vehicleType: 'سيارة عادية', etaMinutes: 8, rating: 4.5, deepLink: '#' },
+    ] as const;
+
+    const makeEstimate = (providerId: RideProvider, providerName: string, logoUrl: string, vehicleType: string, etaMinutes: number, rating: number, deepLink: string) => {
+      const estimate = estimateProviderPrice(providerId, {
+        distanceKm,
+        durationMinutes: baseDurationMins,
+        startTime: new Date(),
+        category,
+      });
+      return {
+        providerId,
+        providerName,
+        logoUrl,
+        vehicleType,
+        rideType: `${providerName} ${category === 'comfort' ? 'Comfort' : category === 'scooter' ? 'Motorcycle' : 'Economy'}`,
+        typeCategory: category === 'scooter' ? 'scooter' : category === 'comfort' ? 'comfort' : 'normal',
+        fare: estimate.estimatedFare,
+        estimatedFareMin: estimate.minFare,
+        estimatedFareMax: estimate.maxFare,
+        currency: 'EGP',
+        etaMinutes,
         durationMinutes: baseDurationMins,
         isLive: false,
-        quoteStatus: "FALLBACK",
-        quoteSource: "smart-time-estimator",
-        driverRating: 4.8,
-        rating: 4.8,
-        badge: "cheapest",
-        deepLink: `https://m.uber.com/ul/?action=setPickup&pickup[latitude]=${fromLat}&pickup[longitude]=${fromLng}&dropoff[latitude]=${toLat}&dropoff[longitude]=${toLng}`,
-      },
-      {
-        providerId: "uber-comfort",
-        providerName: "Uber Comfort",
-        logoUrl: "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=100&auto=format&fit=crop&q=80",
-        vehicleType: "Comfort (سيارات حديثة مكيفة)",
-        rideType: "Uber Comfort (مكيفة حديثة)",
-        typeCategory: "comfort",
-        fare: Math.round(distanceKm * 13.5 + 35),
-        estimatedFareMin: Math.round(distanceKm * 13.5 + 30),
-        estimatedFareMax: Math.round(distanceKm * 13.5 + 40),
-        currency: "EGP",
-        etaMinutes: 3,
-        durationMinutes: baseDurationMins - 2,
-        isLive: false,
-        quoteStatus: "FALLBACK",
-        quoteSource: "smart-time-estimator",
-        driverRating: 4.9,
-        rating: 4.9,
-        badge: "best",
-        deepLink: `https://m.uber.com/ul/?action=setPickup&pickup[latitude]=${fromLat}&pickup[longitude]=${fromLng}&dropoff[latitude]=${toLat}&dropoff[longitude]=${toLng}`,
-      },
-      {
-        providerId: "careem",
-        providerName: "Careem GO",
-        logoUrl: "https://images.unsplash.com/photo-1508974239320-0a029497e820?w=100&auto=format&fit=crop&q=80",
-        vehicleType: "Careem GO (توفير وموثوقية)",
-        rideType: "Careem GO",
-        typeCategory: "normal",
-        fare: Math.round(distanceKm * 10.2 + 22),
-        estimatedFareMin: Math.round(distanceKm * 10.2 + 18),
-        estimatedFareMax: Math.round(distanceKm * 10.2 + 28),
-        currency: "EGP",
-        etaMinutes: 5,
-        durationMinutes: baseDurationMins,
-        isLive: false,
-        quoteStatus: "FALLBACK",
-        quoteSource: "smart-time-estimator",
-        driverRating: 4.7,
-        rating: 4.7,
+        quoteStatus: 'ESTIMATED',
+        quoteSource: 'smart-time-estimator',
+        pricingNote: 'سعر تقديري من SMART TIME وقد يختلف عن السعر الفعلي',
+        effectivePerKm: estimate.effectivePerKm,
+        trafficFactor: estimate.trafficFactor,
+        timeFactor: estimate.timeFactor,
+        driverRating: rating,
+        rating,
         badge: null,
-        deepLink: `careem://book?from_lat=${fromLat}&from_lng=${fromLng}&to_lat=${toLat}&to_lng=${toLng}`,
-      },
-      {
-        providerId: "indrive",
-        providerName: "inDrive",
-        logoUrl: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=100&auto=format&fit=crop&q=80",
-        vehicleType: "inDrive (حدد سعرك وتفاوض)",
-        rideType: "inDrive (عرض سعرك)",
-        typeCategory: "normal",
-        fare: Math.round(distanceKm * 8.0 + 20),
-        estimatedFareMin: Math.round(distanceKm * 8.0 + 15),
-        estimatedFareMax: Math.round(distanceKm * 8.0 + 25),
-        currency: "EGP",
-        etaMinutes: 6,
-        durationMinutes: baseDurationMins + 1,
-        isLive: false, // Estimated fallback only
-        quoteStatus: "FALLBACK",
-        quoteSource: "smart-time-estimator",
-        driverRating: 4.6,
-        rating: 4.6,
-        badge: null,
-        deepLink: `indrive://route?start_lat=${fromLat}&start_lng=${fromLng}&end_lat=${toLat}&end_lng=${toLng}`,
-      },
-      {
-        providerId: "didi",
-        providerName: "DiDi Express",
-        logoUrl: "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=100&auto=format&fit=crop&q=80",
-        vehicleType: "DiDi Express (سريع واقتصادي)",
-        rideType: "DiDi Express",
-        typeCategory: "normal",
-        fare: Math.round(distanceKm * 9.0 + 23),
-        estimatedFareMin: Math.round(distanceKm * 9.0 + 18),
-        estimatedFareMax: Math.round(distanceKm * 9.0 + 28),
-        currency: "EGP",
-        etaMinutes: 2,
-        durationMinutes: baseDurationMins - 1,
-        isLive: false,
-        quoteStatus: "FALLBACK",
-        quoteSource: "smart-time-estimator",
-        driverRating: 4.7,
-        rating: 4.7,
-        badge: "fastest",
-        deepLink: `didiglobal://trip?pick_lat=${fromLat}&pick_lng=${fromLng}&drop_lat=${toLat}&drop_lng=${toLng}`,
-      },
-      {
-        providerId: "scooter",
-        providerName: "Scooter Express",
-        logoUrl: "https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=100&auto=format&fit=crop&q=80",
-        vehicleType: "دراجة نارية سريعة (سكوتر)",
-        rideType: "دراجة نارية سريعة (Motorcycle)",
-        typeCategory: "scooter",
-        fare: Math.round(distanceKm * 5.5 + 15),
-        estimatedFareMin: Math.round(distanceKm * 5.5 + 12),
-        estimatedFareMax: Math.round(distanceKm * 5.5 + 18),
-        currency: "EGP",
-        etaMinutes: 2,
-        durationMinutes: Math.round(baseDurationMins * 0.65),
-        isLive: false,
-        quoteStatus: "FALLBACK",
-        quoteSource: "smart-time-estimator",
-        driverRating: 4.8,
-        rating: 4.8,
-        badge: null,
-        deepLink: `https://m.uber.com/ul/?action=setPickup`,
-      },
-    ];
+        deepLink,
+      };
+    };
 
-    let filtered = providers;
-    if (filter && filter !== "all" && filter !== "normal") {
-      filtered = providers.filter((p) => p.typeCategory === filter || p.providerId.includes(filter));
-      if (filtered.length === 0) filtered = providers;
-    }
+    const providers = filter === 'scooter'
+      ? [makeEstimate(
+          'indrive', 'inDrive', '/provider-logos/indrive.svg', 'موتوسيكل', 3, 4.6,
+          `indrive://route?start_lat=${fromLat}&start_lng=${fromLng}&end_lat=${toLat}&end_lng=${toLng}`,
+        )]
+      : carProviders.map((p) => makeEstimate(p.providerId as RideProvider, p.providerName, p.logoUrl, filter === 'comfort' ? 'Comfort' : p.vehicleType, p.etaMinutes, p.rating, p.deepLink));
 
-    // V8 policy: these are estimates only until an official provider integration is configured.
-    for (const provider of ["uber", "careem", "indrive", "didi"]) {
-      setServiceStatus(provider, "NOT_CONFIGURED", "transport", "Showing SMART TIME estimate only; not an official live fare");
+    const sortedByFare = [...providers].sort((a, b) => a.fare - b.fare);
+    const fastest = [...providers].sort((a, b) => a.etaMinutes - b.etaMinutes)[0];
+    if (sortedByFare[0]) (sortedByFare[0] as any).badge = 'cheapest';
+
+    for (const provider of ['uber', 'careem', 'indrive', 'didi']) {
+      setServiceStatus(provider, 'NOT_CONFIGURED', 'transport', 'Showing SMART TIME estimate only; not an official live fare');
     }
     const requestId = crypto.randomUUID();
 
     const result = {
       distanceKm,
       estimatedDurationMins: baseDurationMins,
-      bestValueId: "uber-comfort",
-      cheapestId: "uber",
-      fastestId: "didi",
-      options: filtered,
+      routeSource: metrics.source,
+      pricingMode: 'SMART_TIME_ESTIMATE',
+      pricingDisclaimer: 'جميع الأسعار تقديرية واجتهادية من SMART TIME وليست أسعارًا رسمية من شركات النقل.',
+      bestValueId: sortedByFare[0]?.providerId || null,
+      cheapestId: sortedByFare[0]?.providerId || null,
+      fastestId: fastest?.providerId || null,
+      options: providers,
     };
 
     // الخصم والحفظ يتمان في معاملة واحدة حتى لا يحدث خصم مزدوج أو رصيد سالب
-    // عند ضغط المستخدم أكثر من مرة أو وصول طلبين في نفس اللحظة.
     let newBalance = currentBalance;
     try {
       db.exec('BEGIN IMMEDIATE');
@@ -656,15 +704,14 @@ const handleTripCompare = (req: express.Request, res: express.Response) => {
           required: TRIP_SEARCH_COST_EGP,
         });
       }
-
       const balanceRow = db.prepare('SELECT wallet_balance FROM users WHERE id = ?').get(user.id) as any;
       newBalance = Number(balanceRow?.wallet_balance || 0);
 
       db.prepare("INSERT INTO ride_requests(id,pickup_json,destination_json,created_at) VALUES(?,?,?,?)")
         .run(requestId, JSON.stringify(pickup || from || {}), JSON.stringify(destination || to || {}), new Date().toISOString());
-      for (const q of filtered) {
+      for (const option of providers) {
         db.prepare("INSERT INTO ride_quotes(id,request_id,provider,amount,currency,eta_minutes,duration_minutes,status,raw_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
-          .run(crypto.randomUUID(), requestId, q.providerId, q.fare, q.currency, q.etaMinutes, q.durationMinutes, "FALLBACK", JSON.stringify(q), new Date().toISOString());
+          .run(crypto.randomUUID(), requestId, option.providerId, option.fare, option.currency, option.etaMinutes, option.durationMinutes, 'ESTIMATED', JSON.stringify(option), new Date().toISOString());
       }
       db.prepare(
         `INSERT INTO wallet_transactions (id, user_id, amount, type, reference, balance_after, created_at) VALUES (?, ?, ?, 'trip_search', ?, ?, ?)`
@@ -675,231 +722,30 @@ const handleTripCompare = (req: express.Request, res: express.Response) => {
       throw txError;
     }
 
-    res.json({
+    return res.json({
       success: true,
       result,
       distanceKm,
       baseDurationMins,
-      options: filtered,
+      options: providers,
       recommendations: {
-        best: providers.find((p) => p.badge === "best"),
-        cheapest: providers.find((p) => p.badge === "cheapest"),
-        fastest: providers.find((p) => p.badge === "fastest"),
+        best: sortedByFare[0] || null,
+        cheapest: sortedByFare[0] || null,
+        fastest: fastest || null,
       },
       requestId,
       livePricing: false,
-      quoteStatus: "FALLBACK",
-      warning: "Official transport fare APIs are not configured. Prices shown are estimates only.",
+      quoteStatus: 'ESTIMATED',
+      warning: 'جميع الأسعار تقديرية واجتهادية من SMART TIME وليست أسعارًا رسمية من شركات النقل.',
       timestamp: new Date().toISOString(),
       walletBalance: newBalance,
       tripCost: TRIP_SEARCH_COST_EGP,
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (e: any) {
+    console.error('Trip compare failed:', e);
+    return res.status(500).json({ error: e?.message || 'تعذر حساب أسعار الرحلة' });
   }
 };
-
-// ============ نظام المحفظة (Wallet) ============
-
-function requireAuthUser(req: express.Request, res: express.Response): any | null {
-  const user = authUser(req);
-  if (!user) {
-    res.status(401).json({ error: 'يجب تسجيل الدخول أولاً' });
-    return null;
-  }
-  return user;
-}
-
-function isOwnerRequest(req: express.Request): boolean {
-  const user = authUser(req);
-  if (!user) return false;
-  if (PROGRAM_OWNER_USER_ID) return String(user.id || '') === PROGRAM_OWNER_USER_ID;
-  return !!PROGRAM_OWNER_EMAIL && String(user.email || '').trim().toLowerCase() === PROGRAM_OWNER_EMAIL;
-}
-
-// جلب رصيد المستخدم الحالي
-app.get('/api/wallet/me', (req, res) => {
-  const user = requireAuthUser(req, res);
-  if (!user) return;
-  const row = db.prepare('SELECT wallet_balance, trip_free_searches, phone_verified FROM users WHERE id = ?').get(user.id) as any;
-  res.json({
-    balance: Number(row?.wallet_balance || 0),
-    tripCost: TRIP_SEARCH_COST_EGP,
-    isOwner: isOwnerRequest(req),
-    walletNumber: OWNER_WALLET_NUMBER || undefined,
-    instapayAddress: OWNER_INSTAPAY_ADDRESS || undefined,
-    topupMin: WALLET_TOPUP_MIN_EGP,
-    topupMax: WALLET_TOPUP_MAX_EGP,
-    freeSearches: Math.max(0, Number(row?.trip_free_searches || 0)),
-    phoneVerified: !!row?.phone_verified,
-  });
-});
-
-// المستخدم يطلب شحن رصيد بعد ما يحول فلوس يدويًا
-app.post('/api/wallet/topup-request', (req, res) => {
-  const user = requireAuthUser(req, res);
-  if (!user) return;
-  const amountRaw = Number(req.body.amount);
-  const amount = Math.round(amountRaw * 100) / 100;
-  const method = String(req.body.method || '').trim();
-  const note = String(req.body.note || '').trim().slice(0, 120);
-  if (!Number.isFinite(amount) || amount < WALLET_TOPUP_MIN_EGP || amount > WALLET_TOPUP_MAX_EGP) {
-    return res.status(400).json({ error: `المبلغ يجب أن يكون من ${WALLET_TOPUP_MIN_EGP} إلى ${WALLET_TOPUP_MAX_EGP} ج.م` });
-  }
-  if (!ALLOWED_TOPUP_METHODS.has(method)) return res.status(400).json({ error: 'وسيلة الشحن غير مدعومة' });
-
-  // منع الضغط المكرر أو إرسال نفس الطلب عدة مرات خلال دقيقتين.
-  const recentCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const duplicate = db.prepare(
-    `SELECT id FROM wallet_topups WHERE user_id = ? AND amount = ? AND method = ? AND status = 'pending' AND created_at >= ? LIMIT 1`
-  ).get(user.id, amount, method, recentCutoff) as any;
-  if (duplicate) return res.status(409).json({ error: 'يوجد طلب شحن مماثل قيد المراجعة بالفعل' });
-
-  const id = `topup_${crypto.randomUUID()}`;
-  db.prepare(
-    `INSERT INTO wallet_topups (id, user_id, amount, method, note, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)`
-  ).run(id, user.id, amount, method, note, new Date().toISOString());
-
-  res.json({ ok: true, id, message: 'تم إرسال طلب الشحن، سيتم مراجعته والموافقة عليه قريبًا' });
-});
-
-// المستخدم يشوف طلباته وحالتها
-app.get('/api/wallet/topup-requests/mine', (req, res) => {
-  const user = requireAuthUser(req, res);
-  if (!user) return;
-  const rows = db.prepare(
-    `SELECT id, amount, method, note, status, created_at, reviewed_at FROM wallet_topups WHERE user_id = ? ORDER BY created_at DESC`
-  ).all(user.id);
-  res.json({ requests: rows });
-});
-
-// سجل حركات المحفظة للمستخدم الحالي
-app.get('/api/wallet/transactions', (req, res) => {
-  const user = requireAuthUser(req, res);
-  if (!user) return;
-  const rows = db.prepare(
-    `SELECT id, amount, type, reference, balance_after, created_at
-     FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`
-  ).all(user.id);
-  res.json({ transactions: rows });
-});
-
-// --- نقاط نهاية خاصة بصاحب البرنامج (الأدمن) فقط ---
-
-// جلب كل طلبات الشحن (اختياريًا فلترة بالحالة)
-app.get('/api/admin/wallet/summary', (req, res) => {
-  if (!isOwnerRequest(req)) return res.status(403).json({ error: 'هذا الإجراء مخصص لصاحب البرنامج فقط' });
-  const pending = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as amount FROM wallet_topups WHERE status='pending'").get() as any;
-  const approved = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as amount FROM wallet_topups WHERE status='approved'").get() as any;
-  const rejected = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as amount FROM wallet_topups WHERE status='rejected'").get() as any;
-  const users = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(wallet_balance),0) as balances FROM users").get() as any;
-  const tripUsage = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(-amount),0) as amount FROM wallet_transactions WHERE type='trip_search'").get() as any;
-  res.json({
-    pending: { count: Number(pending?.count||0), amount: Number(pending?.amount||0) },
-    approved: { count: Number(approved?.count||0), amount: Number(approved?.amount||0) },
-    rejected: { count: Number(rejected?.count||0), amount: Number(rejected?.amount||0) },
-    users: { count: Number(users?.count||0), balances: Number(users?.balances||0) },
-    tripUsage: { count: Number(tripUsage?.count||0), amount: Number(tripUsage?.amount||0) },
-    tripCost: TRIP_SEARCH_COST_EGP,
-    topupMin: WALLET_TOPUP_MIN_EGP,
-    topupMax: WALLET_TOPUP_MAX_EGP,
-  });
-});
-
-app.get('/api/admin/wallet/topups', (req, res) => {
-  if (!isOwnerRequest(req)) return res.status(403).json({ error: 'هذا الإجراء مخصص لصاحب البرنامج فقط' });
-  const status = String(req.query.status || 'pending');
-  const q = String(req.query.q || '').trim().slice(0, 80);
-  const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 200);
-  const params: any[] = [];
-  let where = 't.status = ?'; params.push(status);
-  if (q) { where += ' AND (u.email LIKE ? OR u.display_name LIKE ? OR u.phone LIKE ? OR t.id LIKE ?)'; const x=`%${q}%`; params.push(x,x,x,x); }
-  params.push(limit);
-  const rows = db.prepare(
-    `SELECT t.id, t.user_id, u.email, u.display_name, u.phone, t.amount, t.method, t.note, t.status,
-            t.reviewed_by, t.reviewed_at, t.review_note, t.created_at
-     FROM wallet_topups t JOIN users u ON u.id = t.user_id
-     WHERE ${where} ORDER BY t.created_at ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT ?`
-  ).all(...params);
-  res.json({ requests: rows });
-});
-
-app.get('/api/admin/wallet/users', (req, res) => {
-  if (!isOwnerRequest(req)) return res.status(403).json({ error: 'هذا الإجراء مخصص لصاحب البرنامج فقط' });
-  const q = String(req.query.q || '').trim().slice(0, 80);
-  const params: any[] = [];
-  let where = '1=1';
-  if (q) { where += ' AND (email LIKE ? OR display_name LIKE ? OR phone LIKE ?)'; const x=`%${q}%`; params.push(x,x,x); }
-  params.push(Math.min(Math.max(Number(req.query.limit || 100),1),200));
-  const rows = db.prepare(`SELECT id,email,display_name,phone,wallet_balance,created_at FROM users WHERE ${where} ORDER BY wallet_balance DESC LIMIT ?`).all(...params);
-  res.json({ users: rows });
-});
-
-app.get('/api/admin/wallet/audit', (req, res) => {
-  if (!isOwnerRequest(req)) return res.status(403).json({ error: 'هذا الإجراء مخصص لصاحب البرنامج فقط' });
-  const limit = Math.min(Math.max(Number(req.query.limit || 100),1),200);
-  const rows = db.prepare(`SELECT id,topup_id,user_id,action,amount,note,actor_id,actor_email,created_at FROM wallet_admin_actions ORDER BY created_at DESC LIMIT ?`).all(limit);
-  res.json({ actions: rows });
-});
-
-// الموافقة على طلب شحن وزيادة رصيد المستخدم فعليًا
-app.post('/api/admin/wallet/topups/:id/approve', (req, res) => {
-  if (!isOwnerRequest(req)) return res.status(403).json({ error: 'هذا الإجراء مخصص لصاحب البرنامج فقط' });
-  try {
-    db.exec('BEGIN IMMEDIATE');
-    const topup = db.prepare(`SELECT * FROM wallet_topups WHERE id = ?`).get(req.params.id) as any;
-    if (!topup) { db.exec('ROLLBACK'); return res.status(404).json({ error: 'الطلب غير موجود' }); }
-    if (topup.status !== 'pending') { db.exec('ROLLBACK'); return res.status(409).json({ error: 'تمت مراجعة هذا الطلب من قبل' }); }
-
-    const reviewedAt = new Date().toISOString();
-    const reviewNote = String(req.body?.note || '').trim().slice(0, MAX_REVIEW_NOTE_LENGTH);
-    const reviewer = String((authUser(req) as any)?.id || PROGRAM_OWNER_EMAIL || 'owner');
-    const review = db.prepare(
-      `UPDATE wallet_topups SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ? AND status = 'pending'`
-    ).run(PROGRAM_OWNER_EMAIL || reviewer, reviewedAt, reviewNote, topup.id) as any;
-    if (!review.changes) { db.exec('ROLLBACK'); return res.status(409).json({ error: 'تمت مراجعة هذا الطلب بالفعل' }); }
-
-    db.prepare('UPDATE users SET wallet_balance = ROUND(wallet_balance + ?, 2) WHERE id = ?').run(topup.amount, topup.user_id);
-    const userRow = db.prepare('SELECT wallet_balance FROM users WHERE id = ?').get(topup.user_id) as any;
-    const newBalance = Number(userRow?.wallet_balance || 0);
-    db.prepare(
-      `INSERT INTO wallet_transactions (id, user_id, amount, type, reference, balance_after, created_at) VALUES (?, ?, ?, 'topup', ?, ?, ?)`
-    ).run(`wtx_${crypto.randomUUID()}`, topup.user_id, topup.amount, topup.id, newBalance, reviewedAt);
-    db.prepare(`INSERT INTO wallet_admin_actions (id,topup_id,user_id,action,amount,note,actor_id,actor_email,created_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-      .run(`waa_${crypto.randomUUID()}`, topup.id, topup.user_id, 'approve', topup.amount, reviewNote, reviewer, PROGRAM_OWNER_EMAIL || reviewer, reviewedAt);
-    db.exec('COMMIT');
-    res.json({ ok: true, newBalance });
-  } catch (e: any) {
-    try { db.exec('ROLLBACK'); } catch {}
-    res.status(500).json({ error: e?.message || 'تعذر اعتماد طلب الشحن' });
-  }
-});
-
-app.post('/api/admin/wallet/topups/:id/reject', (req, res) => {
-  if (!isOwnerRequest(req)) return res.status(403).json({ error: 'هذا الإجراء مخصص لصاحب البرنامج فقط' });
-  try {
-    db.exec('BEGIN IMMEDIATE');
-    const reviewedAt = new Date().toISOString();
-    const reviewNote = String(req.body?.note || '').trim().slice(0, MAX_REVIEW_NOTE_LENGTH);
-    const reviewer = String((authUser(req) as any)?.id || PROGRAM_OWNER_EMAIL || 'owner');
-    const result = db.prepare(
-      `UPDATE wallet_topups SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ? AND status = 'pending'`
-    ).run(PROGRAM_OWNER_EMAIL || reviewer, reviewedAt, reviewNote, req.params.id) as any;
-    if (!result.changes) {
-      db.exec('ROLLBACK');
-      const exists = db.prepare('SELECT id FROM wallet_topups WHERE id = ?').get(req.params.id);
-      return res.status(exists ? 409 : 404).json({ error: exists ? 'تمت مراجعة هذا الطلب من قبل' : 'الطلب غير موجود' });
-    }
-    const topup = db.prepare('SELECT user_id,amount FROM wallet_topups WHERE id=?').get(req.params.id) as any;
-    db.prepare(`INSERT INTO wallet_admin_actions (id,topup_id,user_id,action,amount,note,actor_id,actor_email,created_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-      .run(`waa_${crypto.randomUUID()}`, req.params.id, topup?.user_id || null, 'reject', Number(topup?.amount||0), reviewNote, reviewer, PROGRAM_OWNER_EMAIL || reviewer, reviewedAt);
-    db.exec('COMMIT');
-    res.json({ ok: true });
-  } catch (e:any) {
-    try { db.exec('ROLLBACK'); } catch {}
-    res.status(500).json({ error: e?.message || 'تعذر رفض طلب الشحن' });
-  }
-});
 
 app.post("/api/trips/compare", handleTripCompare);
 app.post("/api/transport/compare", handleTripCompare);
@@ -907,6 +753,51 @@ app.post("/api/transport/compare", handleTripCompare);
 // ----------------------------------------------------
 // 4B. Google Maps & Geolocation Proxy Endpoints
 // ----------------------------------------------------
+app.get("/api/maps/route", async (req, res) => {
+  try {
+    const from = String(req.query.from || "").trim();
+    const to = String(req.query.to || "").trim();
+    const valid = (v: string) => /^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/.test(v);
+    if (!valid(from) || !valid(to)) return res.status(400).json({ error: "Valid from/to coordinates are required" });
+
+    const tomtomKey = process.env.TOMTOM_API_KEY;
+    if (tomtomKey) {
+      try {
+        const url = `https://api.tomtom.com/routing/1/calculateRoute/${encodeURIComponent(from)}:${encodeURIComponent(to)}/json?key=${encodeURIComponent(tomtomKey)}&routeType=fastest&traffic=true&travelMode=car&language=ar`;
+        const rr = await fetch(url);
+        const data = await rr.json();
+        const summary = data?.routes?.[0]?.summary;
+        const points = data?.routes?.[0]?.legs?.[0]?.points || [];
+        if (rr.ok && points.length) {
+          return res.json({
+            coordinates: points.map((p: any) => [p.latitude, p.longitude]),
+            distanceKm: Number(summary?.lengthInMeters || 0) / 1000,
+            durationMins: Number(summary?.travelTimeInSeconds || 0) / 60,
+            provider: "tomtom",
+          });
+        }
+      } catch {}
+    }
+
+    // Development fallback: public OSRM routing. No API key required.
+    const [fromLat, fromLng] = from.split(',').map(Number);
+    const [toLat, toLng] = to.split(',').map(Number);
+    const osrm = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=false`;
+    const or = await fetch(osrm, { headers: { "User-Agent": "SMART-TIME/25.7" } });
+    const od = await or.json();
+    const route = od?.routes?.[0];
+    if (!or.ok || !route?.geometry?.coordinates?.length) return res.status(502).json({ error: "Route service unavailable" });
+    res.json({
+      coordinates: route.geometry.coordinates.map((p: [number, number]) => [p[1], p[0]]),
+      distanceKm: Number(route.distance || 0) / 1000,
+      durationMins: Number(route.duration || 0) / 60,
+      provider: "osrm",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Route failed" });
+  }
+});
+
 app.get("/api/maps/geocode", async (req, res) => {
   try {
     const address = String(req.query.address || "").trim();
@@ -1145,7 +1036,7 @@ app.post("/api/backup/export", (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.json({
     exportDate: new Date().toISOString(),
-    version: "8.3.14",
+    version: "25.7",
     data: payload,
   });
 });
@@ -1302,6 +1193,26 @@ app.get("/api/live/weather", async (req, res) => {
     });
   } catch (error) {
     return res.status(502).json({ source: "open-meteo", error: (error as Error)?.message });
+  }
+});
+
+
+app.get('/api/sports/exercises', async (req, res) => {
+  try {
+    const key = process.env.RAPIDAPI_KEY;
+    if (!key) return res.status(503).json({ error: 'RAPIDAPI_KEY غير مضبوط في متغيرات البيئة' });
+    const bodyPart = typeof req.query.bodyPart === 'string' ? req.query.bodyPart : '';
+    const endpoint = bodyPart
+      ? `https://exercisedb.p.rapidapi.com/exercises/bodyPart/${encodeURIComponent(bodyPart)}?limit=12&offset=0`
+      : 'https://exercisedb.p.rapidapi.com/exercises?limit=12&offset=0';
+    const upstream = await fetch(endpoint, {
+      headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': 'exercisedb.p.rapidapi.com' },
+    });
+    const text = await upstream.text();
+    res.status(upstream.status).type('application/json').send(text);
+  } catch (error) {
+    console.error('ExerciseDB proxy error:', error);
+    res.status(502).json({ error: 'تعذر الاتصال بخدمة ExerciseDB' });
   }
 });
 

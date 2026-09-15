@@ -11,12 +11,16 @@ export class StorageAdapter {
     }
   }
 
-  static setItem<T>(key: string, value: T): void {
-    if (typeof window === 'undefined') return;
+  static setItem<T>(key: string, value: T): boolean {
+    if (typeof window === 'undefined') return false;
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      const serialized = JSON.stringify(value);
+      localStorage.setItem(key, serialized);
+      // Verify immediately so a save action never fails silently.
+      return localStorage.getItem(key) === serialized;
     } catch (e) {
       console.error(`[StorageAdapter] Failed to save key "${key}":`, e);
+      return false;
     }
   }
 

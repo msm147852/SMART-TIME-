@@ -60,3 +60,26 @@ Until an official provider fare API is configured, transport prices are explicit
 
 ### Secrets
 Keep API keys in server `.env` variables only. Do not put secrets in `VITE_*` variables or frontend source code.
+
+## قسم الطعام — تحديث سبتمبر 2026
+- تم دمج محتوى تقرير نظام الطيبات في واجهة منظمة: نظرة عامة، القواعد، المسموحات حسب التكرار، الممنوعات، الوصفات، والخطة الأسبوعية.
+- تمت إضافة تنبيه واضح بأن المحتوى منقول من التقرير وليس توصية طبية، مع عدم إيقاف أي دواء موصوف دون طبيب.
+- تم توسيع مكتبة الأكلات المصرية لتشمل وجبات رئيسية، أطباق شعبية، محاشي، طواجن، أسماك، فطور، ومخبوزات.
+- تمت إضافة مكتبة مستقلة للحلويات المصرية.
+- تمت إضافة وصفات طيبات مبنية على الأصناف المسموحة الواردة في التقرير مع تمييز ما هو تجميع وصفي وليس نصًا حرفيًا من المصدر.
+- الملف الأصلي للتقرير محفوظ في `docs/tayyibat-report-source.txt`.
+
+
+## مكتبة الطعام التفصيلية
+تمت إضافة مكتبة منظمة قابلة للتوسع تشمل: المحاشي، المشويات (الدجاج والكفتة والحمام والسمان والسمك)، المشروبات الساخنة والباردة، العصائر، المخبوزات، والسلطات. كل وصفة تحتوي على صورة، كمية شراء، مكونات، تتبيلة عند الحاجة، خطوات تحضير وطهي، ونصائح. ويمكن إضافة مكونات الوصفة مباشرة إلى قائمة المشتريات.
+
+## Sports & Fitness Hub
+- SportsView now provides four interactive cards: Exercise Library, Favorites, My Sport/Search, and Sports News.
+- ExerciseDB requests are proxied through `/api/sports/exercises` so the RapidAPI key is not exposed in browser code.
+- Set `RAPIDAPI_KEY` in `.env` (see `.env.example`) before running the server.
+
+## AI Food Images
+- Food recipe cards now request a dedicated AI-generated image from `/api/food/generated-image` using the exact recipe title/category.
+- The API uses the server-side `GEMINI_API_KEY` and the Gemini image model `gemini-3.1-flash-image`; the key is never sent to the browser.
+- Generated images are cached in server memory for reuse.
+- In category cards, the dish name is fully visible below the image. Clicking the name toggles the ingredients open/closed.

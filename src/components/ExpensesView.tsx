@@ -1,36 +1,40 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Language, Expense, VehicleAccidentRecord, StudentProfile, StudentExpenseRecord, MonthlyIncome, BankCertificate } from '../types';
+import { Language, Expense, VehicleAccidentRecord, StudentProfile, StudentExpenseRecord, MedicalExpenseRecord, MonthlyIncome, BankCertificate } from '../types';
 import { StorageAdapter, VehiclesRepository, ExpensesRepository } from '../services';
 import { isDateInMonth, getCertificatesProfitForMonth, getPrimaryIncomeForMonth } from '../services/financeCalculations';
 import { FinancialDashboard } from './expenses/FinancialDashboard';
 import { SectionsMenuScreen } from './expenses/SectionsMenuScreen';
 import { HouseExpensesSection, SpecializedExpense } from './expenses/HouseExpensesSection';
 import { WorkExpensesSection } from './expenses/WorkExpensesSection';
-import { VehicleExpensesSection, VehicleFuelRecord, VehicleMaintenanceRecord } from './expenses/VehicleExpensesSection';
+import { PersonalExpensesSection, AssociationRecord } from './expenses/PersonalExpensesSection';
+import { VehicleExpensesSection, VehicleFuelRecord, VehicleMaintenanceRecord, VehicleOilFilterRecord } from './expenses/VehicleExpensesSection';
 import { EducationExpensesSection } from './expenses/EducationExpensesSection';
 import { IncomeAndCertificatesSection } from './expenses/IncomeAndCertificatesSection';
 import { FinancialReportsSection } from './expenses/FinancialReportsSection';
 import { AddExpenseModal } from './expenses/AddExpenseModal';
-import { VehicleCameraModal } from './VehicleCameraModal';
 
 interface ExpensesViewProps {
   language: Language;
   currency: string;
   expenses?: Expense[];
   onUpdateExpenses?: (expenses: Expense[]) => void;
+  userProfile?: import('../types').UserProfile;
+  onBackToHome?: () => void;
 }
 
 export const ExpensesView: React.FC<ExpensesViewProps> = ({
   language,
   currency,
+  userProfile,
+  onBackToHome,
 }) => {
   const isAr = language === 'ar';
 
   // --- 1. CURRENT SCREEN STATE ---
   // 'dashboard' | 'sections_menu' | 'house' | 'work' | 'vehicle' | 'education' | 'income_certs' | 'reports'
   const [currentScreen, setCurrentScreen] = useState<
-    'dashboard' | 'sections_menu' | 'house' | 'work' | 'vehicle' | 'education' | 'income_certs' | 'reports'
-  >('dashboard');
+    'dashboard' | 'sections_menu' | 'house' | 'work' | 'personal' | 'vehicle' | 'education' | 'income_certs' | 'reports'
+  >('sections_menu');
 
   // Month selector (default: current year-month YYYY-MM)
   const currentYearMonth = useMemo(() => {
@@ -41,10 +45,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
   // Universal Add Expense Modal
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
-
-  // Camera Modal for Vehicles
-  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
-  const [cameraMode, setCameraMode] = useState<'accident' | 'odometer'>('accident');
 
   // --- 2. DATA STATES (PERSISTED) ---
 
@@ -58,12 +58,27 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     ]);
   });
 
+  // Medical expenses (inside the Home section)
+  const [medicalList, setMedicalList] = useState<MedicalExpenseRecord[]>(() => {
+    return StorageAdapter.getItem<MedicalExpenseRecord[]>('smart_time_medical_expenses', []);
+  });
+
   // Work Expenses
   const [workList, setWorkList] = useState<SpecializedExpense[]>(() => {
     return StorageAdapter.getItem<SpecializedExpense[]>('smart_time_work_expenses', [
       { id: 'w1', section: 'work', type: 'أدوات مكتبية', amount: 350, date: `${currentYearMonth}-03`, notes: 'أوراق طباعة وأحبار' },
       { id: 'w2', section: 'work', type: 'اشتراكات برمجيات وسيرفرات', amount: 800, date: `${currentYearMonth}-04`, notes: 'سيرفر الاستضافة السحابية' },
     ]);
+  });
+
+  // Personal Expenses
+  const [personalList, setPersonalList] = useState<SpecializedExpense[]>(() => {
+    return StorageAdapter.getItem<SpecializedExpense[]>('smart_time_personal_expenses', []);
+  });
+
+  // Personal associations (جمعياتي)
+  const [associationsList, setAssociationsList] = useState<AssociationRecord[]>(() => {
+    return StorageAdapter.getItem<AssociationRecord[]>('smart_time_personal_associations', []);
   });
 
   // Vehicle: Fuel, Maintenance, Accidents
@@ -78,6 +93,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     return StorageAdapter.getItem<VehicleMaintenanceRecord[]>('smart_time_vehicle_maint', [
       { id: 'm1', maintenanceType: 'كهرباء', description: 'تغيير شمعات الإشعال وفحص البطارية', supplyName: 'بوجيهات أصلية', supplyPrice: 800, laborDescription: 'تركيب وفحص', laborPrice: 200, total: 1000, date: `${currentYearMonth}-05` },
     ]);
+  });
+
+
+  const [oilFilterList, setOilFilterList] = useState<VehicleOilFilterRecord[]>(() => {
+    return StorageAdapter.getItem<VehicleOilFilterRecord[]>('smart_time_vehicle_oil_filters', []);
   });
 
   const [accidentList, setAccidentList] = useState<VehicleAccidentRecord[]>(() => {
@@ -160,9 +180,24 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     StorageAdapter.setItem('smart_time_house_expenses', list);
   };
 
+  const handleSaveMedical = (list: MedicalExpenseRecord[]) => {
+    setMedicalList(list);
+    StorageAdapter.setItem('smart_time_medical_expenses', list);
+  };
+
   const handleSaveWork = (list: SpecializedExpense[]) => {
     setWorkList(list);
     StorageAdapter.setItem('smart_time_work_expenses', list);
+  };
+
+  const handleSavePersonal = (list: SpecializedExpense[]) => {
+    setPersonalList(list);
+    StorageAdapter.setItem('smart_time_personal_expenses', list);
+  };
+
+  const handleSaveAssociations = (list: AssociationRecord[]) => {
+    setAssociationsList(list);
+    StorageAdapter.setItem('smart_time_personal_associations', list);
   };
 
   const handleSaveFuel = (list: VehicleFuelRecord[]) => {
@@ -173,6 +208,12 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   const handleSaveMaint = (list: VehicleMaintenanceRecord[]) => {
     setMaintList(list);
     StorageAdapter.setItem('smart_time_vehicle_maint', list);
+  };
+
+
+  const handleSaveOilFilter = (list: VehicleOilFilterRecord[]) => {
+    setOilFilterList(list);
+    StorageAdapter.setItem('smart_time_vehicle_oil_filters', list);
   };
 
   const handleSaveAccidents = (list: VehicleAccidentRecord[]) => {
@@ -210,6 +251,16 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     [currentMonthHouse]
   );
 
+  const currentMonthMedical = useMemo(
+    () => medicalList.filter((e) => isDateInMonth(e.date, selectedMonth)),
+    [medicalList, selectedMonth]
+  );
+  const medicalTotal = useMemo(
+    () => currentMonthMedical.reduce((s, e) => s + (Number(e.examinationCost) || 0) + (Number(e.medicationCost) || 0), 0),
+    [currentMonthMedical]
+  );
+  const homeAndMedicalTotal = houseTotal + medicalTotal;
+
   const currentMonthWork = useMemo(
     () => workList.filter((e) => isDateInMonth(e.date, selectedMonth)),
     [workList, selectedMonth]
@@ -217,6 +268,15 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   const workTotal = useMemo(
     () => currentMonthWork.reduce((s, e) => s + (Number(e.amount) || 0), 0),
     [currentMonthWork]
+  );
+
+  const currentMonthPersonal = useMemo(
+    () => personalList.filter((e) => isDateInMonth(e.date, selectedMonth)),
+    [personalList, selectedMonth]
+  );
+  const personalTotal = useMemo(
+    () => currentMonthPersonal.reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [currentMonthPersonal]
   );
 
   const currentMonthFuel = useMemo(
@@ -237,6 +297,15 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     [currentMonthMaint]
   );
 
+  const currentMonthOil = useMemo(
+    () => oilFilterList.filter((o) => isDateInMonth(o.date, selectedMonth)),
+    [oilFilterList, selectedMonth]
+  );
+  const oilTotal = useMemo(
+    () => currentMonthOil.reduce((s, o) => s + (Number(o.price) || 0), 0),
+    [currentMonthOil]
+  );
+
   const currentMonthAccidents = useMemo(
     () => accidentList.filter((a) => isDateInMonth(a.date, selectedMonth)),
     [accidentList, selectedMonth]
@@ -246,7 +315,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     [currentMonthAccidents]
   );
 
-  const vehicleTotal = fuelTotal + maintTotal + accidentTotal;
+  const vehicleTotal = fuelTotal + maintTotal + oilTotal + accidentTotal;
 
   const currentMonthEducation = useMemo(
     () => studentExpensesList.filter((e) => isDateInMonth(e.date, selectedMonth)),
@@ -257,8 +326,27 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     [currentMonthEducation]
   );
 
-  // Grand Total Expenses for the month
-  const monthlyExpenses = houseTotal + workTotal + vehicleTotal + educationTotal;
+  const associationFinancials = useMemo(() => {
+    let installments = 0;
+    let earned = 0;
+    const [yy, mm] = selectedMonth.split('-').map(Number);
+    const monthStart = new Date(yy, mm - 1, 1, 0, 0, 0);
+    associationsList.forEach((a) => {
+      const start = new Date(`${a.startDate}T00:00:00`);
+      if (!Number.isNaN(start.getTime()) && start <= monthStart) {
+        const monthIndex = (yy - start.getFullYear()) * 12 + (mm - 1 - start.getMonth());
+        // الجمعية مدتها = عدد الأفراد، وتبدأ من تاريخ بداية الأقساط.
+        if (monthIndex >= 0 && monthIndex < Math.max(1, Math.floor(Number(a.memberCount) || 1))) {
+          installments += Number(a.installment) || 0;
+        }
+      }
+      if ((a.payoutDate || '').slice(0, 7) === selectedMonth) earned += Number(a.value) || 0;
+    });
+    return { installments, earned };
+  }, [associationsList, selectedMonth]);
+
+  // Grand Total Expenses for the month. Association installments are expenses; association payout is earned income.
+  const monthlyExpenses = homeAndMedicalTotal + personalTotal + associationFinancials.installments + vehicleTotal + educationTotal;
 
   // Primary Income from Salary & Extra streams
   const primaryIncome = useMemo(
@@ -272,17 +360,25 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     [certificates, selectedMonth]
   );
 
-  // Total Monthly Income = Primary Income + Bank Certificates Returns
-  const monthlyIncome = primaryIncome + certificatesProfit;
+  // Current account is part of the master financial balance. Deposits are positive and withdrawals negative.
+  const currentAccountNet = useMemo(
+    () => (incomeList.find((doc) => doc.month === selectedMonth)?.sources || [])
+      .filter((src) => src.type === 'current_deposit' || src.type === 'current_withdrawal')
+      .reduce((sum, src) => sum + (Number(src.amount) || 0), 0),
+    [incomeList, selectedMonth]
+  );
 
-  // Net Income / Balance = Total Income - Total Expenses
+  // Master monthly income = earned income + certificate returns + current-account movement + association payouts.
+  const monthlyIncome = primaryIncome.total + certificatesProfit + currentAccountNet + associationFinancials.earned;
+
+  // Master net income is always derived from the same monthly income and all expense sections.
   const netIncome = monthlyIncome - monthlyExpenses;
 
   // Recent Transactions Stream across all sections
   const recentTransactions = useMemo(() => {
     const list: {
       id: string;
-      section: 'house' | 'work' | 'vehicle' | 'education';
+      section: 'house' | 'work' | 'personal' | 'vehicle' | 'education';
       title: string;
       amount: number;
       date: string;
@@ -300,14 +396,25 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       });
     });
 
-    workList.forEach((w) => {
+    medicalList.forEach((m) => {
+      list.push({
+        id: m.id,
+        section: 'house',
+        title: `طبي: ${m.familyMember}${m.facilityName ? ` - ${m.facilityName}` : ''}`,
+        amount: (Number(m.examinationCost) || 0) + (Number(m.medicationCost) || 0),
+        date: m.date,
+        badge: isAr ? 'طبي' : 'Medical',
+      });
+    });
+
+    personalList.forEach((w) => {
       list.push({
         id: w.id,
         section: 'work',
         title: w.type,
         amount: w.amount,
         date: w.date,
-        badge: isAr ? 'عمل' : 'Work',
+        badge: isAr ? 'شخصي' : 'Personal',
       });
     });
 
@@ -346,11 +453,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     });
 
     return list.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
-  }, [houseList, workList, fuelList, maintList, studentExpensesList, students, isAr]);
+  }, [houseList, medicalList, personalList, fuelList, maintList, studentExpensesList, students, isAr]);
 
   // Universal Add Expense Handler
   const handleUniversalAddExpense = (data: {
-    section: 'house' | 'work' | 'vehicle' | 'education';
+    section: 'house' | 'work' | 'personal' | 'vehicle' | 'education';
     category: string;
     amount: number;
     date: string;
@@ -378,6 +485,16 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
         notes: data.notes,
       };
       handleSaveWork([newItem, ...workList]);
+    } else if (data.section === 'personal') {
+      const newItem: SpecializedExpense = {
+        id: `p_${Date.now()}`,
+        section: 'work',
+        type: data.category,
+        amount: data.amount,
+        date: data.date,
+        notes: data.notes,
+      };
+      handleSavePersonal([newItem, ...personalList]);
     } else if (data.section === 'vehicle') {
       if (data.category.includes('وقود') || data.category.includes('بنزين') || data.category.includes('سولار')) {
         const newFuel: VehicleFuelRecord = {
@@ -431,12 +548,12 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           onOpenSectionsMenu={() => setCurrentScreen('sections_menu')}
           onOpenAddExpense={() => setIsAddExpenseModalOpen(true)}
           onSelectSection={(sec) => setCurrentScreen(sec)}
-          houseTotal={houseTotal}
-          houseCount={currentMonthHouse.length}
-          workTotal={workTotal}
-          workCount={currentMonthWork.length}
+          houseTotal={homeAndMedicalTotal}
+          houseCount={currentMonthHouse.length + currentMonthMedical.length}
+          workTotal={personalTotal + associationFinancials.installments}
+          workCount={currentMonthPersonal.length + associationsList.length}
           vehicleTotal={vehicleTotal}
-          vehicleCount={currentMonthFuel.length + currentMonthMaint.length + currentMonthAccidents.length}
+          vehicleCount={currentMonthFuel.length + currentMonthMaint.length + currentMonthOil.length + currentMonthAccidents.length}
           educationTotal={educationTotal}
           educationCount={currentMonthEducation.length}
           certsCount={certificates.length}
@@ -451,20 +568,23 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           currency={currency}
           selectedMonth={selectedMonth}
           onSelectMonth={setSelectedMonth}
-          onBack={() => setCurrentScreen('dashboard')}
+          onBack={() => { if (onBackToHome) onBackToHome(); else setCurrentScreen('dashboard'); }}
           onSelectSection={(sec) => setCurrentScreen(sec)}
-          houseTotal={houseTotal}
-          houseCount={currentMonthHouse.length}
-          workTotal={workTotal}
-          workCount={currentMonthWork.length}
+          houseTotal={homeAndMedicalTotal}
+          houseCount={currentMonthHouse.length + currentMonthMedical.length}
+          workTotal={personalTotal + associationFinancials.installments}
+          workCount={currentMonthPersonal.length + associationsList.length}
           vehicleTotal={vehicleTotal}
-          vehicleCount={currentMonthFuel.length + currentMonthMaint.length + currentMonthAccidents.length}
+          vehicleCount={currentMonthFuel.length + currentMonthMaint.length + currentMonthOil.length + currentMonthAccidents.length}
           educationTotal={educationTotal}
           educationCount={currentMonthEducation.length}
           monthlyIncome={monthlyIncome}
           certsCount={certificates.length}
           monthlyExpenses={monthlyExpenses}
           netIncome={netIncome}
+          certificatesProfit={certificatesProfit}
+          currentAccountNet={currentAccountNet}
+          userProfile={userProfile}
         />
       )}
 
@@ -477,6 +597,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           onBack={() => setCurrentScreen('sections_menu')}
           expenses={houseList}
           onSaveExpenses={handleSaveHouse}
+          medicalExpenses={medicalList}
+          onSaveMedicalExpenses={handleSaveMedical}
         />
       )}
 
@@ -492,7 +614,21 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
         />
       )}
 
-      {/* 5. FULL SCREEN: VEHICLE EXPENSES */}
+      {/* 5. FULL SCREEN: PERSONAL EXPENSES */}
+      {currentScreen === 'personal' && (
+        <PersonalExpensesSection
+          language={language}
+          currency={currency}
+          selectedMonth={selectedMonth}
+          onBack={() => setCurrentScreen('sections_menu')}
+          expenses={personalList}
+          onSaveExpenses={handleSavePersonal}
+          associations={associationsList}
+          onSaveAssociations={handleSaveAssociations}
+        />
+      )}
+
+      {/* 6. FULL SCREEN: VEHICLE EXPENSES */}
       {currentScreen === 'vehicle' && (
         <VehicleExpensesSection
           language={language}
@@ -503,12 +639,10 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           onSaveFuel={handleSaveFuel}
           maintList={maintList}
           onSaveMaint={handleSaveMaint}
+          oilFilterList={oilFilterList}
+          onSaveOilFilter={handleSaveOilFilter}
           accidentList={accidentList}
           onSaveAccidents={handleSaveAccidents}
-          onOpenCamera={(mode) => {
-            setCameraMode(mode);
-            setIsCameraModalOpen(true);
-          }}
         />
       )}
 
@@ -553,9 +687,20 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           monthlyExpenses={monthlyExpenses}
           netIncome={netIncome}
           houseTotal={houseTotal}
-          workTotal={workTotal}
+          workTotal={personalTotal}
           vehicleTotal={vehicleTotal}
           educationTotal={educationTotal}
+          houseList={houseList}
+          medicalList={medicalList}
+          personalList={personalList}
+          associationsList={associationsList}
+          fuelList={fuelList}
+          maintList={maintList}
+          oilFilterList={oilFilterList}
+          accidentList={accidentList}
+          studentExpensesList={studentExpensesList}
+          students={students}
+          incomeList={incomeList}
         />
       )}
 
@@ -569,40 +714,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
         onAddExpense={handleUniversalAddExpense}
       />
 
-      {/* --- VEHICLE CAMERA MODAL --- */}
-      <VehicleCameraModal
-        isOpen={isCameraModalOpen}
-        onClose={() => setIsCameraModalOpen(false)}
-        mode={cameraMode}
-        onCapture={(imgData, odomValue) => {
-          if (cameraMode === 'odometer' && odomValue) {
-            // Log fuel record with scanned odometer
-            const newFuel: VehicleFuelRecord = {
-              id: `f_${Date.now()}`,
-              fuelType: 'بنزين 92',
-              price: 650,
-              odometer: odomValue,
-              dateTime: new Date().toISOString().slice(0, 16),
-            };
-            handleSaveFuel([newFuel, ...fuelList]);
-          } else if (cameraMode === 'accident' && imgData) {
-            // Log accident record with photo
-            const newAcc: VehicleAccidentRecord = {
-              id: `acc_${Date.now()}`,
-              vehicleId: 'default_vehicle',
-              title: isAr ? 'صدمة مصورة عبر الكاميرا' : 'Camera captured incident',
-              photoUrl: imgData,
-              date: new Date().toISOString().split('T')[0],
-              time: new Date().toLocaleTimeString('ar-EG'),
-              estimatedDamage: 0,
-              notes: isAr ? 'صورة مرفقة عبر الكاميرا' : 'Photo attached',
-              createdAt: new Date().toISOString(),
-            };
-            handleSaveAccidents([newAcc, ...accidentList]);
-          }
-          setIsCameraModalOpen(false);
-        }}
-      />
     </div>
   );
 };

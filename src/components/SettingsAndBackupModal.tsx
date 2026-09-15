@@ -308,6 +308,8 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   const [vehiclePrefs, setVehiclePrefs] = useState<VehiclePreferences>(
     userProfile.vehiclePreferences || {
       primaryVehicleName: 'تويوتا كورولا 2023',
+      vehicleType: 'تويوتا كورولا',
+      vehicleShape: 'سيدان',
       fuelType: 'gasoline95',
       serviceIntervalKm: 10000,
     }
@@ -1659,6 +1661,37 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       }
                       className="w-full p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                      {isAr ? 'نوع السيارة' : 'Car Type'}
+                    </label>
+                    <input
+                      type="text"
+                      value={vehiclePrefs.vehicleType || ''}
+                      onChange={(e) => setVehiclePrefs({ ...vehiclePrefs, vehicleType: e.target.value })}
+                      placeholder={isAr ? 'مثال: تويوتا كورولا' : 'e.g. Toyota Corolla'}
+                      className="w-full p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                      {isAr ? 'شكل السيارة' : 'Body Shape'}
+                    </label>
+                    <select
+                      value={vehiclePrefs.vehicleShape || 'سيدان'}
+                      onChange={(e) => setVehiclePrefs({ ...vehiclePrefs, vehicleShape: e.target.value })}
+                      className="w-full p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold"
+                    >
+                      <option value="سيدان">{isAr ? 'سيدان' : 'Sedan'}</option>
+                      <option value="SUV">SUV</option>
+                      <option value="هاتشباك">{isAr ? 'هاتشباك' : 'Hatchback'}</option>
+                      <option value="كوبيه">{isAr ? 'كوبيه' : 'Coupe'}</option>
+                      <option value="بيك أب">{isAr ? 'بيك أب' : 'Pickup'}</option>
+                      <option value="فان">{isAr ? 'فان' : 'Van'}</option>
+                    </select>
                   </div>
 
                   <div>

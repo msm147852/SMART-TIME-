@@ -41,7 +41,6 @@ interface NavigationHeaderProps {
   onToggleDailyTask?: (id: string) => void;
   onAddDailyTask?: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
   onDeleteDailyTask?: (id: string) => void;
-  onLogout?: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -64,7 +63,6 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onToggleDailyTask,
   onAddDailyTask,
   onDeleteDailyTask,
-  onLogout,
 }) => {
   const t = translations[language];
   const isAr = language === 'ar';
@@ -274,17 +272,6 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                       {language === lang && <span className="text-accent-500 text-xs">✓</span>}
                     </button>
                   ))}
-                </div>
-
-                {/* Logout */}
-                <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => { if (window.confirm(isAr ? 'هل تريد تسجيل الخروج من SMART TIME؟' : 'Sign out of SMART TIME?')) { onLogout?.(); setIsMenuOpen(false); } }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>{isAr ? 'تسجيل الخروج' : 'Sign out'}</span>
-                  </button>
                 </div>
 
                 {/* Settings Link */}

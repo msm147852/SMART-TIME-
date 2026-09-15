@@ -61,7 +61,10 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
   const isAr = language === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
 
-  const [activeTab, setActiveTab] = useState<'income' | 'certificates' | 'all'>('income');
+  const [activeTab, setActiveTab] = useState<'menu' | 'income' | 'certificates' | 'all'>('menu');
+  const [bankTab, setBankTab] = useState<'certificates' | 'current'>('certificates');
+  const [incomeMode, setIncomeMode] = useState<'job' | 'free'>('job');
+  const [incomeJobTab, setIncomeJobTab] = useState<'salary' | 'bonus' | 'transfer' | 'other'>('salary');
 
   // --- 1. INCOME SOURCES STATE ---
   const currentMonthDoc = useMemo(() => {
@@ -69,46 +72,28 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
   }, [incomeList, selectedMonth]);
 
   const currentSources: IncomeSourceItem[] = useMemo(() => {
-    if (currentMonthDoc?.sources && currentMonthDoc.sources.length > 0) {
-      return currentMonthDoc.sources;
-    }
+    const stored = currentMonthDoc?.sources?.filter((s) => s.type !== 'current_deposit' && s.type !== 'current_withdrawal') || [];
+    if (stored.length > 0) return stored;
     // Fallback migration from legacy fields
     const legacy: IncomeSourceItem[] = [];
     if (currentMonthDoc?.salary && currentMonthDoc.salary > 0) {
-      legacy.push({
-        id: `src_sal_${selectedMonth}`,
-        source: isAr ? 'الراتب الأساسي' : 'Base Salary',
-        amount: currentMonthDoc.salary,
-        date: `${selectedMonth}-01`,
-        type: 'salary',
-        notes: isAr ? 'الراتب الشهري' : 'Monthly Salary',
-        createdAt: currentMonthDoc.createdAt || new Date().toISOString(),
-      });
+      legacy.push({ id: `src_sal_${selectedMonth}`, source: isAr ? 'الراتب الأساسي' : 'Base Salary', amount: currentMonthDoc.salary, date: `${selectedMonth}-01`, type: 'salary', notes: isAr ? 'الراتب الشهري' : 'Monthly Salary', createdAt: currentMonthDoc.createdAt || new Date().toISOString() });
     }
     if (currentMonthDoc?.bonuses && currentMonthDoc.bonuses > 0) {
-      legacy.push({
-        id: `src_bon_${selectedMonth}`,
-        source: isAr ? 'مكافآت وحوافز' : 'Bonuses',
-        amount: currentMonthDoc.bonuses,
-        date: `${selectedMonth}-01`,
-        type: 'bonus',
-        notes: isAr ? 'مكافآت شهرية' : 'Bonuses',
-        createdAt: currentMonthDoc.createdAt || new Date().toISOString(),
-      });
+      legacy.push({ id: `src_bon_${selectedMonth}`, source: isAr ? 'مكافآت وحوافز' : 'Bonuses', amount: currentMonthDoc.bonuses, date: `${selectedMonth}-01`, type: 'bonus', notes: isAr ? 'مكافآت شهرية' : 'Bonuses', createdAt: currentMonthDoc.createdAt || new Date().toISOString() });
     }
     if (currentMonthDoc?.otherIncome && currentMonthDoc.otherIncome > 0) {
-      legacy.push({
-        id: `src_oth_${selectedMonth}`,
-        source: isAr ? 'دخل إضافي' : 'Other Income',
-        amount: currentMonthDoc.otherIncome,
-        date: `${selectedMonth}-01`,
-        type: 'extra',
-        notes: currentMonthDoc.otherIncomeNote || (isAr ? 'دخل إضافي' : 'Other income'),
-        createdAt: currentMonthDoc.createdAt || new Date().toISOString(),
-      });
+      legacy.push({ id: `src_oth_${selectedMonth}`, source: isAr ? 'دخل إضافي' : 'Other Income', amount: currentMonthDoc.otherIncome, date: `${selectedMonth}-01`, type: 'extra', notes: currentMonthDoc.otherIncomeNote || (isAr ? 'دخل إضافي' : 'Other income'), createdAt: currentMonthDoc.createdAt || new Date().toISOString() });
     }
     return legacy;
   }, [currentMonthDoc, selectedMonth, isAr]);
+
+  const currentAccountTransactions: IncomeSourceItem[] = useMemo(() =>
+    (currentMonthDoc?.sources || []).filter((s) => s.type === 'current_deposit' || s.type === 'current_withdrawal'),
+    [currentMonthDoc]
+  );
+  const currentAccountBalance = currentAccountTransactions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
 
   // Modals
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -118,6 +103,13 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
   const [sourceDate, setSourceDate] = useState(`${selectedMonth}-01`);
   const [sourceType, setSourceType] = useState('salary');
   const [sourceNotes, setSourceNotes] = useState('');
+
+  // --- 1B. CURRENT ACCOUNT STATE ---
+  const [currentAccountMode, setCurrentAccountMode] = useState<'deposit' | 'withdrawal'>('deposit');
+  const [currentAccountDescription, setCurrentAccountDescription] = useState('');
+  const [currentAccountAmount, setCurrentAccountAmount] = useState('');
+  const [currentAccountDate, setCurrentAccountDate] = useState(`${selectedMonth}-01`);
+  const [editingCurrentAccountId, setEditingCurrentAccountId] = useState<string | null>(null);
 
   // --- 2. BANK CERTIFICATES STATE ---
   const [isCertModalOpen, setIsCertModalOpen] = useState(false);
@@ -167,7 +159,7 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
   };
 
   // --- 3. TOTALS & LINKING CALCULATIONS ---
-  const primaryIncomeTotal = currentSources.reduce((s, src) => s + (Number(src.amount) || 0), 0);
+  const primaryIncomeTotal = currentSources.reduce((s, src) => s + (Number(src.amount) || 0), 0) + currentAccountBalance;
   const monthlyCertsProfit = getCertificatesProfitForMonth(certificates, selectedMonth);
   const grandTotalIncome = primaryIncomeTotal + monthlyCertsProfit;
 
@@ -175,14 +167,15 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
   const handleSaveSource = (e: React.FormEvent) => {
     e.preventDefault();
     const p = parseFloat(sourceAmount);
-    if (isNaN(p) || p <= 0 || !sourceName.trim()) return;
+    if (isNaN(p) || p <= 0 || !sourceName.trim()) { window.alert(isAr ? 'من فضلك أدخل اسم مصدر الدخل والمبلغ بشكل صحيح.' : 'Please enter a valid income source and amount.'); return; }
 
+    const effectiveSourceType = incomeMode === 'free' ? 'extra' : incomeJobTab;
     const newSource: IncomeSourceItem = {
       id: editingSourceId || `src_${Date.now()}`,
       source: sourceName.trim(),
       amount: p,
       date: sourceDate,
-      type: sourceType,
+      type: effectiveSourceType,
       notes: sourceNotes.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
@@ -244,12 +237,65 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
     }
   };
 
+  const saveCurrentAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = parseFloat(currentAccountAmount);
+    if (!currentAccountDescription.trim() || isNaN(value) || value <= 0) {
+      window.alert(isAr ? 'من فضلك أدخل وصف العملية وقيمتها بشكل صحيح.' : 'Please enter a valid description and amount.');
+      return;
+    }
+    const signedAmount = currentAccountMode === 'withdrawal' ? -value : value;
+    const newTx: IncomeSourceItem = {
+      id: editingCurrentAccountId || `current_${Date.now()}`,
+      source: currentAccountDescription.trim(),
+      amount: signedAmount,
+      date: currentAccountDate,
+      type: currentAccountMode === 'withdrawal' ? 'current_withdrawal' : 'current_deposit',
+      notes: currentAccountMode === 'withdrawal' ? 'سحب من الحساب الجاري' : 'إيداع في الحساب الجاري',
+      createdAt: editingCurrentAccountId ? (currentAccountTransactions.find(x => x.id === editingCurrentAccountId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+    };
+    const allSources = [...currentSources, ...currentAccountTransactions];
+    const updatedSources = editingCurrentAccountId
+      ? allSources.map(x => x.id === editingCurrentAccountId ? newTx : x)
+      : [newTx, ...allSources];
+    const salary = updatedSources.filter(s => s.type === 'salary').reduce((sum, x) => sum + x.amount, 0);
+    const bonuses = updatedSources.filter(s => s.type === 'bonus').reduce((sum, x) => sum + x.amount, 0);
+    const otherIncome = updatedSources.filter(s => s.type !== 'salary' && s.type !== 'bonus' && s.type !== 'current_deposit' && s.type !== 'current_withdrawal').reduce((sum, x) => sum + x.amount, 0);
+    const nextDoc: MonthlyIncome = {
+      id: currentMonthDoc?.id || `income_${selectedMonth}`,
+      month: selectedMonth, salary, bonuses, otherIncome, sources: updatedSources,
+      createdAt: currentMonthDoc?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const nextList = currentMonthDoc ? incomeList.map(doc => doc.month === selectedMonth ? nextDoc : doc) : [nextDoc, ...incomeList];
+    onSaveIncome(nextList);
+    setEditingCurrentAccountId(null); setCurrentAccountDescription(''); setCurrentAccountAmount(''); setCurrentAccountDate(`${selectedMonth}-01`);
+  };
+
+  const deleteCurrentAccount = (id: string) => {
+    if (!window.confirm(isAr ? 'هل أنت متأكد من حذف هذه العملية؟' : 'Delete this transaction?')) return;
+    const updatedSources = [...currentSources, ...currentAccountTransactions].filter(x => x.id !== id);
+    const salary = updatedSources.filter(s => s.type === 'salary').reduce((sum, x) => sum + x.amount, 0);
+    const bonuses = updatedSources.filter(s => s.type === 'bonus').reduce((sum, x) => sum + x.amount, 0);
+    const otherIncome = updatedSources.filter(s => s.type !== 'salary' && s.type !== 'bonus' && s.type !== 'current_deposit' && s.type !== 'current_withdrawal').reduce((sum, x) => sum + x.amount, 0);
+    const nextDoc: MonthlyIncome = { id: currentMonthDoc?.id || `income_${selectedMonth}`, month: selectedMonth, salary, bonuses, otherIncome, sources: updatedSources, createdAt: currentMonthDoc?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const nextList = currentMonthDoc ? incomeList.map(doc => doc.month === selectedMonth ? nextDoc : doc) : incomeList;
+    onSaveIncome(nextList);
+  };
+
+  const exportCurrentAccount = (type: 'csv' | 'print') => {
+    if (type === 'print') { window.print(); return; }
+    const rows = currentAccountTransactions.map(x => [x.type === 'current_withdrawal' ? 'سحب' : 'إيداع', x.source, x.amount, x.date]);
+    const csv = '\uFEFF' + [['النوع','الوصف','القيمة','التاريخ'], ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`current-account-${selectedMonth}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+
   // --- SAVE CERTIFICATE ---
   const handleSaveCertificate = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(certAmount);
     const rate = parseFloat(certAnnualRate);
-    if (isNaN(amt) || amt <= 0 || !certBankName.trim()) return;
+    if (isNaN(amt) || amt <= 0 || !certBankName.trim()) { window.alert(isAr ? 'من فضلك أدخل البنك وقيمة الشهادة بشكل صحيح.' : 'Please enter a valid bank and certificate amount.'); return; }
 
     const calc = calculateCertificateProfits(amt, rate || 0, certFrequency, certDuration);
 
@@ -305,34 +351,28 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
     setIsCertModalOpen(true);
   };
 
-  const exportData = (type: 'csv' | 'print') => {
+  const exportIncomeData = (type: 'csv' | 'print') => {
     if (type === 'csv') {
-      const headers = ['النوع', 'المصدر/البنك', 'القيمة', 'التاريخ/الدورية', 'الأرباح/الملاحظات'];
-      const rows = [
-        ...currentSources.map((s) => ['دخل شهري', s.source, s.amount, s.date, s.notes || '']),
-        ...certificates.map((c) => [
-          'شهادة بنكية',
-          c.bankName,
-          c.amount,
-          `عائد ${c.annualRate || 0}% - ${c.profitFrequency}`,
-          `ربح شهري: ${c.monthlyEquivalentProfit || 0} ${currency}`,
-        ]),
-      ];
-      const csvContent =
-        '\uFEFF' +
-        [headers.join(','), ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join(
-          '\n'
-        );
+      const headers = ['الفئة', 'الوصف', 'القيمة', 'التاريخ'];
+      const rows = currentSources.map((s) => [
+        s.type === 'salary' ? 'الراتب الشهري' : s.type === 'bonus' ? 'مكافآت' : s.type === 'transfer' ? 'انتقالات' : 'أخرى/دخل حر',
+        s.source,
+        s.amount,
+        s.date,
+      ]);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `income-and-certificates-${selectedMonth}.csv`;
+      a.download = `monthly-income-${selectedMonth}.csv`;
       a.click();
+      URL.revokeObjectURL(url);
     } else {
       window.print();
     }
   };
+
 
   return (
     <div className="space-y-4" dir={isAr ? 'rtl' : 'ltr'}>
@@ -340,7 +380,7 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
       <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
-            onClick={onBack}
+            onClick={() => (activeTab === 'menu' ? onBack() : setActiveTab('menu'))}
             className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 text-slate-700 dark:text-slate-200 hover:text-cyan-600 flex items-center justify-center transition-all active:scale-95"
             title={isAr ? 'رجوع' : 'Back'}
           >
@@ -352,33 +392,187 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
             </div>
             <div>
               <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">
-                {isAr ? 'الدخل الشهري والشهادات البنكية' : 'Income & Bank Certificates'}
+                {isAr ? 'الدخل الشهري ومعاملات البنكية' : 'Monthly Income & Bank Transactions'}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {isAr ? 'إدارة مصادر الدخل المتعددة، الشهادات وحساب الأرباح الآلي' : 'Manage income sources, bank certificates & automated returns'}
+                {isAr ? 'إدارة الدخل الشهري والمعاملات البنكية بنفس نظام المصروفات' : 'Manage monthly income and bank transactions'}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setEditingSourceId(null);
-              setSourceName('');
-              setSourceAmount('');
-              setSourceDate(`${selectedMonth}-01`);
-              setSourceType('salary');
-              setSourceNotes('');
-              setIsIncomeModalOpen(true);
-            }}
-            className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-slate-800 dark:text-slate-200 hover:text-emerald-600 font-bold text-xs flex items-center gap-1.5 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{isAr ? 'مصدر دخل +' : 'Add Income +'}</span>
-          </button>
+        <div className="flex items-center gap-2"></div>
+      </div>
 
+      {/* 2. Main section menu — same philosophy as My Car */}
+      {activeTab === 'menu' && (
+        <>
+          <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
+            <button onClick={() => setActiveTab('income')} className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[.99]">
+              <Coins className="w-4 h-4" />
+              <span>{isAr ? 'الدخل الشهري' : 'Monthly Income'}</span>
+            </button>
+            <button onClick={() => setActiveTab('certificates')} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-black text-sm flex items-center justify-center gap-2 active:scale-[.99]">
+              <Building className="w-4 h-4" />
+              <span>{isAr ? 'معاملات البنكية' : 'Bank Transactions'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button onClick={() => setActiveTab('income')} className="text-right bg-white dark:bg-slate-900 p-5 rounded-3xl border border-emerald-200 dark:border-emerald-900/40 shadow-sm hover:shadow-md hover:border-emerald-400 transition-all active:scale-[.99]">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600"><Coins className="w-6 h-6" /></div>
+                <div className="flex-1">
+                  <h2 className="font-black text-slate-900 dark:text-white">{isAr ? 'الدخل الشهري' : 'Monthly Income'}</h2>
+                  <p className="text-xs text-slate-500 mt-1">{isAr ? `${currentSources.length} مصدر دخل • ${formatMoney(primaryIncomeTotal)} ${currency}` : `${currentSources.length} sources • ${formatMoney(primaryIncomeTotal)} ${currency}`}</p>
+                </div>
+                <ArrowLeft className="w-5 h-5 text-slate-400 rtl:rotate-180" />
+              </div>
+            </button>
+
+            <button onClick={() => setActiveTab('certificates')} className="text-right bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-emerald-400 transition-all active:scale-[.99]">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600"><Building className="w-6 h-6" /></div>
+                <div className="flex-1">
+                  <h2 className="font-black text-slate-900 dark:text-white">{isAr ? 'المعاملات البنكية' : 'Bank Transactions'}</h2>
+                  <p className="text-xs text-slate-500 mt-1">{isAr ? `${certificates.length} معاملة/شهادة • ${formatMoney(monthlyCertsProfit)} ${currency} عائد شهري` : `${certificates.length} records • ${formatMoney(monthlyCertsProfit)} ${currency} monthly return`}</p>
+                </div>
+                <ArrowLeft className="w-5 h-5 text-slate-400 rtl:rotate-180" />
+              </div>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* 2. Income detail screen — organized like My Car */}
+      {activeTab === 'income' && (
+        <div className="space-y-4">
+          <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
+            <button onClick={() => setActiveTab('income')} className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-black text-sm">{isAr ? 'الدخل الشهري' : 'Monthly Income'}</button>
+            <button onClick={() => setActiveTab('certificates')} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-black text-sm">{isAr ? 'معاملات البنكية' : 'Bank Transactions'}</button>
+          </div>
+
+          <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
+            <button
+              onClick={() => setIncomeMode('job')}
+              className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${incomeMode === 'job' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+            >{isAr ? 'الوظيفة' : 'Job'}</button>
+            <button
+              onClick={() => setIncomeMode('free')}
+              className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${incomeMode === 'free' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+            >{isAr ? 'دخل حر' : 'Freelance Income'}</button>
+          </div>
+
+          {incomeMode === 'job' && (
+            <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {[
+                ['salary', 'الراتب الشهري'],
+                ['bonus', 'مكافآت'],
+                ['transfer', 'انتقالات'],
+                ['other', 'أخرى'],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setIncomeJobTab(key as typeof incomeJobTab)}
+                  className={`py-2.5 rounded-xl text-xs font-black transition-all ${incomeJobTab === key ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                >{isAr ? label : key === 'salary' ? 'Monthly Salary' : key === 'bonus' ? 'Bonuses' : key === 'transfer' ? 'Transfers' : 'Other'}</button>
+              ))}
+            </div>
+          )}
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3">
+                <div className="text-[11px] font-black text-slate-500 mb-2">{isAr ? 'الوصف' : 'Description'}</div>
+                <input
+                  type="text"
+                  value={sourceName}
+                  onChange={(e) => setSourceName(e.target.value)}
+                  placeholder={isAr ? (incomeMode === 'job' ? ({salary:'مثال: الراتب الأساسي',bonus:'مثال: مكافأة الأداء',transfer:'مثال: بدل انتقالات',other:'مثال: دخل آخر'} as Record<string,string>)[incomeJobTab] : 'مثال: عمل حر / مشروع') : 'Income description'}
+                  className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium"
+                />
+              </div>
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3">
+                <div className="text-[11px] font-black text-slate-500 mb-2">{isAr ? 'القيمة' : 'Amount'}</div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={sourceAmount}
+                  onChange={(e) => setSourceAmount(e.target.value)}
+                  placeholder="0"
+                  className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-black text-emerald-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 p-3">
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'الإجمالي المحسوب تلقائياً' : 'Auto Calculated Total'}</span>
+              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatMoney(currentSources.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) + (parseFloat(sourceAmount) || 0))} {currency}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                handleSaveSource(syntheticEvent);
+              }}
+              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-sm active:scale-[.99]"
+            >
+              {editingSourceId ? (isAr ? 'حفظ التعديل' : 'Save Edit') : (isAr ? 'حفظ الدخل' : 'Save Income')}
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">{isAr ? 'الدخل المحفوظ' : 'Saved Income'}</h2>
+                <p className="text-[11px] text-slate-400 mt-1">{formatMoney(primaryIncomeTotal)} {currency}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => exportIncomeData('csv')} className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5" />{isAr ? 'تصدير' : 'Export'}</button>
+                <button onClick={() => exportIncomeData('print')} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" title={isAr ? 'طباعة / PDF' : 'Print / PDF'}><Printer className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+            {currentSources.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">{isAr ? 'لم يتم حفظ أي دخل بعد.' : 'No income saved yet.'}</div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {currentSources.map((src) => (
+                  <div key={src.id} className="p-3.5 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">{src.source}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{src.type === 'salary' ? 'الراتب الشهري' : src.type === 'bonus' ? 'مكافآت' : src.type === 'transfer' ? 'انتقالات' : 'دخل حر / أخرى'} • {src.date}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-black text-emerald-600">+{formatMoney(src.amount)} {currency}</span>
+                      <button onClick={() => { setEditingSourceId(src.id); setSourceName(src.source); setSourceAmount(String(src.amount)); setSourceDate(src.date); setSourceType(src.type); setSourceNotes(src.notes || ''); setIncomeMode(src.type === 'extra' ? 'free' : 'job'); setIncomeJobTab((src.type === 'salary' || src.type === 'bonus' || src.type === 'transfer' || src.type === 'other') ? src.type as typeof incomeJobTab : 'other'); }} className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDeleteSource(src.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Bank transactions detail — existing certificate properties preserved */}
+      {activeTab === 'certificates' && (
+        <div className="space-y-4">
+          <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
+            <button onClick={() => setActiveTab('income')} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-black text-sm">{isAr ? 'الدخل الشهري' : 'Monthly Income'}</button>
+            <button onClick={() => setActiveTab('certificates')} className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-black text-sm">{isAr ? 'معاملات بنكية' : 'Bank Transactions'}</button>
+          </div>
+
+          <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
+            <button onClick={() => setBankTab('certificates')} className={`flex-1 py-3 rounded-xl font-black text-sm ${bankTab === 'certificates' ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>{isAr ? 'الشهادات البنكية' : 'Bank Certificates'}</button>
+            <button onClick={() => setBankTab('current')} className={`flex-1 py-3 rounded-xl font-black text-sm ${bankTab === 'current' ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>{isAr ? 'الحساب الجاري' : 'Current Account'}</button>
+          </div>
+
+          {bankTab === 'certificates' && <>
           <button
+            type="button"
             onClick={() => {
               setEditingCertId(null);
               setCertBankName('');
@@ -390,210 +584,20 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
               setCertNotes('');
               setIsCertModalOpen(true);
             }}
-            className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+            className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[.99]"
           >
-            <Building className="w-3.5 h-3.5" />
-            <span>{isAr ? 'شهادة بنكية +' : 'Add Certificate +'}</span>
+            <Building className="w-4 h-4" />
+            <span>{isAr ? 'إضافة معاملة +' : 'Add Transaction +'}</span>
           </button>
-        </div>
-      </div>
 
-      {/* 2. Monthly Grand Total Breakdown Card */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/40 shadow-sm bg-gradient-to-br from-white via-white to-emerald-50/20 dark:from-slate-900 dark:to-emerald-950/20">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            {isAr ? 'إجمالي الدخل المحسوب لهذا الشهر' : 'Total Monthly Income'}
-          </span>
-          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full">
-            {isAr ? 'مربوط بالـ Dashboard' : 'Synced with Dashboard'}
-          </span>
-        </div>
-
-        <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-          {formatMoney(grandTotalIncome)}{' '}
-          <span className="text-sm font-semibold text-slate-500">{currency}</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-            <span className="text-slate-500">{isAr ? 'مصادر الدخل (رواتب وأعمال):' : 'Primary Income Streams:'}</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">
-              {formatMoney(primaryIncomeTotal)} {currency} ({currentSources.length} {isAr ? 'مصدر' : 'sources'})
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between text-xs p-2 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40">
-            <span className="text-emerald-700 dark:text-emerald-300 font-medium">
-              {isAr ? 'أرباح الشهادات البنكية المحسوبة:' : 'Bank Certificate Returns:'}
-            </span>
-            <span className="font-bold text-emerald-700 dark:text-emerald-300">
-              +{formatMoney(monthlyCertsProfit)} {currency} ({certificates.length} {isAr ? 'شهادة' : 'certs'})
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Sub Tabs: Income Streams vs Bank Certificates */}
-      <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
-        <button
-          onClick={() => setActiveTab('income')}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-            activeTab === 'income'
-              ? 'bg-emerald-500 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Coins className="w-4 h-4" />
-          <span>{isAr ? 'مصادر الدخل الشهري' : 'Income Sources'}</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">{currentSources.length}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('certificates')}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-            activeTab === 'certificates'
-              ? 'bg-emerald-500 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Building className="w-4 h-4" />
-          <span>{isAr ? 'الشهادات البنكية والأرباح' : 'Bank Certificates'}</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">{certificates.length}</span>
-        </button>
-      </div>
-
-      {/* 4. Tab 1: Income Sources */}
-      {activeTab === 'income' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{isAr ? 'قائمة مصادر الدخل لهذا الشهر' : 'Income Streams This Month'}</span>
-            </h2>
-            <button
-              onClick={() => {
-                setEditingSourceId(null);
-                setSourceName('');
-                setSourceAmount('');
-                setSourceDate(`${selectedMonth}-01`);
-                setSourceType('salary');
-                setSourceNotes('');
-                setIsIncomeModalOpen(true);
-              }}
-              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{isAr ? 'إضافة مصدر دخل' : 'Add Source'}</span>
-            </button>
-          </div>
-
-          {currentSources.length === 0 ? (
-            <div className="p-10 text-center text-slate-400 space-y-2">
-              <Coins className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700" />
-              <p className="text-xs">{isAr ? 'لم يتم تسجيل أي مصدر دخل لهذا الشهر' : 'No income sources recorded for this month'}</p>
-              <button
-                onClick={() => {
-                  setEditingSourceId(null);
-                  setSourceName(isAr ? 'الراتب الأساسي' : 'Salary');
-                  setSourceAmount('25000');
-                  setSourceDate(`${selectedMonth}-01`);
-                  setSourceType('salary');
-                  setSourceNotes('');
-                  setIsIncomeModalOpen(true);
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isAr ? 'إضافة الراتب الأساسي' : 'Add Salary'}</span>
-              </button>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {currentSources.map((src) => (
-                <div
-                  key={src.id}
-                  className="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-between gap-3 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center text-emerald-600">
-                      <Coins className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{src.source}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                          {src.type === 'salary'
-                            ? isAr ? 'راتب' : 'Salary'
-                            : src.type === 'bonus'
-                            ? isAr ? 'مكافأة' : 'Bonus'
-                            : src.type === 'investment'
-                            ? isAr ? 'استثمار' : 'Investment'
-                            : isAr ? 'دخل إضافي' : 'Extra'}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {src.date} {src.notes && `• ${src.notes}`}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-base font-black text-emerald-600 dark:text-emerald-400">
-                      +{formatMoney(src.amount)}{' '}
-                      <span className="text-[10px] font-normal text-slate-500">{currency}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          setEditingSourceId(src.id);
-                          setSourceName(src.source);
-                          setSourceAmount(String(src.amount));
-                          setSourceDate(src.date);
-                          setSourceType(src.type);
-                          setSourceNotes(src.notes || '');
-                          setIsIncomeModalOpen(true);
-                        }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSource(src.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 5. Tab 2: Bank Certificates with Calculations */}
-      {activeTab === 'certificates' && (
-        <div className="space-y-3">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1">
-                {isAr ? 'إجمالي أصل الشهادات البنكية المحفوظة' : 'Total Certificates Principal'}
-              </span>
-              <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
-                {formatMoney(certificates.reduce((s, c) => s + (Number(c.amount) || 0), 0))}{' '}
-                <span className="text-xs font-semibold text-slate-500">{currency}</span>
-              </div>
+              <span className="text-xs font-bold text-slate-500 block mb-1">{isAr ? 'إجمالي أصل المعاملات البنكية المحفوظة' : 'Total Bank Principal'}</span>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{formatMoney(certificates.reduce((s, c) => s + (Number(c.amount) || 0), 0))} <span className="text-xs font-semibold text-slate-500">{currency}</span></div>
             </div>
             <div className="text-right">
-              <span className="text-xs font-bold text-slate-500 block mb-1">
-                {isAr ? 'العائد الشهري المحسوب' : 'Monthly Profit Synced'}
-              </span>
-              <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                +{formatMoney(monthlyCertsProfit)} {currency}
-              </div>
+              <span className="text-xs font-bold text-slate-500 block mb-1">{isAr ? 'العائد الشهري المحسوب' : 'Monthly Return'}</span>
+              <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">+{formatMoney(monthlyCertsProfit)} {currency}</div>
             </div>
           </div>
 
@@ -601,116 +605,70 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
             {certificates.length === 0 ? (
               <div className="col-span-2 bg-white dark:bg-slate-900 p-10 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-slate-400 space-y-2">
                 <Building className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700" />
-                <p className="text-xs">{isAr ? 'لا توجد شهادات بنكية مضافة بعد' : 'No bank certificates added yet'}</p>
-                <button
-                  onClick={() => {
-                    setEditingCertId(null);
-                    setCertBankName(isAr ? 'البنك الأهلي المصري' : 'National Bank');
-                    setCertAmount('240000');
-                    setCertAnnualRate('18');
-                    setCertDuration('1 سنة');
-                    setCertFrequency('monthly');
-                    setIsCertModalOpen(true);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{isAr ? 'إضافة شهادة تجريبية (مثال 240 ألف)' : 'Add Sample Certificate'}</span>
-                </button>
+                <p className="text-xs">{isAr ? 'لا توجد معاملات بنكية مضافة بعد' : 'No bank transactions added yet'}</p>
               </div>
             ) : (
               certificates.map((cert) => {
-                const calc = calculateCertificateProfits(
-                  cert.amount,
-                  cert.annualRate || 0,
-                  cert.profitFrequency,
-                  cert.duration
-                );
+                const calc = calculateCertificateProfits(cert.amount, cert.annualRate || 0, cert.profitFrequency, cert.duration);
                 return (
-                  <div
-                    key={cert.id}
-                    className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between"
-                  >
+                  <div key={cert.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
                     <div>
-                      {/* Top Bar */}
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600">
-                            <Building className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">{cert.bankName}</h3>
-                            {cert.certificateNumber && (
-                              <span className="text-[10px] text-slate-400 block">{cert.certificateNumber}</span>
-                            )}
-                          </div>
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600"><Building className="w-4 h-4" /></div>
+                          <div><h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">{cert.bankName}</h3>{cert.certificateNumber && <span className="text-[10px] text-slate-400 block">{cert.certificateNumber}</span>}</div>
                         </div>
-
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openEditCert(cert)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCert(cert.id)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <button onClick={() => openEditCert(cert)} className="p-1 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => handleDeleteCert(cert.id)} className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
-
-                      {/* Principal & Rate */}
                       <div className="flex items-baseline justify-between mt-3 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">{isAr ? 'قيمة الشهادة' : 'Principal'}</span>
-                          <span className="text-base font-black text-slate-900 dark:text-slate-100">
-                            {formatMoney(cert.amount)} {currency}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-400 block">{isAr ? 'العائد السنوي' : 'Annual Rate'}</span>
-                          <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
-                            {cert.annualRate || 0}%
-                          </span>
-                        </div>
+                        <div><span className="text-[10px] text-slate-400 block">{isAr ? 'قيمة المعاملة' : 'Principal'}</span><span className="text-lg font-black text-slate-900 dark:text-white">{formatMoney(cert.amount)} {currency}</span></div>
+                        <div className="text-right"><span className="text-[10px] text-slate-400 block">{isAr ? 'العائد' : 'Return'}</span><span className="text-sm font-black text-emerald-600">{formatMoney(calc.monthlyEquivalent)} {currency}/شهر</span></div>
                       </div>
-
-                      {/* Profit Calculations Box */}
-                      <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                        <div className="p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20">
-                          <span className="text-[10px] text-slate-500 block">{isAr ? 'الربح السنوي المتوقع' : 'Annual Return'}</span>
-                          <span className="font-black text-emerald-700 dark:text-emerald-300">
-                            {formatMoney(calc.annualProfit)} {currency}
-                          </span>
-                        </div>
-
-                        <div className="p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20">
-                          <span className="text-[10px] text-slate-500 block">
-                            {isAr ? `الربح الشهري (${cert.profitFrequency === 'monthly' ? 'شهري' : cert.profitFrequency})` : 'Monthly Eq.'}
-                          </span>
-                          <span className="font-black text-emerald-700 dark:text-emerald-300">
-                            {formatMoney(calc.monthlyEquivalent)} {currency}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer dates */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>{cert.duration}</span>
-                      <span>إصدار: {cert.issueDate} • استحقاق: {cert.maturityDate}</span>
                     </div>
                   </div>
                 );
               })
             )}
           </div>
+          </>}
+
+          {bankTab === 'current' && (
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="text-xs font-bold text-slate-500 mb-1">{isAr ? 'قيمة الحساب الجاري الحالية' : 'Current Account Balance'}</div>
+                <div className={`text-3xl font-black ${currentAccountBalance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{currentAccountBalance >= 0 ? '+' : ''}{formatMoney(currentAccountBalance)} {currency}</div>
+                <div className="text-[11px] text-slate-400 mt-1">{isAr ? 'تضاف القيمة الصافية تلقائياً إلى إجمالي الدخل الشهري' : 'Net balance is automatically included in monthly income.'}</div>
+              </div>
+
+              <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
+                <button onClick={() => setCurrentAccountMode('deposit')} className={`flex-1 py-3 rounded-xl font-black text-sm ${currentAccountMode === 'deposit' ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>{isAr ? 'إيداع' : 'Deposit'}</button>
+                <button onClick={() => setCurrentAccountMode('withdrawal')} className={`flex-1 py-3 rounded-xl font-black text-sm ${currentAccountMode === 'withdrawal' ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>{isAr ? 'سحب' : 'Withdrawal'}</button>
+              </div>
+
+              <form onSubmit={saveCurrentAccount} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div><label className="text-xs font-bold block mb-1">{isAr ? 'الوصف' : 'Description'}</label><input value={currentAccountDescription} onChange={e => setCurrentAccountDescription(e.target.value)} required className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border" placeholder={isAr ? 'مثال: تحويل من البنك' : 'e.g. Bank transfer'} /></div>
+                  <div><label className="text-xs font-bold block mb-1">{isAr ? 'قيمة الإيداع' : 'Amount'}</label><input type="number" min="0.01" step="0.01" value={currentAccountAmount} onChange={e => setCurrentAccountAmount(e.target.value)} required className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border font-black" placeholder="0" /></div>
+                </div>
+                <div><label className="text-xs font-bold block mb-1">{isAr ? 'التاريخ' : 'Date'}</label><input type="date" value={currentAccountDate} onChange={e => setCurrentAccountDate(e.target.value)} required className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border" /></div>
+                <div className={`rounded-xl p-3 border ${currentAccountMode === 'withdrawal' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                  <div className="text-xs font-bold">{isAr ? 'القيمة التي ستضاف للحساب الجاري' : 'Value added to current account'}</div>
+                  <div className="text-2xl font-black">{currentAccountMode === 'withdrawal' ? '-' : '+'}{formatMoney(parseFloat(currentAccountAmount) || 0)} {currency}</div>
+                </div>
+                <button type="submit" className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black">{editingCurrentAccountId ? (isAr ? 'حفظ التعديل' : 'Save Edit') : (isAr ? 'حفظ العملية' : 'Save Transaction')}</button>
+              </form>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between"><div><h2 className="text-sm font-black">{isAr ? 'عمليات الحساب الجاري' : 'Current Account Transactions'}</h2><p className="text-[11px] text-slate-400 mt-1">{formatMoney(currentAccountBalance)} {currency}</p></div><div className="flex gap-1.5"><button onClick={() => exportCurrentAccount('csv')} className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5" />{isAr ? 'تصدير' : 'Export'}</button><button onClick={() => exportCurrentAccount('print')} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800"><Printer className="w-3.5 h-3.5" /></button></div></div>
+                {currentAccountTransactions.length === 0 ? <div className="p-8 text-center text-slate-400 text-xs">{isAr ? 'لا توجد عمليات محفوظة.' : 'No transactions saved.'}</div> : <div className="divide-y divide-slate-100 dark:divide-slate-800">{currentAccountTransactions.map(tx => <div key={tx.id} className="p-3.5 flex items-center justify-between gap-3"><div><div className="font-bold text-sm">{tx.source}</div><div className="text-[10px] text-slate-400">{tx.type === 'current_withdrawal' ? 'سحب' : 'إيداع'} • {tx.date}</div></div><div className="flex items-center gap-2"><span className={`font-black ${tx.amount < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{tx.amount < 0 ? '' : '+'}{formatMoney(tx.amount)} {currency}</span><button onClick={() => { setEditingCurrentAccountId(tx.id); setCurrentAccountDescription(tx.source); setCurrentAccountAmount(String(Math.abs(tx.amount))); setCurrentAccountDate(tx.date); setCurrentAccountMode(tx.amount < 0 ? 'withdrawal' : 'deposit'); }} className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600"><Edit2 className="w-3.5 h-3.5" /></button><button onClick={() => deleteCurrentAccount(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></div></div>)}</div>}
+              </div>
+            </div>
+          )}
         </div>
       )}
-
       {/* --- MODAL 1: ADD / EDIT INCOME SOURCE --- */}
       {isIncomeModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -848,12 +806,12 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
                   <label className="font-bold block mb-1">{isAr ? 'قيمة الشهادة (الأصل) *' : 'Certificate Amount *'}</label>
                   <input
                     type="number"
-                    step="1000"
+                    step="1"
                     min="1"
                     required
                     value={certAmount}
                     onChange={(e) => setCertAmount(e.target.value)}
-                    placeholder="240000"
+                    placeholder="مثال: 5000"
                     className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border font-bold text-emerald-600"
                   />
                 </div>

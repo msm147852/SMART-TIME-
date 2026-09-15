@@ -20,11 +20,11 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
-import { Language } from '../../types';
+import { Language, MedicalExpenseRecord } from '../../types';
 
 export interface SpecializedExpense {
   id: string;
-  section: 'house' | 'work';
+  section: 'house' | 'work' | 'personal';
   type: string;
   customType?: string;
   amount: number;
@@ -40,6 +40,8 @@ interface HouseExpensesSectionProps {
   onBack: () => void;
   expenses: SpecializedExpense[];
   onSaveExpenses: (list: SpecializedExpense[]) => void;
+  medicalExpenses: MedicalExpenseRecord[];
+  onSaveMedicalExpenses: (list: MedicalExpenseRecord[]) => void;
 }
 
 export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
@@ -49,9 +51,23 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
   onBack,
   expenses,
   onSaveExpenses,
+  medicalExpenses,
+  onSaveMedicalExpenses,
 }) => {
   const isAr = language === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
+  const [activeTab, setActiveTab] = useState<'home' | 'medical'>('home');
+  const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
+  const [editingMedicalId, setEditingMedicalId] = useState<string | null>(null);
+  const [medicalFamilyMember, setMedicalFamilyMember] = useState('');
+  const [medicalFacilityName, setMedicalFacilityName] = useState('');
+  const [medicalFacilityType, setMedicalFacilityType] = useState<MedicalExpenseRecord['facilityType']>('مستشفى');
+  const [medicalCondition, setMedicalCondition] = useState('');
+  const [medicalDiagnosis, setMedicalDiagnosis] = useState('');
+  const [medicalExamCost, setMedicalExamCost] = useState('');
+  const [medicalMedicationCost, setMedicalMedicationCost] = useState('');
+  const [medicalDate, setMedicalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [medicalNotes, setMedicalNotes] = useState('');
 
   // Filter & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,6 +99,8 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
     'أخرى (مخصص)',
   ];
 
+  const currentMonthMedical = medicalExpenses.filter((e) => isDateInMonth(e.date, selectedMonth));
+  const medicalMonthTotal = currentMonthMedical.reduce((sum, e) => sum + (Number(e.examinationCost) || 0) + (Number(e.medicationCost) || 0), 0);
   const currentMonthExpenses = expenses.filter((e) => isDateInMonth(e.date, selectedMonth));
   const monthTotal = currentMonthExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const supplyTotal = currentMonthExpenses.filter((e) => e.paymentType === 'supply').reduce((s, e) => s + (Number(e.amount) || 0), 0);
@@ -122,7 +140,7 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return;
+    if (isNaN(numAmount) || numAmount <= 0) { window.alert(isAr ? 'من فضلك أدخل مبلغًا صحيحًا أكبر من صفر.' : 'Please enter a valid amount greater than zero.'); return; }
 
     const newItem: SpecializedExpense = {
       id: editingId || `house_${Date.now()}`,
@@ -151,6 +169,49 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
       const updated = expenses.filter((e) => e.id !== id);
       onSaveExpenses(updated);
     }
+  };
+
+  const openAddMedical = () => {
+    setEditingMedicalId(null);
+    setMedicalFamilyMember(''); setMedicalFacilityName(''); setMedicalFacilityType('مستشفى');
+    setMedicalCondition(''); setMedicalDiagnosis(''); setMedicalExamCost(''); setMedicalMedicationCost('');
+    setMedicalDate(new Date().toISOString().split('T')[0]); setMedicalNotes('');
+    setIsMedicalModalOpen(true);
+  };
+
+  const openEditMedical = (item: MedicalExpenseRecord) => {
+    setEditingMedicalId(item.id); setMedicalFamilyMember(item.familyMember); setMedicalFacilityName(item.facilityName || '');
+    setMedicalFacilityType(item.facilityType); setMedicalCondition(item.conditionDescription); setMedicalDiagnosis(item.doctorDiagnosis || '');
+    setMedicalExamCost(String(item.examinationCost || '')); setMedicalMedicationCost(String(item.medicationCost || ''));
+    setMedicalDate(item.date); setMedicalNotes(item.notes || ''); setIsMedicalModalOpen(true);
+  };
+
+  const handleSaveMedical = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!medicalFamilyMember.trim() || !medicalCondition.trim()) { window.alert(isAr ? 'من فضلك أدخل اسم فرد الأسرة وتوصيف الحالة.' : 'Please enter family member and condition.'); return; }
+    const exam = Number(medicalExamCost) || 0; const meds = Number(medicalMedicationCost) || 0;
+    if (exam < 0 || meds < 0 || exam + meds <= 0) { window.alert(isAr ? 'يجب إدخال تكلفة الكشف أو الأدوية بقيمة أكبر من صفر.' : 'Enter examination or medication cost greater than zero.'); return; }
+    const item: MedicalExpenseRecord = {
+      id: editingMedicalId || `medical_${Date.now()}`, familyMember: medicalFamilyMember.trim(), facilityName: medicalFacilityName.trim() || undefined,
+      facilityType: medicalFacilityType, conditionDescription: medicalCondition.trim(), doctorDiagnosis: medicalDiagnosis.trim() || undefined,
+      examinationCost: exam, medicationCost: meds, date: medicalDate, notes: medicalNotes.trim() || undefined,
+    };
+    onSaveMedicalExpenses(editingMedicalId ? medicalExpenses.map(x => x.id === editingMedicalId ? item : x) : [item, ...medicalExpenses]);
+    setIsMedicalModalOpen(false);
+  };
+
+  const deleteMedical = (id: string) => {
+    if (window.confirm(isAr ? 'هل أنت متأكد من حذف المصروف الطبي؟' : 'Delete this medical expense?')) onSaveMedicalExpenses(medicalExpenses.filter(x => x.id !== id));
+  };
+
+  const exportMedical = (mode: 'excel' | 'print') => {
+    const rows = currentMonthMedical.map(e => [e.date, e.familyMember, e.facilityType, e.facilityName || '', e.conditionDescription, e.doctorDiagnosis || '', e.examinationCost, e.medicationCost, (e.examinationCost || 0) + (e.medicationCost || 0), e.notes || '']);
+    if (mode === 'print') {
+      const w = window.open('', '_blank'); if (!w) return;
+      w.document.write(`<html dir="rtl"><head><title>المصروفات الطبية</title><meta charset="utf-8"><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:right}</style></head><body><h2>القسم الطبي - المصروفات الطبية</h2><table><tr><th>التاريخ</th><th>الفرد</th><th>الجهة</th><th>الحالة</th><th>التشخيص</th><th>الكشف</th><th>الأدوية</th><th>الإجمالي</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]} ${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td><td>${r[7]}</td><td>${r[8]}</td></tr>`).join('')}</table><script>window.print()</script></body></html>`); w.document.close(); return;
+    }
+    const csv='\uFEFF'+[['التاريخ','فرد الأسرة','نوع الجهة','الجهة','توصيف الحالة','تشخيص الدكتور','تكلفة الكشف','تكلفة الأدوية','الإجمالي','ملاحظات'],...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); const a=document.createElement('a'); a.href=url; a.download=`medical-expenses-${selectedMonth}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   const exportData = (type: 'csv' | 'excel' | 'print') => {
@@ -198,7 +259,7 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
             </div>
             <div>
               <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">
-                {isAr ? 'مصروفات المنزل' : 'Home Expenses'}
+                {isAr ? 'مصروفات منزلية' : 'Home Expenses'}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isAr ? 'متابعة طعام، إصلاحات، مفروشات ومستلزمات البيت' : 'Track groceries, repairs, home utilities & furnishings'}
@@ -207,16 +268,32 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{isAr ? 'إضافة مصروف +' : 'Add Expense +'}</span>
-        </button>
       </div>
 
-      {/* 2. Monthly Summary Cards */}
+      {/* Main section tabs */}
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => setActiveTab('home')} className={`py-3 rounded-2xl border font-black text-sm transition-all ${activeTab === 'home' ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800'}`}>🏠 {isAr ? 'مصروفات منزلية' : 'Home Expenses'}</button>
+        <button onClick={() => setActiveTab('medical')} className={`py-3 rounded-2xl border font-black text-sm transition-all ${activeTab === 'medical' ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800'}`}>🩺 {isAr ? 'القسم الطبي' : 'Medical'}</button>
+      </div>
+      <button onClick={activeTab === 'medical' ? openAddMedical : openAddModal} className="w-full py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"><Plus className="w-5 h-5"/><span>{activeTab === 'medical' ? (isAr ? 'إضافة كشف +' : 'Add Medical Record +') : (isAr ? 'إضافة مصروفات +' : 'Add Home Expense +')}</span></button>
+
+      {activeTab === 'medical' && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="text-xs font-bold text-slate-500 mb-1">{isAr ? 'إجمالي المصروفات الطبية لهذا الشهر' : 'Medical expenses this month'}</div>
+            <div className="text-2xl font-black text-cyan-600">{formatMoney(medicalMonthTotal)} <span className="text-xs text-slate-500">{currency}</span></div>
+            <div className="text-[11px] text-slate-400 mt-1">{currentMonthMedical.length} {isAr ? 'حالة/كشف مسجل' : 'medical records'}</div>
+          </div>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between"><span className="font-black text-sm">🩺 {isAr ? 'سجل الكشوفات الطبية' : 'Medical Records'}</span><button onClick={openAddMedical} className="px-4 py-2 rounded-xl bg-cyan-500 text-white text-xs font-bold"><Plus className="w-4 h-4 inline ml-1"/>{isAr ? 'إضافة كشف' : 'Add'}</button></div>
+            {currentMonthMedical.length === 0 ? <div className="p-10 text-center text-slate-400 text-xs">{isAr ? 'لا توجد كشوفات طبية مسجلة لهذا الشهر' : 'No medical records for this month'}</div> : <div className="divide-y divide-slate-100 dark:divide-slate-800">{currentMonthMedical.map(item => <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="font-black text-slate-900 dark:text-white">{item.familyMember} <span className="text-[10px] px-2 py-1 rounded-full bg-cyan-100 text-cyan-800">{item.facilityType}</span></div><div className="text-xs text-slate-500 mt-1">{item.facilityName || '—'} • {item.conditionDescription}</div>{item.doctorDiagnosis && <div className="text-xs text-slate-500 mt-1">{isAr ? 'التشخيص: ' : 'Diagnosis: '}{item.doctorDiagnosis}</div>}<div className="text-[11px] text-slate-400 mt-1">{item.date}</div></div><div className="flex items-center gap-3"><div className="text-sm font-black">{formatMoney((Number(item.examinationCost)||0)+(Number(item.medicationCost)||0))} {currency}</div><div className="flex gap-1"><button onClick={() => openEditMedical(item)} className="p-2 rounded-lg text-slate-500 hover:text-cyan-600"><Edit2 className="w-4 h-4"/></button><button onClick={() => deleteMedical(item.id)} className="p-2 rounded-lg text-slate-500 hover:text-rose-600"><Trash2 className="w-4 h-4"/></button></div></div></div>)}</div>}
+          </div>
+          <div className="flex gap-2"><button onClick={() => exportMedical('excel')} className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"><FileSpreadsheet className="w-4 h-4 inline ml-1 text-emerald-600"/>Excel</button><button onClick={() => exportMedical('print')} className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"><Printer className="w-4 h-4 inline ml-1 text-cyan-600"/>{isAr ? 'طباعة / PDF' : 'Print / PDF'}</button></div>
+        </div>
+      )}
+      {activeTab === 'home' && (
+        <div className="space-y-4">
+            {/* 2. Monthly Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1">
@@ -533,6 +610,25 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
                   {editingId ? (isAr ? 'حفظ التعديلات' : 'Save Changes') : isAr ? 'إضافة المصروف' : 'Add Expense'}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+        </div>
+      )}
+
+      {isMedicalModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between"><h3 className="font-black">🩺 {editingMedicalId ? (isAr ? 'تعديل كشف طبي' : 'Edit Medical Record') : (isAr ? 'إضافة كشف طبي' : 'Add Medical Record')}</h3><button onClick={() => setIsMedicalModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><X className="w-4 h-4"/></button></div>
+            <form onSubmit={handleSaveMedical} className="p-4 space-y-3">
+              <input required value={medicalFamilyMember} onChange={e=>setMedicalFamilyMember(e.target.value)} placeholder={isAr ? 'اسم فرد الأسرة *' : 'Family member *'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"/>
+              <div className="grid grid-cols-2 gap-2"><select value={medicalFacilityType} onChange={e=>setMedicalFacilityType(e.target.value as any)} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"><option>مستشفى</option><option>عيادة خاصة</option><option>عيادة أسنان</option><option>صيدلية</option><option>أخرى</option></select><input value={medicalFacilityName} onChange={e=>setMedicalFacilityName(e.target.value)} placeholder={isAr ? 'اسم المستشفى / العيادة' : 'Facility name'} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/></div>
+              <textarea required rows={2} value={medicalCondition} onChange={e=>setMedicalCondition(e.target.value)} placeholder={isAr ? 'توصيف الحالة المرضية *' : 'Condition description *'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/>
+              <textarea rows={2} value={medicalDiagnosis} onChange={e=>setMedicalDiagnosis(e.target.value)} placeholder={isAr ? 'تشخيص الدكتور' : 'Doctor diagnosis'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/>
+              <div className="grid grid-cols-2 gap-2"><input type="number" min="0" step="0.01" value={medicalExamCost} onChange={e=>setMedicalExamCost(e.target.value)} placeholder={isAr ? 'تكلفة الكشف' : 'Exam cost'} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/><input type="number" min="0" step="0.01" value={medicalMedicationCost} onChange={e=>setMedicalMedicationCost(e.target.value)} placeholder={isAr ? 'تكلفة الأدوية' : 'Medication cost'} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/></div>
+              <div className="grid grid-cols-2 gap-2"><input type="date" required value={medicalDate} onChange={e=>setMedicalDate(e.target.value)} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/><input value={medicalNotes} onChange={e=>setMedicalNotes(e.target.value)} placeholder={isAr ? 'ملاحظات' : 'Notes'} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"/></div>
+              <div className="flex gap-2 pt-2"><button type="button" onClick={()=>setIsMedicalModalOpen(false)} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">{isAr ? 'إلغاء' : 'Cancel'}</button><button type="submit" className="flex-1 py-3 rounded-xl bg-cyan-500 text-white text-xs font-black">{isAr ? 'حفظ' : 'Save'}</button></div>
             </form>
           </div>
         </div>

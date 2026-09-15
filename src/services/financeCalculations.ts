@@ -191,8 +191,13 @@ export const getPrimaryIncomeForMonth = (
   }
 
   if (currentIncomeDoc.sources && currentIncomeDoc.sources.length > 0) {
-    const total = currentIncomeDoc.sources.reduce((s, src) => s + (Number(src.amount) || 0), 0);
-    const salary = currentIncomeDoc.sources
+    // Current-account deposits/withdrawals are tracked separately from earned income.
+    // They are added to the master monthly balance in ExpensesView as a signed net value.
+    const earnedSources = currentIncomeDoc.sources.filter(
+      (src) => src.type !== 'current_deposit' && src.type !== 'current_withdrawal'
+    );
+    const total = earnedSources.reduce((s, src) => s + (Number(src.amount) || 0), 0);
+    const salary = earnedSources
       .filter((s) => s.type === 'salary' || s.source.includes('راتب'))
       .reduce((s, src) => s + (Number(src.amount) || 0), 0);
     const other = total - salary;

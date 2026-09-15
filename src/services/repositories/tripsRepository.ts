@@ -31,7 +31,7 @@ export class TripsRepository {
 
   static addRecentTrip(trip: RecentTrip): RecentTrip[] {
     const list = this.getRecentTrips();
-    const updated = [trip, ...list].slice(0, 50);
+    const updated = [trip, ...list].slice(0, 10);
     this.saveRecentTrips(updated);
     return updated;
   }

@@ -57,7 +57,7 @@ import WalletView from './components/WalletView';
 import AdminWalletPanel from './components/AdminWalletPanel';
 import { VehiclesView } from './components/VehiclesView';
 import { EducationView } from './components/EducationView';
-import { FoodView } from './components/FoodView';
+import FoodSection from './components/FoodSection';
 import { ReligiousView } from './components/ReligiousView';
 import { SecureVaultView } from './components/SecureVaultView';
 import { AiCenterView } from './components/AiCenterView';
@@ -69,8 +69,7 @@ import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
-import { AuthView } from './components/AuthView';
-import { restoreSession, logout } from './services/authService';
+import { startTrialSession } from './services/authService';
 
 // Icons
 import {
@@ -84,10 +83,6 @@ import {
 export default function App() {
   // Global App State
   const [authChecked, setAuthChecked] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [guestMode, setGuestMode] = useState(false);
-  const [loginNotice, setLoginNotice] = useState('');
-  const [requireTripPhoneVerification, setRequireTripPhoneVerification] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [viewHistory, setViewHistory] = useState<AppView[]>([]);
   const [language, setLanguage] = useState<Language>('ar');
@@ -148,42 +143,19 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
   useEffect(() => {
-    restoreSession().then((session) => {
-      setAuthenticated(!!session);
-    setGuestMode(false);
-      setGuestMode(false);
-      if (session) setUserProfile(UserRepository.getProfile());
-      setAuthChecked(true);
-    });
+    // المرحلة التجريبية: تشغيل التطبيق مباشرة بدون شاشة دخول أو أي توثيق.
+    startTrialSession()
+      .then((session) => {
+        if (session) setUserProfile(UserRepository.getProfile());
+      })
+      .catch((error) => {
+        console.error('Trial session error:', error);
+        // حتى لو فشل الاتصال بالـ API، لا نعرض شاشة دخول؛ التطبيق يظل قابلاً للاستعراض.
+      })
+      .finally(() => setAuthChecked(true));
   }, []);
 
-  const handleAuthenticated = async () => {
-    setLoginNotice('');
-    setRequireTripPhoneVerification(false);
-    const session = await restoreSession();
-    setAuthenticated(!!session);
-    setGuestMode(false);
-    if (session) setUserProfile(UserRepository.getProfile());
-  };
-
-  const handleGuest = () => { setLoginNotice(''); setRequireTripPhoneVerification(false); setGuestMode(true); setAuthenticated(true); };
-
-  const handleNavigateSafe = (nextView: AppView) => {
-    // Guests can browse the app, but Trips requires an authenticated account.
-    if (nextView === 'trips' && guestMode) {
-      setRequireTripPhoneVerification(false);
-      setLoginNotice('قسم الرحلات متاح بعد تسجيل الدخول أو إنشاء حساب جديد. اضغط الزر للانتقال إلى شاشة الدخول.');
-      setAuthenticated(false);
-      setGuestMode(false);
-      return;
-    }
-    // TEMPORARY (testing phase): Trips no longer requires phone verification to enter —
-    // it opens immediately for any logged-in account. To bring the gate back later, restore the
-    // `if (nextView === 'trips' && authenticated) { ... requiresPhoneVerification ... }` block
-    // that used to sit here (still available in the project's git history).
-    handleNavigate(nextView);
-  };
-
+  const handleNavigateSafe = (nextView: AppView) => handleNavigate(nextView);
 
 
   const handleToggleDailyTask = (id: string) => {
@@ -282,8 +254,7 @@ export default function App() {
     { view: 'notes' as AppView, label: language === 'ar' ? 'الملاحظات' : 'Notes', icon: FileText },
   ];
 
-  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تأمين الجلسة…</div>;
-  if (!authenticated) return <AuthView onAuthenticated={handleAuthenticated} onGuest={handleGuest} loginNotice={loginNotice} requireTripPhoneVerification={requireTripPhoneVerification} />;
+  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تشغيل النسخة التجريبية…</div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-accent-500 selection:text-white">
@@ -319,7 +290,6 @@ export default function App() {
           onToggleDailyTask={handleToggleDailyTask}
           onAddDailyTask={handleAddDailyTask}
           onDeleteDailyTask={handleDeleteDailyTask}
-          onLogout={async () => { if (!guestMode) await logout(); setAuthenticated(false); setGuestMode(false); }}
         />
 
         {/* 3. Main Android Viewport Container (Scrollable) */}
@@ -380,6 +350,8 @@ export default function App() {
               language={language}
               currency={userProfile.currency}
               expenses={expenses}
+              userProfile={userProfile}
+              onBackToHome={() => handleNavigateSafe('dashboard')}
               onUpdateExpenses={(updated) => {
                 setExpenses(updated);
                 ExpensesRepository.saveExpenses(updated);
@@ -449,19 +421,7 @@ export default function App() {
           )}
 
           {currentView === 'food' && (
-            <FoodView
-              language={language}
-              recipes={recipes}
-              shoppingList={shoppingList}
-              onUpdateRecipes={(updated) => {
-                setRecipes(updated);
-                FoodRepository.saveRecipes(updated);
-              }}
-              onUpdateShoppingList={(updated) => {
-                setShoppingList(updated);
-                FoodRepository.saveShoppingList(updated);
-              }}
-            />
+            <FoodSection onBack={() => handleNavigateSafe('dashboard' as AppView)} />
           )}
 
           {currentView === 'religious' && (

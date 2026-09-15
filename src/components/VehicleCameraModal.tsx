@@ -28,6 +28,7 @@ interface VehicleCameraModalProps {
   currency?: string;
   language?: Language;
   vehicleId?: string;
+  odometerOnly?: boolean;
 }
 
 export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
@@ -39,6 +40,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
   currency = 'EGP',
   language = 'ar',
   vehicleId,
+  odometerOnly = false,
 }) => {
   const isAr = language === 'ar';
 
@@ -480,7 +482,7 @@ export const VehicleCameraModal: React.FC<VehicleCameraModalProps> = ({
 
           {/* Mode switch & Close */}
           <div className="flex items-center gap-2">
-            {!capturedPhotoUrl && (
+            {!capturedPhotoUrl && !odometerOnly && (
               <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                 <button
                   type="button"

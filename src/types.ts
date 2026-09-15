@@ -70,6 +70,8 @@ export interface TickerPreferences {
 
 export interface VehiclePreferences {
   primaryVehicleName?: string;
+  vehicleType?: string;
+  vehicleShape?: string;
   fuelType?: 'gasoline92' | 'gasoline95' | 'gas' | 'diesel' | 'electric';
   serviceIntervalKm?: number;
 }
@@ -400,6 +402,11 @@ export interface RecipeIngredient {
   unit: string;
 }
 
+export type FoodMainSection = 'eastern' | 'eastern_desserts' | 'diet';
+export type FoodSubcategory = 'starches' | 'pastries' | 'desserts';
+export type DietSystem = 'keto' | 'tayyibat' | 'common';
+export type FoodCompatibility = 'allowed' | 'not_allowed' | 'needs_review';
+
 export interface Recipe {
   id: string;
   title: string;
@@ -414,6 +421,18 @@ export interface Recipe {
   ingredients: RecipeIngredient[];
   steps: string[];
   isFavorite: boolean;
+  mainSection?: FoodMainSection;
+  subcategory?: FoodSubcategory;
+  dietSystems?: DietSystem[];
+  compatibility?: Partial<Record<DietSystem, FoodCompatibility>>;
+  source?: string;
+  sourceAuthor?: string;
+  sourcePage?: string;
+  sourceUrl?: string;
+  tags?: string[];
+  notes?: string;
+  servings?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 export interface ShoppingItem {
@@ -470,6 +489,7 @@ export interface RecentTrip {
   provider: string;
   rideType: string;
   fare: number;
+  distanceKm?: number;
 }
 
 export interface FavoritePlace {
@@ -826,4 +846,17 @@ export interface StudentExpenseRecord {
   title: string;
   amount: number;
   date: string;
+}
+
+export interface MedicalExpenseRecord {
+  id: string;
+  familyMember: string;
+  facilityName?: string;
+  facilityType: 'مستشفى' | 'عيادة خاصة' | 'عيادة أسنان' | 'صيدلية' | 'أخرى';
+  conditionDescription: string;
+  doctorDiagnosis?: string;
+  examinationCost: number;
+  medicationCost: number;
+  date: string;
+  notes?: string;
 }

@@ -1,23 +1,7 @@
 import React from 'react';
-import {
-  ArrowRight,
-  ArrowLeft,
-  Home,
-  Briefcase,
-  Car,
-  BookOpen,
-  DollarSign,
-  BarChart3,
-  ChevronLeft,
-  Calendar,
-  Layers,
-  Sparkles,
-  TrendingUp,
-  TrendingDown,
-  ShieldCheck,
-} from 'lucide-react';
+import { ArrowRight, ArrowLeft, Home, UserRound, Car, BookOpen, DollarSign, BarChart3, Layers, Calendar, Wallet, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { formatMoney } from '../../services/financeCalculations';
-import { Language } from '../../types';
+import { Language, UserProfile } from '../../types';
 
 interface SectionsMenuScreenProps {
   language: Language;
@@ -25,7 +9,7 @@ interface SectionsMenuScreenProps {
   selectedMonth: string;
   onSelectMonth: (month: string) => void;
   onBack: () => void;
-  onSelectSection: (section: 'house' | 'work' | 'vehicle' | 'education' | 'income_certs' | 'reports') => void;
+  onSelectSection: (section: 'house' | 'work' | 'personal' | 'vehicle' | 'education' | 'income_certs' | 'reports') => void;
   houseTotal: number;
   houseCount: number;
   workTotal: number;
@@ -38,206 +22,92 @@ interface SectionsMenuScreenProps {
   certsCount: number;
   monthlyExpenses: number;
   netIncome: number;
+  certificatesProfit?: number;
+  currentAccountNet?: number;
+  userProfile?: UserProfile;
 }
 
 export const SectionsMenuScreen: React.FC<SectionsMenuScreenProps> = ({
-  language,
-  currency,
-  selectedMonth,
-  onSelectMonth,
-  onBack,
-  onSelectSection,
-  houseTotal,
-  houseCount,
-  workTotal,
-  workCount,
-  vehicleTotal,
-  vehicleCount,
-  educationTotal,
-  educationCount,
-  monthlyIncome,
-  certsCount,
-  monthlyExpenses,
-  netIncome,
+  language, currency, selectedMonth, onSelectMonth, onBack, onSelectSection,
+  houseTotal, houseCount, workTotal, workCount, vehicleTotal, vehicleCount,
+  educationTotal, educationCount, monthlyIncome, certsCount, monthlyExpenses,
+  netIncome, certificatesProfit = 0, currentAccountNet = 0, userProfile,
 }) => {
   const isAr = language === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
+  const signed = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${formatMoney(Math.abs(value))}`;
   const isSurplus = netIncome >= 0;
 
   const sections = [
-    {
-      id: 'house' as const,
-      title: isAr ? 'مصروفات المنزل' : 'Home Expenses',
-      desc: isAr ? 'فطار، غداء، عشاء، صيانة وسباكة، مفروشات وأجهزة منزلية' : 'Groceries, dining, home maintenance, appliances',
-      icon: Home,
-      total: houseTotal,
-      count: houseCount,
-      countLabel: isAr ? 'عملية' : 'items',
-      badgeColor: 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800',
-      accentHover: 'hover:border-cyan-400 dark:hover:border-cyan-600',
-    },
-    {
-      id: 'work' as const,
-      title: isAr ? 'مصروفات العمل' : 'Work Expenses',
-      desc: isAr ? 'أدوات مكتبية، صيانة أجهزة، اشتراكات برمجيات وضيافة' : 'Office supplies, equipment, software, hospitality',
-      icon: Briefcase,
-      total: workTotal,
-      count: workCount,
-      countLabel: isAr ? 'عملية' : 'items',
-      badgeColor: 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800',
-      accentHover: 'hover:border-sky-400 dark:hover:border-sky-600',
-    },
-    {
-      id: 'vehicle' as const,
-      title: isAr ? 'المركبة' : 'Vehicle Expenses',
-      desc: isAr ? 'استهلاك الوقود، الصيانة، الحوادث وكاميرا قراءة العداد' : 'Fuel logs, maintenance, accident reports, odometer OCR',
-      icon: Car,
-      total: vehicleTotal,
-      count: vehicleCount,
-      countLabel: isAr ? 'سجل' : 'records',
-      badgeColor: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800',
-      accentHover: 'hover:border-teal-400 dark:hover:border-teal-600',
-    },
-    {
-      id: 'education' as const,
-      title: isAr ? 'التعليم' : 'Education Expenses',
-      desc: isAr ? 'ملفات الطلاب، مصاريف المدارس، الدروس، الكتب والباص' : 'Student profiles, tuition, tutoring, textbooks, school bus',
-      icon: BookOpen,
-      total: educationTotal,
-      count: educationCount,
-      countLabel: isAr ? 'بند' : 'records',
-      badgeColor: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800',
-      accentHover: 'hover:border-indigo-400 dark:hover:border-indigo-600',
-    },
-    {
-      id: 'income_certs' as const,
-      title: isAr ? 'الدخل والشهادات' : 'Income & Certificates',
-      desc: isAr ? 'الرواتب، مصادر الدخل، الشهادات البنكية وحساب الأرباح' : 'Salaries, income streams, bank certificates & profit engine',
-      icon: DollarSign,
-      total: monthlyIncome,
-      count: certsCount,
-      countLabel: isAr ? 'شهادة' : 'certs',
-      badgeColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800',
-      accentHover: 'hover:border-emerald-400 dark:hover:border-emerald-600',
-      isIncome: true,
-    },
-    {
-      id: 'reports' as const,
-      title: isAr ? 'التقارير والتحليلات' : 'Reports & Analytics',
-      desc: isAr ? 'الرسوم البيانية، مقارنة الدخل بالمصروفات والتصدير' : 'Visual charts, income vs expenses comparisons & export',
-      icon: BarChart3,
-      total: monthlyExpenses,
-      count: 0,
-      countLabel: isAr ? 'تحليل شامل' : 'Master analysis',
-      badgeColor: 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800',
-      accentHover: 'hover:border-cyan-400 dark:hover:border-cyan-600',
-      isReport: true,
-    },
+    { id: 'vehicle' as const, title: isAr ? 'سيارتي' : 'My Car', icon: Car, total: -Math.abs(vehicleTotal), count: vehicleCount, desc: isAr ? `${userProfile?.vehiclePreferences?.vehicleType || userProfile?.vehiclePreferences?.primaryVehicleName || 'السيارة الأساسية'} • ${userProfile?.vehiclePreferences?.vehicleShape || 'سيدان'}` : 'Vehicle expenses' },
+    { id: 'income_certs' as const, title: isAr ? 'الدخل والشهادات' : 'Income & Certificates', icon: DollarSign, total: monthlyIncome, count: certsCount, desc: isAr ? 'الدخل، الشهادات البنكية والحساب الجاري' : 'Income, certificates and current account' },
+    { id: 'education' as const, title: isAr ? 'التعليم' : 'Education', icon: BookOpen, total: -Math.abs(educationTotal), count: educationCount, desc: isAr ? 'مصاريف التعليم والطلاب' : 'Education expenses' },
+    { id: 'house' as const, title: isAr ? 'مصروفات المنزل' : 'Home Expenses', icon: Home, total: -Math.abs(houseTotal), count: houseCount, desc: isAr ? 'كل مصروفات المنزل' : 'All home expenses' },
+    { id: 'personal' as const, title: isAr ? 'المصروفات الشخصية' : 'Personal Expenses', icon: UserRound, total: -Math.abs(workTotal), count: workCount, desc: isAr ? 'المصروفات الشخصية اليومية' : 'Personal daily expenses' },
+    { id: 'reports' as const, title: isAr ? 'التقارير' : 'Reports', icon: BarChart3, total: 0, count: 0, desc: isAr ? 'التقارير والتحليلات والتصدير' : 'Reports, analytics and export', noMoney: true },
   ];
 
   return (
     <div className="space-y-4" dir={isAr ? 'rtl' : 'ltr'}>
-      {/* 1. Header with Back Button */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 text-slate-700 dark:text-slate-200 hover:text-cyan-600 flex items-center justify-center transition-all active:scale-95"
-            title={isAr ? 'الرجوع للملخص' : 'Back to summary'}
-          >
+      {/* Master section title */}
+      <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+          <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-cyan-50 transition-all active:scale-95">
             <BackIcon className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-              <span>{isAr ? 'أقسام الدخل والمصروفات' : 'Income & Expenses Sections'}</span>
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {isAr ? 'اختر القسم المطلوب لإدارته واستعراض بياناته بالتفصيل' : 'Select a section to manage its data in full screen'}
-            </p>
+          <div className="flex-1 text-center">
+            <div className="font-black text-lg flex items-center justify-center gap-2"><Layers className="w-5 h-5 text-cyan-600" />{isAr ? 'أقسام الدخل والمصروفات' : 'Income & Expenses Sections'}</div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-          <Calendar className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => onSelectMonth(e.target.value)}
-            className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
-          />
+          <div className="w-10" />
         </div>
       </div>
 
-      {/* 2. Top Fast Balance Strip */}
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-slate-500 text-[10px] block">{isAr ? 'الدخل' : 'Income'}</span>
-          <span className="font-black text-emerald-600 dark:text-emerald-400">{formatMoney(monthlyIncome)} {currency}</span>
-        </div>
-        <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-slate-500 text-[10px] block">{isAr ? 'المصروفات' : 'Expenses'}</span>
-          <span className="font-black text-rose-600 dark:text-rose-400">{formatMoney(monthlyExpenses)} {currency}</span>
-        </div>
-        <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-slate-500 text-[10px] block">{isAr ? 'الصافي' : 'Net'}</span>
-          <span className={`font-black ${isSurplus ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-            {isSurplus ? '+' : ''}{formatMoney(netIncome)} {currency}
-          </span>
+      {/* Income data tab */}
+      <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="w-full py-3 text-center font-black text-sm bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700">{isAr ? 'بيانات الدخل' : 'Income Data'}</div>
+        <div className="grid grid-cols-3 gap-2 p-3 text-center">
+          <div className="rounded-xl p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900"><div className="text-[11px] font-bold text-slate-500">الدخل</div><div className="font-black text-emerald-600">+{formatMoney(monthlyIncome)} {currency}</div></div>
+          <div className="rounded-xl p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900"><div className="text-[11px] font-bold text-slate-500">المصروفات</div><div className="font-black text-rose-600">-{formatMoney(Math.abs(monthlyExpenses))} {currency}</div></div>
+          <div className={`rounded-xl p-3 border ${isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}><div className="text-[11px] font-bold text-slate-500">الصافي</div><div className={`font-black ${isSurplus ? 'text-emerald-600' : 'text-rose-600'}`}>{signed(netIncome)} {currency}</div></div>
         </div>
       </div>
 
-      {/* 3. 2-Column Grid of 6 Section Cards */}
+      {/* Section cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        {sections.map((sec) => {
+        {sections.map(sec => {
           const Icon = sec.icon;
-          return (
-            <div
-              key={sec.id}
-              onClick={() => onSelectSection(sec.id)}
-              className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md ${sec.accentHover} group relative overflow-hidden flex flex-col justify-between`}
-            >
-              <div>
-                {/* Top card bar: icon + count badge */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shadow-xs ${sec.badgeColor} group-hover:scale-105 transition-transform`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {sec.isReport ? sec.countLabel : `${sec.count} ${sec.countLabel}`}
-                  </span>
-                </div>
-
-                {/* Section title & description */}
-                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
-                  {sec.title}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                  {sec.desc}
-                </p>
-              </div>
-
-              {/* Bottom value + Open Section button */}
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-medium">
-                    {sec.isIncome ? (isAr ? 'إجمالي الدخل الشهري' : 'Total Monthly Income') : sec.isReport ? (isAr ? 'الحالة' : 'Status') : (isAr ? 'مصروفات هذا الشهر' : 'This month expenses')}
-                  </span>
-                  <div className={`text-base font-black ${sec.isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                    {sec.isReport ? (isAr ? 'محدث وفوري' : 'Live analytics') : `${formatMoney(sec.total)} ${currency}`}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 text-xs font-bold text-cyan-600 dark:text-cyan-400 group-hover:translate-x-[-3px] transition-transform">
-                  <span>{isAr ? 'فتح' : 'Open'}</span>
-                  <ChevronLeft className="w-4 h-4" />
-                </div>
-              </div>
+          const positive = sec.total > 0;
+          return <button key={sec.id} onClick={() => onSelectSection(sec.id)} className="text-right bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-cyan-400 hover:shadow-md transition-all active:scale-[.99]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="w-11 h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center"><Icon className="w-5 h-5 text-cyan-600" /></div>
+              {!sec.noMoney && <span className={`font-black text-sm ${positive ? 'text-emerald-600' : 'text-rose-600'}`}>{signed(sec.total)} {currency}</span>}
             </div>
-          );
+            <div className="mt-3"><div className="font-black text-base">{sec.title}</div><div className="text-xs text-slate-500 mt-1">{sec.desc}</div></div>
+            {!sec.noMoney && <div className="mt-3 text-[11px] text-slate-400">{sec.count} {isAr ? 'عملية/سجل' : 'records'}</div>}
+          </button>;
         })}
       </div>
+
+      {/* Master financial summary */}
+      <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="w-full py-3 text-center font-black text-sm bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2"><Wallet className="w-4 h-4 text-cyan-600" />{isAr ? 'الملخص المالي والمصروفات' : 'Financial Summary & Expenses'}</div>
+        <div className="p-3 space-y-2 text-sm">
+          <SummaryRow label="الدخل والشهادات والحساب الجاري" value={monthlyIncome} positive />
+          <SummaryRow label="سيارتي" value={-Math.abs(vehicleTotal)} />
+          <SummaryRow label="التعليم" value={-Math.abs(educationTotal)} />
+          <SummaryRow label="مصروفات المنزل" value={-Math.abs(houseTotal)} />
+          <SummaryRow label="المصروفات الشخصية" value={-Math.abs(workTotal)} />
+          <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700"><SummaryRow label="الإجمالي بعد المصروفات" value={netIncome} positive={netIncome >= 0} bold /></div>
+          <div className="text-[11px] text-slate-400 pt-1">{isAr ? `أرباح الشهادات: +${formatMoney(certificatesProfit)} • صافي حركة الحساب الجاري: ${signed(currentAccountNet)}` : `Certificate profit: +${formatMoney(certificatesProfit)} • Current account net: ${signed(currentAccountNet)}`}</div>
+        </div>
+      </div>
+
+
     </div>
   );
+};
+
+const SummaryRow: React.FC<{ label: string; value: number; positive?: boolean; bold?: boolean }> = ({ label, value, positive, bold }) => {
+  const cls = value > 0 || positive ? 'text-emerald-600' : value < 0 ? 'text-rose-600' : 'text-slate-500';
+  return <div className={`flex items-center justify-between gap-3 ${bold ? 'font-black' : 'font-bold'}`}><span>{label}</span><span className={cls}>{value > 0 ? '+' : value < 0 ? '-' : ''}{formatMoney(Math.abs(value))}</span></div>;
 };

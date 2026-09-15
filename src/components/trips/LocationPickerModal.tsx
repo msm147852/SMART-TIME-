@@ -11,11 +11,14 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
+  Crosshair,
+  Loader2,
 } from 'lucide-react';
 import { TripLocation, LocationPickerMode } from './types';
 import { MapLocationPicker } from './MapLocationPicker';
 import { TextSearchLocationPicker } from './TextSearchLocationPicker';
 import { VoiceLocationPicker } from './VoiceLocationPicker';
+import { apiUrl } from '../../services/apiConfig';
 
 interface LocationPickerModalProps {
   isOpen: boolean;
@@ -38,6 +41,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 }) => {
   const isRtl = language === 'ar';
   const [activeTab, setActiveTab] = useState<PickerTab>('menu');
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
 
   if (!isOpen) return null;
 
@@ -45,6 +50,45 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     onSelectLocation(loc);
     setActiveTab('menu');
     onClose();
+  };
+
+  const useCurrentLocation = () => {
+    if (mode !== 'pickup') {
+      setLocationError(isRtl ? 'موقعي متاح لتحديد نقطة الانطلاق فقط.' : 'My location is available for pickup only.');
+      return;
+    }
+    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      setLocationError(isRtl ? 'الموقع الحالي يحتاج HTTPS. افتح SMART TIME عبر HTTPS أو جرّبه على localhost.' : 'Current location requires HTTPS. Open SMART TIME over HTTPS or test it on localhost.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      setLocationError(isRtl ? 'الموقع الجغرافي غير متاح على هذا المتصفح.' : 'Geolocation is not available in this browser.');
+      return;
+    }
+    setLocating(true);
+    setLocationError('');
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const latitude = pos.coords.latitude;
+      const longitude = pos.coords.longitude;
+      let address = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      try {
+        const r = await fetch(apiUrl(`/api/maps/reverse-geocode?lat=${latitude}&lng=${longitude}`));
+        const data = await r.json();
+        if (r.ok && data.address) address = data.address;
+      } catch { /* الإحداثيات تظل صالحة حتى لو تعذر تحويلها لعنوان */ }
+      handleSelectAndClose({
+        address,
+        name: isRtl ? 'موقعي الحالي' : 'My current location',
+        latitude,
+        longitude,
+      });
+      setLocating(false);
+    }, (error) => {
+      setLocating(false);
+      setLocationError(error.code === 1
+        ? (isRtl ? 'اسمح للموقع من المتصفح لاستخدام موقعك الحالي.' : 'Allow location access in your browser.')
+        : (isRtl ? 'تعذر تحديد موقعك الحالي.' : 'Unable to determine your current location.'));
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
   };
 
   const modalTitle =
@@ -67,23 +111,23 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/25 backdrop-blur-sm animate-fadeIn"
       id="location-picker-modal-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="location-picker-modal-title"
     >
       <div
-        className="w-full max-w-xl bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-white"
+        className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-white"
         id="location-picker-modal-container"
       >
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-slate-850 border-b border-slate-800">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-white border-b border-slate-200">
           <div className="flex items-center gap-3">
             {activeTab !== 'menu' && (
               <button
                 onClick={() => setActiveTab('menu')}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
                 title={isRtl ? 'الرجوع للخيارات' : 'Back'}
                 aria-label={isRtl ? 'رجوع' : 'Back'}
               >
@@ -115,7 +159,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                     {mode === 'pickup' ? (isRtl ? 'نقطة الانطلاق 📍' : 'Pickup') : isRtl ? 'نقطة النزول 🏁' : 'Dropoff'}
                   </span>
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">{modalSubtitle}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{modalSubtitle}</p>
               </div>
             </div>
           </div>
@@ -125,7 +169,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               setActiveTab('menu');
               onClose();
             }}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-white hover:bg-slate-700 text-slate-500 hover:text-white transition-colors"
             title={isRtl ? 'إغلاق' : 'Close'}
             aria-label={isRtl ? 'إغلاق النافذة' : 'Close modal'}
           >
@@ -135,13 +179,13 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
         {/* Tab navigation pills (when active in a subview) */}
         {activeTab !== 'menu' && (
-          <div className="flex items-center justify-center gap-2 p-2.5 bg-slate-950/70 border-b border-slate-800 text-xs">
+          <div className="flex items-center justify-center gap-2 p-2.5 bg-slate-50 border-b border-slate-200 text-xs">
             <button
               onClick={() => setActiveTab('map')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
                 activeTab === 'map'
                   ? 'bg-accent-500 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  : 'bg-slate-100 text-slate-500 hover:text-slate-900'
               }`}
               aria-label={isRtl ? 'تحديد من على الخريطة' : 'Map Picker'}
             >
@@ -154,7 +198,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
                 activeTab === 'text'
                   ? 'bg-accent-500 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  : 'bg-slate-100 text-slate-500 hover:text-slate-900'
               }`}
               aria-label={isRtl ? 'كتابة العنوان' : 'Search Address'}
             >
@@ -167,7 +211,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
                 activeTab === 'voice'
                   ? 'bg-accent-500 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  : 'bg-slate-100 text-slate-500 hover:text-slate-900'
               }`}
               aria-label={isRtl ? 'البحث الصوتي' : 'Voice Search'}
             >
@@ -182,10 +226,34 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           {/* Main 3 Options Selection Menu */}
           {activeTab === 'menu' && (
             <div className="space-y-4 py-2" id="location-picker-options-menu">
+              {/* موقع المستخدم الحالي — متاح فقط لنقطة الانطلاق */}
+              {mode === 'pickup' && (
+                <button
+                  onClick={useCurrentLocation}
+                  disabled={locating}
+                  className="w-full p-4 rounded-2xl bg-cyan-50 hover:bg-cyan-100 border-2 border-cyan-200 transition-all flex items-center justify-between group shadow-sm active:scale-98 text-start disabled:opacity-70"
+                  id="use-current-location-option-btn"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-cyan-500 text-white shadow-md">
+                      {locating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Crosshair className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-base text-slate-900">{isRtl ? '📍 موقعي الحالي' : '📍 My current location'}</h3>
+                      <p className="text-xs text-slate-500 mt-1">{isRtl ? 'حدد نقطة الانطلاق تلقائيًا من موقعك أينما كنت' : 'Use your device location as the pickup point'}</p>
+                    </div>
+                  </div>
+                  {locating && <span className="text-[10px] font-bold text-cyan-700">{isRtl ? 'جاري التحديد...' : 'Locating...'}</span>}
+                </button>
+              )}
+              {locationError && mode === 'pickup' && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-bold px-3 py-2">{locationError}</div>
+              )}
+
               {/* Option 1: تحديد من على الخريطة */}
               <button
                 onClick={() => setActiveTab('map')}
-                className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-850 to-slate-800 hover:from-slate-800 hover:to-slate-750 border-2 border-slate-700 hover:border-accent-500 transition-all flex items-center justify-between group shadow-lg active:scale-98 text-start"
+                className="w-full p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-accent-500 transition-all flex items-center justify-between group shadow-lg active:scale-98 text-start"
                 id="pick-from-map-option-btn"
                 aria-label={isRtl ? 'تحديد من على الخريطة. اختر مكان الانطلاق من الخريطة' : 'Pick from map'}
               >
@@ -194,10 +262,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                     <MapPin className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-black text-base text-white group-hover:text-accent-300">
+                    <h3 className="font-black text-base text-slate-900 group-hover:text-accent-700">
                       {isRtl ? '📍 تحديد من على الخريطة' : '📍 Pick from Map'}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       {mode === 'pickup'
                         ? isRtl
                           ? 'اختر مكان الانطلاق من الخريطة التفاعلية بدقة'
@@ -216,7 +284,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               {/* Option 2: كتابة العنوان */}
               <button
                 onClick={() => setActiveTab('text')}
-                className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-850 to-slate-800 hover:from-slate-800 hover:to-slate-750 border-2 border-slate-700 hover:border-accent-500 transition-all flex items-center justify-between group shadow-lg active:scale-98 text-start"
+                className="w-full p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-accent-500 transition-all flex items-center justify-between group shadow-lg active:scale-98 text-start"
                 id="search-address-option-btn"
                 aria-label={isRtl ? 'كتابة العنوان. ابحث عن المكان بالكتابة' : 'Search address by typing'}
               >
@@ -225,10 +293,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                     <Search className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-black text-base text-white group-hover:text-accent-300">
+                    <h3 className="font-black text-base text-slate-900 group-hover:text-accent-700">
                       {isRtl ? '🔎 كتابة العنوان' : '🔎 Type Address or Place'}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       {isRtl
                         ? 'ابحث عن اسم المكان أو المعلم أو الشارع بالكتابة المباشرة'
                         : 'Search by place name, street, mall, or landmark'}
@@ -243,7 +311,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               {/* Option 3: البحث الصوتي */}
               <button
                 onClick={() => setActiveTab('voice')}
-                className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-850 to-slate-800 hover:from-slate-800 hover:to-slate-750 border-2 border-slate-700 hover:border-accent-500 transition-all flex items-center justify-between group shadow-lg active:scale-98 text-start"
+                className="w-full p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-accent-500 transition-all flex items-center justify-between group shadow-lg active:scale-98 text-start"
                 id="voice-search-option-btn"
                 aria-label={isRtl ? 'البحث الصوتي. قل اسم مكان الانطلاق أو الوصول' : 'Voice Search'}
               >
@@ -252,10 +320,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                     <Mic className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-black text-base text-white group-hover:text-accent-300">
+                    <h3 className="font-black text-base text-slate-900 group-hover:text-accent-700">
                       {isRtl ? '🎙️ البحث الصوتي' : '🎙️ Voice Search'}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       {mode === 'pickup'
                         ? isRtl
                           ? 'قل اسم مكان الانطلاق بالصوت وسنحدده لك فوراً'

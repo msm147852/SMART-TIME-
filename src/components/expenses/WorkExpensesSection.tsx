@@ -98,7 +98,7 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return;
+    if (isNaN(numAmount) || numAmount <= 0) { window.alert(isAr ? 'من فضلك أدخل مبلغًا صحيحًا أكبر من صفر.' : 'Please enter a valid amount greater than zero.'); return; }
 
     const newItem: SpecializedExpense = {
       id: editingId || `work_${Date.now()}`,

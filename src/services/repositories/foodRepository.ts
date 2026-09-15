@@ -2,11 +2,17 @@ import { Recipe, ShoppingItem } from '../../types';
 import { STORAGE_KEYS } from '../storageKeys';
 import { StorageAdapter } from '../storageAdapter';
 import { DEFAULT_RECIPES, DEFAULT_SHOPPING_ITEMS } from '../seedData';
+import { FOOD_CATALOG } from '../foodCatalog';
 
 export class FoodRepository {
   // Recipes
   static getRecipes(): Recipe[] {
-    return StorageAdapter.getItem<Recipe[]>(STORAGE_KEYS.RECIPES, DEFAULT_RECIPES);
+    const stored = StorageAdapter.getItem<Recipe[]>(STORAGE_KEYS.RECIPES, []);
+    const base = stored.length ? stored : DEFAULT_RECIPES;
+    const existing = new Set(base.map(r => r.id));
+    const merged = [...base, ...FOOD_CATALOG.filter(r => !existing.has(r.id))];
+    if (merged.length !== base.length) StorageAdapter.setItem(STORAGE_KEYS.RECIPES, merged);
+    return merged;
   }
 
   static saveRecipes(recipes: Recipe[]): void {
