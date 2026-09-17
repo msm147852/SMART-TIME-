@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import type { DetailedRecipe } from './detailedFoodLibrary';
 import {
   CATEGORY_FALLBACK_IMAGES,
   foodImageFor,
@@ -10,7 +9,7 @@ import {
 export { CATEGORY_FALLBACK_IMAGES, foodImageFor, getRecipeCanonicalId, validateRecipeImage };
 
 export interface ValidatedFoodImageProps {
-  recipe: Partial<DetailedRecipe> & Record<string, unknown>;
+  recipe: unknown;
   alt: string;
   className?: string;
   allowVirtualToggle?: boolean;
@@ -19,14 +18,18 @@ export interface ValidatedFoodImageProps {
 /**
  * UI adapter for the V9 food image contract.
  * The canonical image/validation logic lives in foodImageService.ts;
- * this component keeps FoodSection's rendering contract stable.
+ * this component deliberately accepts the different recipe shapes already
+ * used by FoodSection/FoodView and lets the service validate the runtime data.
  */
 export function ValidatedFoodImage({
   recipe,
   alt,
   className,
 }: ValidatedFoodImageProps) {
-  const validated = useMemo(() => validateRecipeImage(recipe), [recipe]);
+  const validated = useMemo(
+    () => validateRecipeImage(recipe as Parameters<typeof validateRecipeImage>[0]),
+    [recipe],
+  );
   const [src, setSrc] = useState(validated.validatedUrl);
 
   React.useEffect(() => {
@@ -41,10 +44,9 @@ export function ValidatedFoodImage({
       loading="lazy"
       decoding="async"
       onError={() => {
-        const fallback =
-          recipe.category && CATEGORY_FALLBACK_IMAGES[String(recipe.category)]
-            ? CATEGORY_FALLBACK_IMAGES[String(recipe.category)]
-            : CATEGORY_FALLBACK_IMAGES.default;
+        const candidate = recipe as { category?: unknown };
+        const category = String(candidate.category ?? 'default');
+        const fallback = CATEGORY_FALLBACK_IMAGES[category] ?? CATEGORY_FALLBACK_IMAGES.default;
         if (src !== fallback) setSrc(fallback);
       }}
     />
