@@ -74,6 +74,11 @@
   #root > div:first-child > div:first-child > nav + div {
     display: none;
   }
+
+  /* Dashboard grid: 2 columns on compact windows, then progressively wider. */
+  #android-dashboard-grid-view > .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 840px) {
@@ -83,6 +88,10 @@
   #root > div:first-child > div:first-child > nav { width: 116px; }
   #root > div:first-child > div:first-child > nav > button { width: 96px; }
   #root > div:first-child > div:first-child > main { padding-inline: 20px; }
+
+  #android-dashboard-grid-view > .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 1200px) {
@@ -92,6 +101,10 @@
   #root > div:first-child > div:first-child > nav { width: 132px; }
   #root > div:first-child > div:first-child > nav > button { width: 108px; }
   #root > div:first-child > div:first-child > main { padding-inline: 28px; }
+
+  #android-dashboard-grid-view > .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
