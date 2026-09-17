@@ -1,11 +1,11 @@
-import type { Note, Expense } from '../types';
+import type { AppView, Note, Expense } from '../types';
 import type { SmartTimeAction } from './aiActionEngine';
 import { ExpensesRepository, NotesRepository } from './repositories';
 import { OfflineActionQueue } from './offlineActionQueue';
 
 export type ActionExecutionResult =
   | { ok: true; type: 'created'; id?: string }
-  | { ok: true; type: 'navigated'; view: SmartTimeAction extends { type: 'navigate'; payload: infer P } ? P : never }
+  | { ok: true; type: 'navigated'; view: AppView }
   | { ok: false; error: string };
 
 const makeId = (prefix: string) =>
@@ -60,7 +60,7 @@ export const AiActionExecutor = {
           return { ok: true, type: 'created' };
 
         case 'navigate':
-          return { ok: true, type: 'navigated', view: action.payload };
+          return { ok: true, type: 'navigated', view: action.payload.view };
       }
     } catch (error) {
       console.error('[SMART TIME V9] AI action execution failed:', error);
