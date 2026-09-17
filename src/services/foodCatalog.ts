@@ -121,17 +121,21 @@ const BASE_FOOD_CATALOG: Recipe[] = [
 
 
 const egyptianRecipes: Recipe[] = EGYPTIAN_DISHES.map((dish) => ({
-  id: dish.dishId,
-  title: dish.title,
+  id: dish.dishId || dish.id,
+  title: dish.title || dish.name,
   category: dish.category === 'dessert' ? 'dessert' : 'normal',
-  image: dish.imageUrl,
-  prepTimeMinutes: 15,
-  cookTimeMinutes: 45,
+  image: dish.imageUrl || dish.image,
+  prepTimeMinutes: dish.prepMinutes || 15,
+  cookTimeMinutes: dish.cookMinutes || 45,
   calories: 0,
   protein: 0,
   carbs: 0,
   fat: 0,
-  ingredients: dish.ingredients.map((name) => ({ name, amount: 'حسب الوصفة', unit: '' })),
+  ingredients: (dish.ingredients || []).map((item) => ({
+    name: typeof item === 'string' ? item : item.name,
+    amount: typeof item === 'string' ? 'حسب الرغبة' : (item.amount || 'حسب الرغبة'),
+    unit: typeof item === 'string' ? '' : (item.unit || ''),
+  })),
   steps: dish.steps,
   isFavorite: false,
   mainSection: dish.category === 'dessert' ? 'eastern_desserts' : 'eastern',
@@ -139,7 +143,7 @@ const egyptianRecipes: Recipe[] = EGYPTIAN_DISHES.map((dish) => ({
   dietSystems: ['common'],
   tags: ['مصري', dish.group, dish.category === 'dessert' ? 'حلويات' : 'وجبات'],
   source: 'مكتبة وصفات SMART TIME',
-  servings: 4,
+  servings: dish.servings || 4,
 }));
 
 const tayyibatRecipes: Recipe[] = TAYYIBAT_RECIPES.map((recipe) => ({

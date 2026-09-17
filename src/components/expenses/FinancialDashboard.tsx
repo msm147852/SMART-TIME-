@@ -14,6 +14,7 @@ import {
   UserRound,
   Car,
   BookOpen,
+  Briefcase,
   DollarSign,
   BarChart3,
   CheckCircle2,
@@ -86,7 +87,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   const savingsRate = monthlyIncome > 0 ? Math.max(0, Math.min(100, Math.round((netIncome / monthlyIncome) * 100))) : 0;
   const expenseRatio = monthlyIncome > 0 ? Math.min(100, Math.round((monthlyExpenses / monthlyIncome) * 100)) : 100;
 
-  const handleNavigateSection = (sec: 'house' | 'work' | 'vehicle' | 'education' | 'income_certs' | 'reports') => {
+  const handleNavigateSection = (sec: 'house' | 'work' | 'personal' | 'vehicle' | 'education' | 'income_certs' | 'reports') => {
     if (onSelectSection) {
       onSelectSection(sec);
     } else if (onOpenSection) {

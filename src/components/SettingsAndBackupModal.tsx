@@ -42,6 +42,7 @@ import {
   PhoneCall,
 } from 'lucide-react';
 import { PhonePermissionsManager } from './PhonePermissionsManager';
+import { CardCustomizerModal } from './CardCustomizerModal';
 import {
   UserProfile,
   Language,
@@ -154,6 +155,9 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
 
   const [notificationSound, setNotificationSound] = useState<NotificationSoundSettings>(() => NotificationSoundService.getSettings());
   const notificationSoundInputRef = useRef<HTMLInputElement>(null);
+
+  // Card Studio Modal State
+  const [isCardCustomizerOpen, setIsCardCustomizerOpen] = useState(false);
 
   // مرجع إدخال ملف الصورة وتحميلها من الهاتف
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2033,8 +2037,35 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* بطاقات Super App وتخصيص الأنماط */}
+              <div className="p-4 rounded-2xl bg-gradient-to-tr from-amber-500/10 via-yellow-500/5 to-amber-500/15 border border-amber-300/60 dark:border-amber-700/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shrink-0">
+                    🎨
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                      {isAr ? 'استوديو تصميم وأنماط البطاقات (Super App Cards)' : 'Card Design Studio'}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {isAr
+                        ? '10 أنماط مظهر عصرية (Glass, Neon, 3D Tilt, Neumorphism, Minimalist) مع تحكم كامل بالكثافة والظلال والزوايا.'
+                        : '10 modern visual styles with 3D tilt, glare, density and shadow controls.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCardCustomizerOpen(true)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 shrink-0"
+                >
+                  {isAr ? 'فتح استوديو البطاقات 🎨' : 'Open Studio'}
+                </button>
+              </div>
             </div>
           )}
+
 
           {/* ======================================================== */}
           {/* TAB: الإشعارات والنغمات */}
@@ -2152,6 +2183,14 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Card Customizer Studio Modal */}
+      <CardCustomizerModal
+        isOpen={isCardCustomizerOpen}
+        onClose={() => setIsCardCustomizerOpen(false)}
+        language={language}
+      />
     </div>
   );
 };
+

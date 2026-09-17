@@ -2,7 +2,6 @@ import express from "express";
 import http from "node:http";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
@@ -10,7 +9,6 @@ import { db, seedDefaultChatRooms } from "./backend/database.js";
 import { getCache, setCache } from "./backend/cache.js";
 import { getServiceStatuses, seedServiceStatuses, setServiceStatus } from "./backend/serviceStatus.js";
 import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
-import { sendPasswordResetEmail, sendEmailVerificationEmail } from "./backend/emailProvider.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 
 dotenv.config();
@@ -84,7 +82,8 @@ app.get('/api/food/generated-image', async (req, res) => {
       config: { responseModalities: ['IMAGE'] } as any,
     });
 
-    const imagePart = response.parts?.find((part: any) => part.inlineData?.data);
+    const parts = (response as any).parts || response.candidates?.[0]?.content?.parts;
+    const imagePart = parts?.find((part: any) => part.inlineData?.data);
     const base64 = imagePart?.inlineData?.data;
     if (!base64) return res.status(502).json({ error: 'Image generation returned no image' });
 
@@ -102,8 +101,6 @@ const TRIAL_MODE = String(process.env.TRIAL_MODE || 'true').trim().toLowerCase()
 const TRIAL_USER_ID = 'smart-time-trial-user';
 const AUTH_SESSION_DAYS = 30;
 const PASSWORD_RESET_MINUTES = 15;
-const EMAIL_VERIFICATION_MINUTES = 10;
-const SESSION_COOKIE = 'smart_time_session';
 const PROGRAM_OWNER_EMAIL = String(process.env.PROGRAM_OWNER_EMAIL || '').trim().toLowerCase();
 const PROGRAM_OWNER_USER_ID = String(process.env.PROGRAM_OWNER_USER_ID || '').trim();
 const PROGRAM_OWNER_ACTIVATION_KEY = String(process.env.PROGRAM_OWNER_ACTIVATION_KEY || '');
@@ -125,12 +122,7 @@ const MAX_REVIEW_NOTE_LENGTH = 300;
 function hashPassword(password: string) { const salt = crypto.randomBytes(16).toString('hex'); return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`; }
 function verifyPassword(password: string, stored: string) { const [salt, expected] = String(stored||'').split(':'); if (!salt||!expected) return false; const actual=crypto.scryptSync(password,salt,64).toString('hex'); return crypto.timingSafeEqual(Buffer.from(actual,'hex'),Buffer.from(expected,'hex')); }
 function createSession(userId: string) { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at) VALUES (?,?,?,?)').run(token,userId,expires,now.toISOString()); return token; }
-function parseCookies(req: express.Request): Record<string,string> { const raw=String(req.headers.cookie||''); return Object.fromEntries(raw.split(';').map(v=>v.trim().split('=').map(decodeURIComponent)).filter(([k,v])=>k&&v)); }
-function sessionCookie(token: string) { const secure=process.env.NODE_ENV==='production' ? '; Secure' : ''; return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${AUTH_SESSION_DAYS*86400}; Path=/; HttpOnly; SameSite=Lax${secure}`; }
-function clearSessionCookie() { const secure=process.env.NODE_ENV==='production' ? '; Secure' : ''; return `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure}`; }
-function setSessionCookie(res: express.Response, token: string) { res.setHeader('Set-Cookie', sessionCookie(token)); }
-function authToken(req: express.Request) { const h=String(req.headers.authorization||''); return parseCookies(req)[SESSION_COOKIE] || (h.startsWith('Bearer ')?h.slice(7).trim():''); }
-function authUser(req: express.Request) { const token=authToken(req); if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,u.activation_status,u.email_verified,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
+function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
 function publicUser(row:any){return {id:row.id,email:row.email,username:row.username||undefined,name:row.name||row.display_name||'',phone:row.phone||undefined,phoneVerified:!!row.phoneVerified,activationStatus:row.activation_status||row.activationStatus||'pending'};}
 function normalizePhone(phone:string){return String(phone||'').replace(/[\s()-]/g,'');}
 function normalizeUsername(username:string){return String(username||'').trim().toLowerCase();}
@@ -242,7 +234,8 @@ async function requestPhoneOtp(phone: string): Promise<{ expires: string; provid
     throw e;
   }
 }
-async function checkPhoneOtp(phone: string, code: string): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+type OtpCheckResult = { ok: true; error?: undefined; status?: undefined } | { ok: false; error: string; status: number };
+async function checkPhoneOtp(phone: string, code: string): Promise<OtpCheckResult> {
   const otp = db.prepare('SELECT * FROM phone_otps WHERE phone=?').get(phone) as any;
   if (!otp || new Date(otp.expires_at).getTime() < Date.now()) return { ok: false, error: 'رمز التحقق منتهي أو غير موجود', status: 400 };
   if (otp.attempts >= 5) return { ok: false, error: 'تم تجاوز عدد المحاولات. اطلب رمزًا جديدًا.', status: 429 };
@@ -256,6 +249,23 @@ async function checkPhoneOtp(phone: string, code: string): Promise<{ ok: true } 
   if (!valid) return { ok: false, error: 'رمز التحقق غير صحيح', status: 400 };
   return { ok: true };
 }
+
+async function sendPasswordResetEmail(email:string, code:string){
+  const provider=String(process.env.EMAIL_PROVIDER||'').trim().toLowerCase();
+  const from=String(process.env.EMAIL_FROM||'').trim();
+  const subject='SMART TIME - رمز إعادة تعيين كلمة المرور';
+  const text=`رمز إعادة تعيين كلمة المرور في SMART TIME هو: ${code}. صالح لمدة ${PASSWORD_RESET_MINUTES} دقيقة. إذا لم تطلب ذلك، تجاهل هذه الرسالة.`;
+  if(provider==='resend'){
+    const key=String(process.env.RESEND_API_KEY||'').trim();
+    if(!key||!from) throw new Error('إعدادات البريد غير مكتملة: RESEND_API_KEY و EMAIL_FROM مطلوبان.');
+    const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[email],subject,text})});
+    if(!r.ok) throw new Error(`فشل إرسال البريد (${r.status}).`);
+    return {provider:'resend'};
+  }
+  if(String(process.env.ALLOW_DEV_EMAIL_CODE||'').toLowerCase()==='true') return {provider:'development',devCode:code};
+  throw new Error('خدمة البريد غير مكوّنة. اضبط EMAIL_PROVIDER=resend و RESEND_API_KEY و EMAIL_FROM أولاً.');
+}
+
 
 app.get('/api/trial/session', (req,res) => {
   if (!TRIAL_MODE) return res.status(404).json({ error: 'Trial mode is disabled' });
@@ -273,7 +283,7 @@ app.get('/api/trial/session', (req,res) => {
       db.prepare("UPDATE users SET activation_status='active', phone_verified=0, phone=NULL WHERE id=?").run(TRIAL_USER_ID);
     }
     const token = createSession(TRIAL_USER_ID);
-    setSessionCookie(res, token); res.json({ user: publicUser({ ...row, name: row.display_name, phoneVerified: false, activation_status: 'active' }) });
+    res.json({ token, user: publicUser({ ...row, name: row.display_name, phoneVerified: false, activation_status: 'active' }) });
   } catch (e:any) {
     res.status(500).json({ error: e.message || 'تعذر بدء النسخة التجريبية' });
   }
@@ -282,51 +292,43 @@ app.get('/api/trial/session', (req,res) => {
 app.post('/api/auth/register', async (req,res)=>{
   try{
     const name=String(req.body.name||'').trim(), username=normalizeUsername(req.body.username), email=String(req.body.email||'').trim().toLowerCase(), password=String(req.body.password||'');
+    // TEMPORARY (testing phase): phone is now optional at signup. Leaving it blank skips phone
+    // verification entirely — the account is created and usable immediately across every section.
+    // The Trips section's phone-gift screen still asks for it later, whenever the user chooses to.
+    // To make phone required again, restore the `if(phone.length<8) return res.status(400)...` check below.
+    const rawPhone=normalizePhone(req.body.phone), phone = rawPhone.length>=8 ? rawPhone : '';
+    const deviceId=String(req.body.deviceId||'').trim().slice(0,200);
     if(name.length<2)return res.status(400).json({error:'الاسم مطلوب'});
     if(!/^[a-z0-9_.-]{3,30}$/.test(username))return res.status(400).json({error:'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا، باستخدام حروف إنجليزية أو أرقام أو _ أو - أو .'});
     if(!/^\S+@\S+\.\S+$/.test(email))return res.status(400).json({error:'البريد الإلكتروني غير صحيح'});
     if(password.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});
-    const existing=db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(email) as any;
-    if(existing && existing.email_verified)return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});
-    if(db.prepare('SELECT id FROM users WHERE username=? AND email<>?').get(username,email))return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
-    const rawPhone=normalizePhone(req.body.phone), phone = rawPhone.length>=8 ? rawPhone : '';
-    if(phone && db.prepare('SELECT id FROM users WHERE phone=? AND email<>?').get(phone,email))return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر.'});
-    const now=new Date().toISOString(), id=existing?.id || `usr_${crypto.randomUUID()}`;
-    if(existing) db.prepare("UPDATE users SET username=?,password_hash=?,display_name=?,phone=?,activation_status='pending' WHERE id=?").run(username,hashPassword(password),name,phone||null,id);
-    else db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,email_verified,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,?,0)").run(id,email,username,hashPassword(password),name,now,phone||null,0,'pending',0);
-    const code=String(crypto.randomInt(100000,1000000)), expires=new Date(Date.now()+EMAIL_VERIFICATION_MINUTES*60000).toISOString();
-    db.prepare(`INSERT INTO email_verifications(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,now);
-    try { await sendEmailVerificationEmail(email,code,EMAIL_VERIFICATION_MINUTES); res.json({ok:true,requiresEmailVerification:true,expiresAt:expires}); }
-    catch(mailErr:any) { db.prepare('DELETE FROM email_verifications WHERE email=?').run(email); res.status(503).json({error:mailErr.message||'تعذر إرسال رمز تأكيد البريد.'}); }
+    if(db.prepare('SELECT id FROM users WHERE email=?').get(email))return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});
+    if(db.prepare('SELECT id FROM users WHERE username=?').get(username))return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
+    if(phone && db.prepare('SELECT id FROM users WHERE phone=?').get(phone))return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر.'});
+    const id=`usr_${crypto.randomUUID()}`, now=new Date().toISOString();
+    db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,0)").run(id,email,username,hashPassword(password),name,now,phone||null,0,'active');
+    // IMPORTANT: the account (with its email) is already committed to the users table above.
+    // A failure to send the phone-verification SMS must never delete that row again — losing the
+    // SMS provider must not mean losing the registration. We keep the account and let the user
+    // retry verification later (via the Trips phone-gift screen, which re-sends a fresh OTP).
+    let expires = new Date(Date.now()+300000).toISOString();
+    let smsSent = false;
+    let devCode: string | undefined;
+    if (phone) {
+      try { const otpResult = await requestPhoneOtp(phone); expires = otpResult.expires; devCode = otpResult.devCode; smsSent = otpResult.provider !== 'development'; }
+      catch(e:any) { /* smsSent stays false; user can retry from the Trips phone-gift screen */ }
+    }
+    const user={id,email,username,name,phone:phone||undefined,phoneVerified:false,activationStatus:'active'};
+    res.json({
+      token:createSession(id),
+      user,
+      requiresPhoneVerification: !!phone,
+      expiresAt:expires,
+      devCode,
+      smsSent,
+      smsWarning: (!smsSent && process.env.NODE_ENV==='production') ? 'تم إنشاء حسابك وتسجيل بريدك الإلكتروني بنجاح، لكن تعذر إرسال رمز SMS الآن. يمكنك إعادة طلب رمز التحقق لاحقًا من شاشة تفعيل هدية الرحلات.' : undefined,
+    });
   }catch(e:any){res.status(500).json({error:e.message||'تعذر إنشاء الحساب'});}
-});
-
-app.post('/api/auth/register/verify-email',async(req,res)=>{
-  try {
-    const email=String(req.body.email||'').trim().toLowerCase(), code=String(req.body.code||'').trim();
-    const pending=db.prepare('SELECT * FROM email_verifications WHERE email=?').get(email) as any;
-    if(!pending || new Date(pending.expires_at).getTime()<Date.now()) return res.status(400).json({error:'رمز التحقق منتهي أو غير موجود.'});
-    if(pending.attempts>=5) return res.status(429).json({error:'تم تجاوز عدد المحاولات. اطلب رمزًا جديدًا.'});
-    db.prepare('UPDATE email_verifications SET attempts=attempts+1 WHERE email=?').run(email);
-    if(otpHash(code)!==pending.code_hash) return res.status(400).json({error:'رمز التحقق غير صحيح.'});
-    const row=db.prepare('SELECT * FROM users WHERE email=?').get(email) as any;
-    if(!row) return res.status(404).json({error:'الحساب غير موجود.'});
-    db.prepare("UPDATE users SET email_verified=1,activation_status='active' WHERE email=?").run(email);
-    db.prepare('DELETE FROM email_verifications WHERE email=?').run(email);
-    const token=createSession(row.id); setSessionCookie(res,token);
-    const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(row.id) as any;
-    res.json({ok:true,user:publicUser({...refreshed,email_verified:1})});
-  } catch(e:any) { res.status(500).json({error:e.message||'تعذر تأكيد البريد الإلكتروني'}); }
-});
-
-app.post('/api/auth/register/resend-email',async(req,res)=>{
-  try {
-    const email=String(req.body.email||'').trim().toLowerCase(), row=db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(email) as any;
-    if(!row || row.email_verified) return res.json({ok:true});
-    const code=String(crypto.randomInt(100000,1000000)), expires=new Date(Date.now()+EMAIL_VERIFICATION_MINUTES*60000).toISOString();
-    db.prepare(`INSERT INTO email_verifications(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());
-    await sendEmailVerificationEmail(email,code,EMAIL_VERIFICATION_MINUTES); res.json({ok:true,expiresAt:expires});
-  } catch(e:any) { res.status(503).json({error:e.message||'تعذر إعادة إرسال رمز البريد.'}); }
 });
 
 app.post('/api/auth/register/verify-phone',async(req,res)=>{
@@ -358,14 +360,14 @@ app.post('/api/auth/trips/verify-phone',async(req,res)=>{
   try{ const user=authUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول أولاً'}); const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim(); const row=db.prepare('SELECT * FROM users WHERE id=?').get(user.id) as any; if(!row)return res.status(404).json({error:'الحساب غير موجود'}); if(row.phone_verified)return res.json({ok:true,user:publicUser({...row,phoneVerified:true}),freeSearches:Number(row.trip_free_searches||0),alreadyVerified:true}); const check=await checkPhoneOtp(phone,code); if(!check.ok)return res.status(check.status).json({error:check.error}); const taken=db.prepare('SELECT id FROM users WHERE phone=? AND id<>?').get(phone,user.id) as any; if(taken)return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر.'}); db.exec('BEGIN IMMEDIATE'); try{ const priorClaim=db.prepare('SELECT id FROM trip_gift_claims WHERE user_id<>? AND phone_hash=? LIMIT 1').get(user.id,giftSignalHash(phone)) as any; const giftEligible=!priorClaim; db.prepare('UPDATE users SET phone=?,phone_verified=1,trip_free_searches=?,trip_gift_claimed_at=? WHERE id=?').run(phone,giftEligible?TRIP_WELCOME_FREE_SEARCHES:0,giftEligible?new Date().toISOString():null,user.id); if(giftEligible)db.prepare('INSERT INTO trip_gift_claims (id,user_id,device_hash,ip_hash,phone_hash,created_at) VALUES (?,?,?,?,?,?)').run(`gift_${crypto.randomUUID()}`,user.id,req.body.deviceId?giftSignalHash(String(req.body.deviceId)):null,giftSignalHash(clientIp(req)),giftSignalHash(phone),new Date().toISOString()); db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone); db.exec('COMMIT'); const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any; res.json({ok:true,user:publicUser(refreshed),giftEligible,freeSearches:giftEligible?3:0,message:giftEligible?'تم تأكيد رقم الهاتف 🎉 حصلت على 3 أبحاث مجانية هدية ترحيبية.':'تم تأكيد الهاتف، لكن الهدية سبق استخدامها بهذا الرقم.'}); }catch(e){db.exec('ROLLBACK');throw e;} }catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد رقم الهاتف'});}
 });
 
-app.post('/api/auth/login',(req,res)=>{try{const identifier=String(req.body.identifier||req.body.email||'').trim(),normalizedEmail=identifier.toLowerCase(),normalizedUsername=normalizeUsername(identifier),password=String(req.body.password||'');let row:any=null;if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;if(!row||!verifyPassword(password,row.password_hash))return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});if(!row.email_verified)return res.status(403).json({error:'يجب تأكيد بريدك الإلكتروني أولًا.'});const user={...row,name:row.display_name,phoneVerified:row.phone_verified};const token=createSession(row.id);setSessionCookie(res,token);res.json({user:publicUser(user)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول'});}});
+app.post('/api/auth/login',(req,res)=>{try{const identifier=String(req.body.identifier||req.body.email||'').trim(),normalizedEmail=identifier.toLowerCase(),normalizedUsername=normalizeUsername(identifier),password=String(req.body.password||'');let row:any=null;if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;if(!row||!verifyPassword(password,row.password_hash))return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});const user={...row,name:row.display_name,phoneVerified:row.phone_verified};res.json({token:createSession(row.id),user:publicUser(user)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول'});}});
 app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user)});});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
 app.post('/api/auth/phone-login/request-otp',async(req,res)=>{try{const phone=normalizePhone(req.body.phone);if(phone.length<8)return res.status(400).json({error:'رقم الهاتف غير صحيح'});const row=db.prepare('SELECT id FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});try{const otpResult=await requestPhoneOtp(phone);res.json({ok:true,expiresAt:otpResult.expires,devCode:otpResult.devCode,smsProvider:otpResult.provider});}catch(err:any){return res.status(503).json({error:err.message||'تعذر إرسال SMS'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر إرسال رمز SMS'});}});
 app.post('/api/auth/phone-login',async(req,res)=>{try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({token:createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
-app.post('/api/auth/forgot-password',async(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code,PASSWORD_RESET_MINUTES);res.json({ok:true,emailSent:true,provider:info.provider});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.status(503).json({error:mailErr.message||'تعذر إرسال رسالة إعادة تعيين كلمة المرور.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
+app.post('/api/auth/forgot-password',async(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code);res.json({ok:true,emailSent:true,provider:info.provider,devCode:info.devCode});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.status(503).json({error:mailErr.message||'تعذر إرسال رسالة إعادة تعيين كلمة المرور.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
 app.post('/api/auth/reset-password',(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase(),code=String(req.body.code||'').trim(),newPassword=String(req.body.newPassword||'');if(newPassword.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});const reset=db.prepare('SELECT * FROM password_resets WHERE email=?').get(email) as any;if(!reset||new Date(reset.expires_at).getTime()<Date.now())return res.status(400).json({error:'رمز الاستعادة منتهي أو غير موجود'});if(reset.attempts>=5)return res.status(429).json({error:'تم تجاوز عدد المحاولات.'});db.prepare('UPDATE password_resets SET attempts=attempts+1 WHERE email=?').run(email);if(otpHash(code)!==reset.code_hash)return res.status(400).json({error:'رمز الاستعادة غير صحيح'});db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword),email);db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.json({ok:true});}catch(e:any){res.status(500).json({error:e.message||'تعذر تغيير كلمة المرور'});}});
-app.post('/api/auth/logout',(req,res)=>{const token=authToken(req);if(token)db.prepare('DELETE FROM sessions WHERE id=?').run(token);res.setHeader('Set-Cookie',clearSessionCookie());res.json({ok:true});});
+app.post('/api/auth/logout',(req,res)=>{const h=String(req.headers.authorization||''),token=h.startsWith('Bearer ')?h.slice(7).trim():'';if(token)db.prepare('DELETE FROM sessions WHERE id=?').run(token);res.json({ok:true});});
 app.post('/api/auth/chat/request-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول بالبريد أولاً'});const phone=normalizePhone(req.body.phone);if(phone.length<8)return res.status(400).json({error:'رقم الهاتف غير صحيح'});const taken=db.prepare('SELECT id FROM users WHERE phone=? AND id<>?').get(phone,user.id) as any;if(taken)return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر'});try{const otpResult=await requestPhoneOtp(phone);res.json({ok:true,expiresAt:otpResult.expires,devCode:otpResult.devCode,smsProvider:otpResult.provider});}catch(err:any){return res.status(503).json({error:err.message||'تعذر إرسال SMS'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر إرسال رمز التحقق'});}});
 app.post('/api/auth/chat/verify-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول غير صالحة'});const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});db.prepare('UPDATE users SET phone=?,phone_verified=1 WHERE id=?').run(phone,user.id);db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any;res.json({token:createSession(user.id),user:publicUser(refreshed)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد الرقم'});}});
 
@@ -1235,6 +1237,7 @@ app.get("/api/live/sports", async (req, res) => {
 // ----------------------------------------------------
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

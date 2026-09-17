@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound, Phone, ArrowDown, ArrowRight, LogIn, AtSign } from 'lucide-react';
-import { loginWithIdentifier, loginWithPhone, requestPhoneLoginOtp, registerWithEmail, verifyRegistrationEmail, requestTripsPhoneOtp, verifyTripsPhone, requestPasswordReset, resetPassword } from '../services/authService';
+import { loginWithIdentifier, loginWithPhone, requestPhoneLoginOtp, registerWithEmail, verifyRegistrationPhone, requestTripsPhoneOtp, verifyTripsPhone, requestPasswordReset, resetPassword } from '../services/authService';
 import approvedLoginVisual from '../assets/images/login-screen-approved.png';
 
 interface Props {
@@ -26,14 +26,15 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [phoneSent, setPhoneSent] = useState(false);
-  const [registerEmailSent, setRegisterEmailSent] = useState(false);
+  const [registerPhoneSent, setRegisterPhoneSent] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [tripPhoneSent, setTripPhoneSent] = useState(false);
+  const [registerSmsFailed, setRegisterSmsFailed] = useState(false);
   const page2Ref = useRef<HTMLElement | null>(null);
 
   const goToLogin = () => page2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const clearError = () => setError('');
-  const switchMode = (next: Mode) => { setMode(next); clearError(); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterEmailSent(false); };
+  const switchMode = (next: Mode) => { setMode(next); clearError(); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterPhoneSent(false); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setBusy(true);
@@ -54,13 +55,17 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         // TEMPORARY (testing phase): phone is optional. Leaving it blank creates the account
         // immediately with no OTP step — full app access right away. Filling it in still runs
         // the normal SMS/WhatsApp verification flow below.
-        if (!registerEmailSent) {
+        if (!registerPhoneSent) {
           const result:any = await registerWithEmail(name.trim(), username.trim(), email.trim(), password, phone.trim());
-          setRegisterEmailSent(true);
-          setError('تم إرسال رمز تأكيد إلى بريدك الإلكتروني. أدخل الرمز لإكمال إنشاء الحساب.'); setBusy(false); return;
+          if (!result?.requiresPhoneVerification) { onAuthenticated(); return; }
+          setRegisterPhoneSent(true);
+          // The account + email are already saved server-side at this point regardless of SMS outcome.
+          setRegisterSmsFailed(!result?.smsSent && !result?.devCode);
+          setError(result?.devCode ? `رمز SMS في وضع التطوير: ${result.devCode}` : result?.smsWarning ? result.smsWarning : 'تم إرسال رمز التحقق إلى هاتفك. أدخل الكود لإكمال التسجيل.'); setBusy(false); return;
         }
-        await verifyRegistrationEmail(email.trim(), code.trim());
-        setError('تم تأكيد البريد الإلكتروني وإنشاء الحساب بنجاح.'); onAuthenticated(); return;
+        const result:any = await verifyRegistrationPhone(phone.trim(), code.trim());
+        setError(result?.giftEligible === false ? 'تم تأكيد الهاتف، لكن الهدية سبق استخدامها بهذا الرقم.' : 'تم تأكيد الهاتف 🎁 وحصلت على 3 أبحاث مجانية هدية ترحيبية.');
+        onAuthenticated(); return;
       }
       if (mode === 'phone') {
         if (!phoneSent) {
@@ -77,7 +82,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
           // Only claim a real email was delivered when a real provider sent it. In dev mode
           // (no mail provider configured) the server returns the code directly — show it instead
           // of pretending an email went out, so the user is never told "sent" when nothing arrived.
-          setError(d.provider === 'development' ? 'وضع التطوير: لا يوجد مزود بريد مُفعّل. راجع سجل الخادم للحصول على الرمز.' : 'تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني. افحص الوارد والرسائل غير المرغوب فيها.');
+          setError(d.provider === 'development' ? `وضع التطوير: لا يوجد مزود بريد مُفعّل على السيرفر. رمز إعادة التعيين هو: ${d.devCode}` : 'تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني. افحص الوارد والرسائل غير المرغوب فيها.');
           setBusy(false); return;
         }
         await resetPassword(email.trim(), code.trim(), password); setMode('login'); setCode(''); setPassword(''); setResetSent(false); setError('تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'); setBusy(false); return;
@@ -90,7 +95,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     finally { setBusy(false); }
   };
 
-  const resetToLogin = () => { setMode('login'); setError(''); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterEmailSent(false); };
+  const resetToLogin = () => { setMode('login'); setError(''); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterPhoneSent(false); };
 
   return (
     <div className="h-screen overflow-y-auto snap-y snap-mandatory bg-white text-slate-950" dir="rtl">
@@ -133,7 +138,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
 
               {mode === 'login' && loginMethod === 'username' && <label className="block"><span className="text-xs font-bold text-slate-700">اسم المستخدم</span><div className="relative mt-1"><AtSign className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required value={username} onChange={e=>setUsername(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="ahmed_123" /></div></label>}
 
-              {mode === 'register' && <><label className="block"><span className="text-xs font-bold text-slate-700">رقم الهاتف (اختياري)</span><div className="relative mt-1"><Phone className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input dir="ltr" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="01XXXXXXXXX" /></div></label>{registerEmailSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز تأكيد البريد الإلكتروني</span><input required inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.4em]" placeholder="••••••" /></label>}</>}
+              {mode === 'register' && <><label className="block"><span className="text-xs font-bold text-slate-700">رقم الهاتف (اختياري الآن — وثّقه لاحقًا من قسم الرحلات)</span><div className="relative mt-1"><Phone className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input dir="ltr" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="01XXXXXXXXX (اختياري)" /></div></label>{registerPhoneSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز تأكيد الهاتف</span><input required inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.4em]" placeholder="••••••" /></label>}</>}
 
               {(mode === 'trip-phone' || mode === 'phone') && <><label className="block"><span className="text-xs font-bold text-slate-700">رقم الهاتف</span><div className="relative mt-1"><Phone className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required dir="ltr" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="01XXXXXXXXX" /></div></label>{(mode==='phone' ? phoneSent : tripPhoneSent) && <label className="block"><span className="text-xs font-bold text-slate-700">رمز SMS</span><input required inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.4em]" placeholder="••••••" /></label>}</>}
 
@@ -141,12 +146,13 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
               {mode === 'forgot' && resetSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز إعادة التعيين المرسل بالبريد</span><input required value={code} onChange={e=>setCode(e.target.value)} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.3em]" placeholder="أدخل الرمز" /></label>}
 
               {error && <div className={`rounded-xl p-3 text-xs font-bold ${error.includes('تم ') ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'}`}>{error}</div>}
-              <button disabled={busy} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black shadow-lg hover:bg-slate-800 transition disabled:opacity-50">{busy?'جارٍ التحقق…':mode==='register'?(registerEmailSent?'تأكيد البريد وإنهاء التسجيل':'إرسال رمز البريد وإنشاء الحساب'):mode==='trip-phone'?(tripPhoneSent?'تأكيد رقم الهاتف والحصول على الهدية':'إرسال رمز التحقق'):mode==='phone'?(phoneSent?'تأكيد رمز SMS والدخول':'إرسال رمز SMS'):mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'): 'دخول'}</button>
+              <button disabled={busy} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black shadow-lg hover:bg-slate-800 transition disabled:opacity-50">{busy?'جارٍ التحقق…':mode==='register'?(registerPhoneSent?'تأكيد الهاتف وإنهاء التسجيل':'إرسال رمز التحقق وإنشاء الحساب'):mode==='trip-phone'?(tripPhoneSent?'تأكيد رقم الهاتف والحصول على الهدية':'إرسال رمز التحقق'):mode==='phone'?(phoneSent?'تأكيد رمز SMS والدخول':'إرسال رمز SMS'):mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'): 'دخول'}</button>
 
               {mode === 'login' && <div className="flex items-center justify-between gap-3 text-[11px] font-bold"><button type="button" onClick={()=>switchMode('forgot')} className="text-slate-600 hover:text-slate-950">نسيت كلمة المرور؟</button><button type="button" onClick={()=>switchMode('register')} className="text-slate-600 hover:text-slate-950">إنشاء حساب جديد</button></div>}
               {mode === 'phone' && <button type="button" onClick={()=>{setMode('login');setLoginMethod('email');clearError();setCode('');setPhoneSent(false);}} className="w-full text-xs font-bold text-slate-500">العودة لاختيارات تسجيل الدخول</button>}
               {mode !== 'login' && mode !== 'trip-phone' && <button type="button" onClick={resetToLogin} className="w-full text-xs font-bold text-slate-500">العودة لتسجيل الدخول</button>}
-              {mode === 'register' && <p className="text-[10px] text-slate-500 text-center">ستحتاج إلى تأكيد البريد الإلكتروني قبل فتح الحساب.</p>}
+              {mode === 'register' && registerSmsFailed && <button type="button" onClick={onAuthenticated} className="w-full text-xs font-bold text-emerald-700">المتابعة الآن إلى التطبيق — يمكنك توثيق الهاتف لاحقًا من قسم الرحلات</button>}
+              {mode === 'register' && <p className="text-[10px] text-slate-500 text-center">بعد توثيق الهاتف تحصل على 3 أبحاث مجانية للرحلات كهدية ترحيب.</p>}
               {mode === 'forgot' && <p className="text-[10px] text-slate-500 text-center">لن يظهر نجاح الإرسال إلا بعد تأكيد السيرفر أن الرسالة خرجت من مزود البريد.</p>}
               <button type="button" onClick={onGuest} className="w-full py-3 rounded-2xl border border-slate-200 text-slate-800 font-black bg-white hover:bg-slate-50">الدخول كزائر</button>
             </form>

@@ -240,6 +240,19 @@ export interface IncomeSourceItem {
   createdAt: string;
 }
 
+export interface CarTripIncomeRecord {
+  id: string;
+  tripNumber: string | number;
+  amount: number;
+  date: string; // YYYY-MM-DD
+  dayName?: string; // e.g. "الثلاثاء"
+  time?: string; // e.g. "14:30"
+  notes?: string;
+  tripType?: string; // e.g. "أوبر", "ديدي", "إندرايف", "مشوار خاص", "كاش"
+  paymentMethod?: string; // "cash" | "wallet" | "card" | "app"
+  createdAt: string;
+}
+
 export interface MonthlyIncome {
   id: string;
   month: string; // YYYY-MM
@@ -860,3 +873,49 @@ export interface MedicalExpenseRecord {
   date: string;
   notes?: string;
 }
+
+// ---------------------------
+// 14. CARD DESIGN SYSTEM & PREFERENCES
+// ---------------------------
+export type CardStyleType =
+  | 'classic'     // كلاسيكي متوازن
+  | 'soft'        // ناعم منحني هادئ
+  | 'glass'       // زجاجي بلوري شفاف (Glassmorphism)
+  | 'floating'    // عائم ثلاثي الأبعاد بظلال عميقة
+  | 'gradient'    // تدرجات لونية عصرية مفعمة بالحيوية
+  | 'minimal'     // مينيمال بسيط ونظيف
+  | 'neon'        // نيون متوهج مستقبلي
+  | 'compact'     // مضغوط عالي الكثافة
+  | 'outline'     // حدود بارزة واضحة
+  | 'dashboard';  // لوحة تحكم ذكية تفاعلية
+
+export type CardRadius = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type CardShadow = 'none' | 'subtle' | 'medium' | 'deep' | 'glow';
+export type CardBlur = 'none' | 'low' | 'medium' | 'high';
+export type CardAnimation = 'off' | 'subtle' | 'normal' | 'dynamic';
+export type CardDensity = 'compact' | 'normal' | 'spacious';
+export type CardPresetId =
+  | 'elegant'
+  | 'darkPremium'
+  | 'glass'
+  | 'minimal'
+  | 'colorful'
+  | 'dashboard'
+  | 'neon';
+
+export interface CardPreferences {
+  style: CardStyleType;
+  radius: CardRadius;
+  shadow: CardShadow;
+  opacity: number; // 70..100
+  blur: CardBlur;
+  animation: CardAnimation;
+  density: CardDensity;
+  showBadges: boolean;
+  showGlow: boolean;
+  tilt3D: boolean;
+  activePreset?: CardPresetId;
+  hiddenCardIds?: string[];
+  cardSizes?: Record<string, 'small' | 'medium' | 'large' | 'wide'>;
+}
+

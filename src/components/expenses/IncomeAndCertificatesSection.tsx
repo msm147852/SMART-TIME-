@@ -19,7 +19,9 @@ import {
   Coins,
   Receipt,
   Layers,
+  Car,
 } from 'lucide-react';
+import { CarIncomeSection } from './CarIncomeSection';
 import {
   formatMoney,
   calculateCertificateProfits,
@@ -63,7 +65,7 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
 
   const [activeTab, setActiveTab] = useState<'menu' | 'income' | 'certificates' | 'all'>('menu');
   const [bankTab, setBankTab] = useState<'certificates' | 'current'>('certificates');
-  const [incomeMode, setIncomeMode] = useState<'job' | 'free'>('job');
+  const [incomeMode, setIncomeMode] = useState<'job' | 'free' | 'car'>('job');
   const [incomeJobTab, setIncomeJobTab] = useState<'salary' | 'bonus' | 'transfer' | 'other'>('salary');
 
   // --- 1. INCOME SOURCES STATE ---
@@ -455,105 +457,122 @@ export const IncomeAndCertificatesSection: React.FC<IncomeAndCertificatesSection
           <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-1.5">
             <button
               onClick={() => setIncomeMode('job')}
-              className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${incomeMode === 'job' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+              className={`flex-1 py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${incomeMode === 'job' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
             >{isAr ? 'الوظيفة' : 'Job'}</button>
             <button
               onClick={() => setIncomeMode('free')}
-              className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${incomeMode === 'free' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
-            >{isAr ? 'دخل حر' : 'Freelance Income'}</button>
-          </div>
-
-          {incomeMode === 'job' && (
-            <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {[
-                ['salary', 'الراتب الشهري'],
-                ['bonus', 'مكافآت'],
-                ['transfer', 'انتقالات'],
-                ['other', 'أخرى'],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setIncomeJobTab(key as typeof incomeJobTab)}
-                  className={`py-2.5 rounded-xl text-xs font-black transition-all ${incomeJobTab === key ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                >{isAr ? label : key === 'salary' ? 'Monthly Salary' : key === 'bonus' ? 'Bonuses' : key === 'transfer' ? 'Transfers' : 'Other'}</button>
-              ))}
-            </div>
-          )}
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3">
-                <div className="text-[11px] font-black text-slate-500 mb-2">{isAr ? 'الوصف' : 'Description'}</div>
-                <input
-                  type="text"
-                  value={sourceName}
-                  onChange={(e) => setSourceName(e.target.value)}
-                  placeholder={isAr ? (incomeMode === 'job' ? ({salary:'مثال: الراتب الأساسي',bonus:'مثال: مكافأة الأداء',transfer:'مثال: بدل انتقالات',other:'مثال: دخل آخر'} as Record<string,string>)[incomeJobTab] : 'مثال: عمل حر / مشروع') : 'Income description'}
-                  className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium"
-                />
-              </div>
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3">
-                <div className="text-[11px] font-black text-slate-500 mb-2">{isAr ? 'القيمة' : 'Amount'}</div>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={sourceAmount}
-                  onChange={(e) => setSourceAmount(e.target.value)}
-                  placeholder="0"
-                  className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-black text-emerald-600"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 p-3">
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'الإجمالي المحسوب تلقائياً' : 'Auto Calculated Total'}</span>
-              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatMoney(currentSources.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) + (parseFloat(sourceAmount) || 0))} {currency}</span>
-            </div>
-
+              className={`flex-1 py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${incomeMode === 'free' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+            >{isAr ? 'دخل حر' : 'Freelance'}</button>
             <button
-              type="button"
-              onClick={() => {
-                const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
-                handleSaveSource(syntheticEvent);
-              }}
-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-sm active:scale-[.99]"
+              onClick={() => setIncomeMode('car')}
+              className={`flex-1 py-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all ${incomeMode === 'car' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
             >
-              {editingSourceId ? (isAr ? 'حفظ التعديل' : 'Save Edit') : (isAr ? 'حفظ الدخل' : 'Save Income')}
+              <Car className="w-4 h-4" />
+              <span>{isAr ? 'دخل سيارة 🚗' : 'Car Income'}</span>
             </button>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">{isAr ? 'الدخل المحفوظ' : 'Saved Income'}</h2>
-                <p className="text-[11px] text-slate-400 mt-1">{formatMoney(primaryIncomeTotal)} {currency}</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => exportIncomeData('csv')} className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5" />{isAr ? 'تصدير' : 'Export'}</button>
-                <button onClick={() => exportIncomeData('print')} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" title={isAr ? 'طباعة / PDF' : 'Print / PDF'}><Printer className="w-3.5 h-3.5" /></button>
-              </div>
-            </div>
-            {currentSources.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">{isAr ? 'لم يتم حفظ أي دخل بعد.' : 'No income saved yet.'}</div>
-            ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {currentSources.map((src) => (
-                  <div key={src.id} className="p-3.5 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">{src.source}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{src.type === 'salary' ? 'الراتب الشهري' : src.type === 'bonus' ? 'مكافآت' : src.type === 'transfer' ? 'انتقالات' : 'دخل حر / أخرى'} • {src.date}</div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-black text-emerald-600">+{formatMoney(src.amount)} {currency}</span>
-                      <button onClick={() => { setEditingSourceId(src.id); setSourceName(src.source); setSourceAmount(String(src.amount)); setSourceDate(src.date); setSourceType(src.type); setSourceNotes(src.notes || ''); setIncomeMode(src.type === 'extra' ? 'free' : 'job'); setIncomeJobTab((src.type === 'salary' || src.type === 'bonus' || src.type === 'transfer' || src.type === 'other') ? src.type as typeof incomeJobTab : 'other'); }} className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDeleteSource(src.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
+          {incomeMode === 'car' ? (
+            <CarIncomeSection
+              language={language}
+              currency={currency}
+              selectedMonth={selectedMonth}
+            />
+          ) : (
+            <>
+              {incomeMode === 'job' && (
+                <div className="w-full bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    ['salary', 'الراتب الشهري'],
+                    ['bonus', 'مكافآت'],
+                    ['transfer', 'انتقالات'],
+                    ['other', 'أخرى'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setIncomeJobTab(key as typeof incomeJobTab)}
+                      className={`py-2.5 rounded-xl text-xs font-black transition-all ${incomeJobTab === key ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >{isAr ? label : key === 'salary' ? 'Monthly Salary' : key === 'bonus' ? 'Bonuses' : key === 'transfer' ? 'Transfers' : 'Other'}</button>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3">
+                    <div className="text-[11px] font-black text-slate-500 mb-2">{isAr ? 'الوصف' : 'Description'}</div>
+                    <input
+                      type="text"
+                      value={sourceName}
+                      onChange={(e) => setSourceName(e.target.value)}
+                      placeholder={isAr ? (incomeMode === 'job' ? ({salary:'مثال: الراتب الأساسي',bonus:'مثال: مكافأة الأداء',transfer:'مثال: بدل انتقالات',other:'مثال: دخل آخر'} as Record<string,string>)[incomeJobTab] : 'مثال: عمل حر / مشروع') : 'Income description'}
+                      className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-medium"
+                    />
                   </div>
-                ))}
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3">
+                    <div className="text-[11px] font-black text-slate-500 mb-2">{isAr ? 'القيمة' : 'Amount'}</div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={sourceAmount}
+                      onChange={(e) => setSourceAmount(e.target.value)}
+                      placeholder="0"
+                      className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-black text-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 p-3">
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{isAr ? 'الإجمالي المحسوب تلقائياً' : 'Auto Calculated Total'}</span>
+                  <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatMoney(currentSources.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) + (parseFloat(sourceAmount) || 0))} {currency}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                    handleSaveSource(syntheticEvent);
+                  }}
+                  className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-sm active:scale-[.99]"
+                >
+                  {editingSourceId ? (isAr ? 'حفظ التعديل' : 'Save Edit') : (isAr ? 'حفظ الدخل' : 'Save Income')}
+                </button>
               </div>
-            )}
-          </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">{isAr ? 'الدخل المحفوظ' : 'Saved Income'}</h2>
+                    <p className="text-[11px] text-slate-400 mt-1">{formatMoney(primaryIncomeTotal)} {currency}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => exportIncomeData('csv')} className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5" />{isAr ? 'تصدير' : 'Export'}</button>
+                    <button onClick={() => exportIncomeData('print')} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" title={isAr ? 'طباعة / PDF' : 'Print / PDF'}><Printer className="w-3.5 h-3.5" /></button>
+                  </div>
+                </div>
+                {currentSources.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs">{isAr ? 'لم يتم حفظ أي دخل بعد.' : 'No income saved yet.'}</div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {currentSources.map((src) => (
+                      <div key={src.id} className="p-3.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">{src.source}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{src.type === 'salary' ? 'الراتب الشهري' : src.type === 'bonus' ? 'مكافآت' : src.type === 'transfer' ? 'انتقالات' : 'دخل حر / أخرى'} • {src.date}</div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-black text-emerald-600">+{formatMoney(src.amount)} {currency}</span>
+                          <button onClick={() => { setEditingSourceId(src.id); setSourceName(src.source); setSourceAmount(String(src.amount)); setSourceDate(src.date); setSourceType(src.type); setSourceNotes(src.notes || ''); setIncomeMode(src.type === 'extra' ? 'free' : 'job'); setIncomeJobTab((src.type === 'salary' || src.type === 'bonus' || src.type === 'transfer' || src.type === 'other') ? src.type as typeof incomeJobTab : 'other'); }} className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => handleDeleteSource(src.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 

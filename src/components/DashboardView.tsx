@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, Expense, Note, Recipe, Vehicle, ChatRoom, AppView } from '../types';
 import {
   MessageSquare,
@@ -12,8 +12,36 @@ import {
   Moon,
   Star,
   GripVertical,
+  Car,
+  GraduationCap,
+  Film,
+  Wallet,
+  ArrowUpRight,
+  SlidersHorizontal,
+  LayoutGrid,
+  Layers,
+  Flame,
+  CheckCircle2,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  RotateCcw,
+  Check,
+  Move,
+  Palette,
+  Eye,
+  EyeOff,
+  Maximize2,
+  Minimize2,
+  Settings,
 } from 'lucide-react';
-import { calculateUserAge, getUserZodiac } from '../utils/liveInfoHelpers';
+import { useCardPreferences } from '../context/CardSettingsContext';
+import {
+  resolveCardContainerClasses,
+  getCardDensityClasses,
+} from '../utils/cardDesignHelper';
+import { CardCustomizerModal } from './CardCustomizerModal';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -27,67 +55,693 @@ interface DashboardViewProps {
   onOpenVoiceSearch: () => void;
 }
 
+
 interface SectionCard {
   id: AppView;
   titleAr: string;
   titleEn: string;
+  subtitleAr: string;
+  subtitleEn: string;
   icon: React.ComponentType<{ className?: string }>;
   isFavorite?: boolean;
   emoji: string;
   tone: string;
+  gradient: string;
+  darkGradient: string;
 }
 
-const DEFAULT_SECTIONS: SectionCard[] = [
-  { id: 'chat', titleAr: 'المحادثات', titleEn: 'Chat', icon: MessageSquare, emoji: '💬', tone: 'chat' },
-  { id: 'expenses', titleAr: 'المصاريف', titleEn: 'Expenses', icon: DollarSign, emoji: '💰', tone: 'expenses' },
-  { id: 'trips', titleAr: 'رحلات', titleEn: 'Trips', icon: Navigation, emoji: '🧭', tone: 'trips' },
-  { id: 'food', titleAr: 'الطعام', titleEn: 'Food', icon: Utensils, emoji: '🍽️', tone: 'food' },
-  { id: 'sports', titleAr: 'القسم الرياضي', titleEn: 'Sports', icon: Trophy, emoji: '🏆', tone: 'sports' },
-  { id: 'notes', titleAr: 'الملاحظات', titleEn: 'Notes', icon: FileText, emoji: '📝', tone: 'notes' },
-  { id: 'vault', titleAr: 'الخزانة الخاصة', titleEn: 'Secure Vault', icon: Shield, emoji: '🔐', tone: 'vault' },
-  { id: 'ai', titleAr: 'الذكاء الاصطناعي', titleEn: 'AI Center', icon: Sparkles, emoji: '✨', tone: 'ai' },
-  { id: 'religious', titleAr: 'القسم الديني', titleEn: 'Religious', icon: Moon, emoji: '🌙', tone: 'religious' },
+const ALL_SECTIONS: SectionCard[] = [
+  {
+    id: 'expenses',
+    titleAr: 'المصاريف والدخل',
+    titleEn: 'Expenses & Income',
+    subtitleAr: 'الميزانية، الدخل الحر، ودخل مشاوير السيارة',
+    subtitleEn: 'Budget, income & car trip earnings',
+    icon: DollarSign,
+    emoji: '💰',
+    tone: 'expenses',
+    gradient: 'from-emerald-500/20 via-teal-500/10 to-transparent',
+    darkGradient: 'from-emerald-950/40 via-teal-950/20 to-slate-900',
+  },
+  {
+    id: 'notes',
+    titleAr: 'الملاحظات والحسابات',
+    titleEn: 'Notes & Accounting',
+    subtitleAr: 'المفكرة الذكية، الحاسبة، ومهام اليوم',
+    subtitleEn: 'Smart notebook, calculator & tasks',
+    icon: FileText,
+    emoji: '📝',
+    tone: 'notes',
+    gradient: 'from-teal-500/20 via-cyan-500/10 to-transparent',
+    darkGradient: 'from-teal-950/40 via-cyan-950/20 to-slate-900',
+  },
+  {
+    id: 'chat',
+    titleAr: 'المحادثات المباشرة',
+    titleEn: 'Live Chat',
+    subtitleAr: 'غرف التواصل والمراسلة الفورية',
+    subtitleEn: 'Instant rooms & messaging',
+    icon: MessageSquare,
+    emoji: '💬',
+    tone: 'chat',
+    gradient: 'from-cyan-500/20 via-sky-500/10 to-transparent',
+    darkGradient: 'from-cyan-950/40 via-sky-950/20 to-slate-900',
+  },
+  {
+    id: 'trips',
+    titleAr: 'الرحلات والملاحة',
+    titleEn: 'Trips & Maps',
+    subtitleAr: 'الأماكن المفضلة، المسارات والمواقع',
+    subtitleEn: 'Saved spots, navigation & routes',
+    icon: Navigation,
+    emoji: '🧭',
+    tone: 'trips',
+    gradient: 'from-sky-500/20 via-blue-500/10 to-transparent',
+    darkGradient: 'from-sky-950/40 via-blue-950/20 to-slate-900',
+  },
+  {
+    id: 'food',
+    titleAr: 'الطعام والمشتريات',
+    titleEn: 'Food & Pantry',
+    subtitleAr: 'الوصفات الشهية، قائمة التسوق والمؤونة',
+    subtitleEn: 'Recipes, shopping list & inventory',
+    icon: Utensils,
+    emoji: '🍽️',
+    tone: 'food',
+    gradient: 'from-pink-500/20 via-rose-500/10 to-transparent',
+    darkGradient: 'from-pink-950/40 via-rose-950/20 to-slate-900',
+  },
+  {
+    id: 'ai',
+    titleAr: 'الذكاء الاصطناعي',
+    titleEn: 'AI Assistant',
+    subtitleAr: 'مساعد SMART TIME الفوري الذكي',
+    subtitleEn: 'Smart generative assistant & tools',
+    icon: Sparkles,
+    emoji: '✨',
+    tone: 'ai',
+    gradient: 'from-fuchsia-500/20 via-purple-500/10 to-transparent',
+    darkGradient: 'from-fuchsia-950/40 via-purple-950/20 to-slate-900',
+  },
+  {
+    id: 'religious',
+    titleAr: 'القسم الديني',
+    titleEn: 'Religious Hub',
+    subtitleAr: 'الأذكار اليومية، التسبيح والقرآن الكريم',
+    subtitleEn: 'Daily Athkar, tasbeeh & Quran',
+    icon: Moon,
+    emoji: '🌙',
+    tone: 'religious',
+    gradient: 'from-blue-500/20 via-indigo-500/10 to-transparent',
+    darkGradient: 'from-blue-950/40 via-indigo-950/20 to-slate-900',
+  },
+  {
+    id: 'sports',
+    titleAr: 'القسم الرياضي',
+    titleEn: 'Sports & Fitness',
+    subtitleAr: 'التمارين، اللياقة البدنية والأنشطة',
+    subtitleEn: 'Workouts, daily fitness & activities',
+    icon: Trophy,
+    emoji: '🏆',
+    tone: 'sports',
+    gradient: 'from-amber-500/20 via-orange-500/10 to-transparent',
+    darkGradient: 'from-amber-950/40 via-orange-950/20 to-slate-900',
+  },
+  {
+    id: 'vault',
+    titleAr: 'الخزانة الخاصة',
+    titleEn: 'Secure Vault',
+    subtitleAr: 'تشفير وحماية البيانات الحساسة برقم سري',
+    subtitleEn: 'Encrypted passwords & private records',
+    icon: Shield,
+    emoji: '🔐',
+    tone: 'vault',
+    gradient: 'from-slate-500/20 via-zinc-500/10 to-transparent',
+    darkGradient: 'from-slate-800/50 via-zinc-900/30 to-slate-900',
+  },
+  {
+    id: 'vehicles',
+    titleAr: 'المركبات والصيانة',
+    titleEn: 'Vehicles',
+    subtitleAr: 'سجل استهلاك الوقود ومواعيد الصيانة',
+    subtitleEn: 'Fuel consumption & maintenance logs',
+    icon: Car,
+    emoji: '🚗',
+    tone: 'vehicles',
+    gradient: 'from-indigo-500/20 via-blue-500/10 to-transparent',
+    darkGradient: 'from-indigo-950/40 via-blue-950/20 to-slate-900',
+  },
+  {
+    id: 'education',
+    titleAr: 'القسم التعليمي',
+    titleEn: 'Education',
+    subtitleAr: 'متابعة الطلاب، الدروس والمصروفات الدراسية',
+    subtitleEn: 'Students, timetable & school expenses',
+    icon: GraduationCap,
+    emoji: '🎓',
+    tone: 'education',
+    gradient: 'from-violet-500/20 via-purple-500/10 to-transparent',
+    darkGradient: 'from-violet-950/40 via-purple-950/20 to-slate-900',
+  },
+  {
+    id: 'media',
+    titleAr: 'الوسائط والملفات',
+    titleEn: 'Media Center',
+    subtitleAr: 'ألبومات الصور، المستندات والملفات',
+    subtitleEn: 'Photo albums, documents & files',
+    icon: Film,
+    emoji: '🎬',
+    tone: 'media',
+    gradient: 'from-rose-500/20 via-pink-500/10 to-transparent',
+    darkGradient: 'from-rose-950/40 via-pink-950/20 to-slate-900',
+  },
+  {
+    id: 'wallet',
+    titleAr: 'المحفظة الذكية',
+    titleEn: 'Smart Wallet',
+    subtitleAr: 'إدارة البطاقات، الرصيد والتحويلات',
+    subtitleEn: 'Cards, balance & transactions',
+    icon: Wallet,
+    emoji: '💳',
+    tone: 'wallet',
+    gradient: 'from-yellow-500/20 via-amber-500/10 to-transparent',
+    darkGradient: 'from-yellow-950/40 via-amber-950/20 to-slate-900',
+  },
 ];
+
+// 3D TACTILE INTERACTIVE CARD COMPONENT WITH 10 STYLES & REORDERING CAPABILITIES
+const Interactive3DCard: React.FC<{
+  section: SectionCard;
+  index: number;
+  totalCards: number;
+  isAr: boolean;
+  statBadge?: string;
+  isReorderMode: boolean;
+  isHidden?: boolean;
+  isWide?: boolean;
+  onClick: () => void;
+  onToggleFavorite: (e: React.MouseEvent) => void;
+  onToggleVisibility?: (e: React.MouseEvent) => void;
+  onToggleSize?: (e: React.MouseEvent) => void;
+  onMoveCard: (direction: 'prev' | 'next', e?: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  layoutMode: 'grid' | 'detailed';
+}> = ({
+  section,
+  index,
+  totalCards,
+  isAr,
+  statBadge,
+  isReorderMode,
+  isHidden = false,
+  isWide = false,
+  onClick,
+  onToggleFavorite,
+  onToggleVisibility,
+  onToggleSize,
+  onMoveCard,
+  onContextMenu,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  layoutMode,
+}) => {
+  const { preferences } = useCardPreferences();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [rotate, setRotate] = useState({ x: 0, y: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Calculate 3D tilt coordinates on mouse / pointer move
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isReorderMode || !preferences.tilt3D || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const rotateX = ((y - centerY) / centerY) * -8; // Max 8 deg tilt
+    const rotateY = ((x - centerX) / centerX) * 8;
+
+    setRotate({ x: rotateX, y: rotateY });
+    setGlare({
+      x: (x / rect.width) * 100,
+      y: (y / rect.height) * 100,
+      opacity: 0.35,
+    });
+  };
+
+  const handleMouseEnter = () => {
+    if (!isReorderMode) setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setRotate({ x: 0, y: 0 });
+    setGlare({ x: 50, y: 50, opacity: 0 });
+  };
+
+  const IconComponent = section.icon;
+  const densityClasses = getCardDensityClasses(preferences.density);
+  const cardContainerClass = resolveCardContainerClasses(preferences, section.tone, isReorderMode);
+
+  // Detailed / Wide Card Layout
+  if (layoutMode === 'detailed' || isWide) {
+    return (
+      <div
+        ref={cardRef}
+        data-card-id={section.id}
+        draggable={isReorderMode}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onClick={isReorderMode ? undefined : onClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          opacity: isHidden ? 0.45 : preferences.opacity / 100,
+          transform:
+            isHovered && !isReorderMode && preferences.tilt3D
+              ? `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) translateY(-3px) scale3d(1.012, 1.012, 1.012)`
+              : 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px) scale3d(1, 1, 1)',
+        }}
+        className={`${cardContainerClass} ${densityClasses.padding} flex items-center justify-between gap-3 sm:gap-4 cursor-pointer select-none transition-all duration-200 ${
+          isWide ? 'col-span-2' : ''
+        }`}
+      >
+        {/* Real-time Specular Glare Layer */}
+        {!isReorderMode && preferences.tilt3D && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 rounded-inherit"
+            style={{
+              background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255, 255, 255, 0.4), transparent 60%)`,
+              opacity: glare.opacity,
+            }}
+          />
+        )}
+
+        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 z-20">
+          {/* Reorder Mode Controls */}
+          {isReorderMode && (
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs">
+                {index + 1}
+              </span>
+              <div className="text-amber-500 p-1">
+                <GripVertical className="w-4 h-4" />
+              </div>
+            </div>
+          )}
+
+          {/* Icon Box */}
+          <div
+            style={{
+              transform:
+                isHovered && !isReorderMode && preferences.tilt3D
+                  ? 'translateZ(20px)'
+                  : 'translateZ(0px)',
+            }}
+            className={`dashboard-section-icon ${densityClasses.iconSize} rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-200 shadow-sm`}
+          >
+            <IconComponent className="w-5 h-5 sm:w-6 sm:h-6" />
+          </div>
+
+          <div
+            className="min-w-0"
+            style={{
+              transform:
+                isHovered && !isReorderMode && preferences.tilt3D
+                  ? 'translateZ(14px)'
+                  : 'translateZ(0px)',
+            }}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`dashboard-section-title font-black ${densityClasses.titleSize} tracking-tight`}>
+                {isAr ? section.titleAr : section.titleEn}
+              </span>
+              <span className="text-sm sm:text-base" aria-hidden="true">
+                {section.emoji}
+              </span>
+              {statBadge && preferences.showBadges && (
+                <span className={`${densityClasses.badgeSize} rounded-full font-black bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 shadow-2xs`}>
+                  {statBadge}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 font-medium">
+              {isAr ? section.subtitleAr : section.subtitleEn}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions side */}
+        <div
+          className="flex items-center gap-1.5 shrink-0 z-20"
+          style={{
+            transform:
+              isHovered && !isReorderMode && preferences.tilt3D
+                ? 'translateZ(16px)'
+                : 'translateZ(0px)',
+          }}
+        >
+          {isReorderMode ? (
+            <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-800 p-1 rounded-xl border border-amber-300 dark:border-amber-700 shadow-xs">
+              {onToggleVisibility && (
+                <button
+                  type="button"
+                  onClick={onToggleVisibility}
+                  className={`p-1.5 rounded-lg text-xs font-black transition-all ${
+                    isHidden
+                      ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                  title={isHidden ? (isAr ? 'إظهار البطاقة' : 'Show') : isAr ? 'إخفاء البطاقة' : 'Hide'}
+                >
+                  {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              )}
+
+              {onToggleSize && (
+                <button
+                  type="button"
+                  onClick={onToggleSize}
+                  className="p-1.5 rounded-lg text-xs font-black bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                  title={isWide ? (isAr ? 'حجم قياسي' : 'Standard size') : isAr ? 'حجم عريض' : 'Wide size'}
+                >
+                  {isWide ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={index === 0}
+                onClick={(e) => onMoveCard('prev', e)}
+                className={`p-1.5 rounded-lg text-xs font-black transition-all ${
+                  index === 0
+                    ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                    : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 hover:bg-amber-200 active:scale-95'
+                }`}
+                title={isAr ? 'تحريك للأعلى' : 'Move Up'}
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={index === totalCards - 1}
+                onClick={(e) => onMoveCard('next', e)}
+                className={`p-1.5 rounded-lg text-xs font-black transition-all ${
+                  index === totalCards - 1
+                    ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                    : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 hover:bg-amber-200 active:scale-95'
+                }`}
+                title={isAr ? 'تحريك للأسفل' : 'Move Down'}
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onToggleFavorite}
+                className={`p-2 rounded-xl transition-all ${
+                  section.isFavorite
+                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-500 shadow-xs'
+                    : 'bg-black/5 dark:bg-white/5 text-slate-400 hover:text-amber-500'
+                }`}
+                title={isAr ? 'المفضلة' : 'Favorite'}
+              >
+                <Star className={`w-4 h-4 ${section.isFavorite ? 'fill-amber-500 text-amber-500' : ''}`} />
+              </button>
+
+              <div className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-slate-900 transition-colors shadow-xs">
+                <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Square Grid Card Layout
+  return (
+    <div
+      ref={cardRef}
+      data-card-id={section.id}
+      draggable={isReorderMode}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onClick={isReorderMode ? undefined : onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        opacity: isHidden ? 0.45 : preferences.opacity / 100,
+        transform:
+          isHovered && !isReorderMode && preferences.tilt3D
+            ? `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) translateY(-4px) scale3d(1.02, 1.02, 1.02)`
+            : 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px) scale3d(1, 1, 1)',
+      }}
+      className={`${cardContainerClass} aspect-square ${densityClasses.padding} flex flex-col items-center justify-between text-center cursor-pointer select-none transition-all duration-200`}
+    >
+      {/* Specular Glare Reflection */}
+      {!isReorderMode && preferences.tilt3D && (
+        <div
+          className="pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 rounded-inherit"
+          style={{
+            background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255, 255, 255, 0.35), transparent 60%)`,
+            opacity: glare.opacity,
+          }}
+        />
+      )}
+
+      {/* Top micro bar: Index/Reorder or Favorite button & Drag handle */}
+      <div
+        className="w-full flex items-center justify-between z-20"
+        style={{
+          transform:
+            isHovered && !isReorderMode && preferences.tilt3D
+              ? 'translateZ(18px)'
+              : 'translateZ(0px)',
+        }}
+      >
+        {isReorderMode ? (
+          <div className="flex items-center gap-1">
+            <span className="px-1.5 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-black text-[10px] shadow-xs">
+              #{index + 1}
+            </span>
+            {onToggleVisibility && (
+              <button
+                type="button"
+                onClick={onToggleVisibility}
+                className={`p-1 rounded-md text-[10px] font-bold ${
+                  isHidden
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300'
+                    : 'bg-black/5 dark:bg-white/10 text-slate-400'
+                }`}
+                title={isHidden ? (isAr ? 'إظهار' : 'Show') : isAr ? 'إخفاء' : 'Hide'}
+              >
+                {isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggleFavorite}
+            className={`p-1 rounded-lg transition-transform active:scale-90 ${
+              section.isFavorite
+                ? 'text-amber-500 bg-amber-100/80 dark:bg-amber-950/60'
+                : 'text-slate-300 dark:text-slate-600 hover:text-amber-500'
+            }`}
+            title={isAr ? 'المفضلة' : 'Favorite'}
+          >
+            <Star className={`w-3.5 h-3.5 ${section.isFavorite ? 'fill-amber-500 text-amber-500' : ''}`} />
+          </button>
+        )}
+
+        {isReorderMode ? (
+          <div className="text-amber-500 p-0.5">
+            <GripVertical className="w-3.5 h-3.5" />
+          </div>
+        ) : statBadge && preferences.showBadges ? (
+          <span className={`${densityClasses.badgeSize} font-black rounded-md bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 shadow-2xs`}>
+            {statBadge}
+          </span>
+        ) : (
+          <div className="text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
+            <GripVertical className="w-3 h-3" />
+          </div>
+        )}
+      </div>
+
+      {/* Center 3D Floating Icon & Emoji Box */}
+      <div
+        className="flex flex-col items-center z-20 my-auto"
+        style={{
+          transform:
+            isHovered && !isReorderMode && preferences.tilt3D
+              ? 'translateZ(26px)'
+              : 'translateZ(0px)',
+        }}
+      >
+        <div className="relative mb-0.5">
+          <div className={`dashboard-section-icon ${densityClasses.iconSize} rounded-2xl flex items-center justify-center shadow-md`}>
+            <IconComponent className="w-5 h-5 sm:w-6 sm:h-6" />
+          </div>
+          <span className="absolute -bottom-1 -right-1 text-sm sm:text-base filter drop-shadow-sm select-none">
+            {section.emoji}
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom Title OR Interactive Touch Move Buttons in Reorder Mode */}
+      <div
+        className="w-full z-20"
+        style={{
+          transform:
+            isHovered && !isReorderMode && preferences.tilt3D
+              ? 'translateZ(18px)'
+              : 'translateZ(0px)',
+        }}
+      >
+        {isReorderMode ? (
+          <div className="flex items-center justify-center gap-1 bg-white/95 dark:bg-slate-800 p-0.5 rounded-lg border border-amber-300 dark:border-amber-700 shadow-xs w-full">
+            <button
+              type="button"
+              disabled={index === 0}
+              onClick={(e) => onMoveCard('prev', e)}
+              className={`flex-1 py-1 rounded-md text-[11px] font-black flex items-center justify-center transition-all ${
+                index === 0
+                  ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 hover:bg-amber-200 active:scale-95'
+              }`}
+              title={isAr ? 'تقديم للبداية' : 'Move forward'}
+            >
+              {isAr ? <ArrowRight className="w-3 h-3" /> : <ArrowLeft className="w-3 h-3" />}
+            </button>
+            <span className="text-[9px] font-black text-slate-700 dark:text-slate-300 truncate max-w-[48px]">
+              {isAr ? section.titleAr : section.titleEn}
+            </span>
+            <button
+              type="button"
+              disabled={index === totalCards - 1}
+              onClick={(e) => onMoveCard('next', e)}
+              className={`flex-1 py-1 rounded-md text-[11px] font-black flex items-center justify-center transition-all ${
+                index === totalCards - 1
+                  ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 hover:bg-amber-200 active:scale-95'
+              }`}
+              title={isAr ? 'تأخير للنهاية' : 'Move backward'}
+            >
+              {isAr ? <ArrowLeft className="w-3 h-3" /> : <ArrowRight className="w-3 h-3" />}
+            </button>
+          </div>
+        ) : (
+          <span className={`dashboard-section-title font-black ${densityClasses.titleSize} tracking-tight block truncate`}>
+            {isAr ? section.titleAr : section.titleEn}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   user,
+  expenses,
+  notes,
+  recipes,
+  vehicles,
+  chatRooms,
   onNavigate,
 }) => {
   const isAr = user.language === 'ar';
+  const { preferences, toggleCardVisibility, setCardSize } = useCardPreferences();
+
+  // Card customizer modal state
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+
+  // Layout mode: 'grid' (شبكة 3D) | 'detailed' (بطاقات تفصيلية)
+  const [layoutMode, setLayoutMode] = useState<'grid' | 'detailed'>(() => {
+    try {
+      return (localStorage.getItem('smart_time_dashboard_layout') as 'grid' | 'detailed') || 'grid';
+    } catch (e) {
+      return 'grid';
+    }
+  });
+
+  // Reorder mode toggle
+  const [isReorderMode, setIsReorderMode] = useState<boolean>(false);
+
+  // Filter category: 'all' | 'favorites'
+  const [activeFilter, setActiveFilter] = useState<'all' | 'favorites'>('all');
 
   // Load section order and favorites from localStorage
   const [sections, setSections] = useState<SectionCard[]>(() => {
     try {
-      const saved = localStorage.getItem('smart_time_dashboard_sections');
+      const saved = localStorage.getItem('smart_time_dashboard_sections_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return DEFAULT_SECTIONS.map((def) => {
-          const found = parsed.find((p: any) => p.id === def.id);
-          return found ? { ...def, isFavorite: found.isFavorite } : def;
+        const ordered: SectionCard[] = [];
+        // Map saved order
+        parsed.forEach((item: any) => {
+          const found = ALL_SECTIONS.find((s) => s.id === item.id);
+          if (found) {
+            ordered.push({ ...found, isFavorite: item.isFavorite });
+          }
         });
+        // Append any new sections that were missing
+        ALL_SECTIONS.forEach((s) => {
+          if (!ordered.some((o) => o.id === s.id)) {
+            ordered.push(s);
+          }
+        });
+        return ordered;
       }
-    } catch (e) {
-      // fallback
-    }
-    return DEFAULT_SECTIONS;
+    } catch (e) {}
+    return ALL_SECTIONS;
   });
 
   const [draggedId, setDraggedId] = useState<AppView | null>(null);
-  const [contextMenuCard, setContextMenuCard] = useState<SectionCard | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('smart_time_dashboard_layout', layoutMode);
+    } catch (e) {}
+  }, [layoutMode]);
 
   useEffect(() => {
     try {
       localStorage.setItem(
-        'smart_time_dashboard_sections',
+        'smart_time_dashboard_sections_v2',
         JSON.stringify(sections.map((s) => ({ id: s.id, isFavorite: s.isFavorite })))
       );
     } catch (e) {}
   }, [sections]);
 
   const handleCardClick = (id: AppView) => {
+    if (isReorderMode) return;
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
       try {
-        window.navigator.vibrate(15);
+        window.navigator.vibrate(12);
       } catch (e) {}
     }
     onNavigate(id);
@@ -98,7 +752,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setSections((prev) =>
       prev.map((s) => (s.id === id ? { ...s, isFavorite: !s.isFavorite } : s))
     );
-    setContextMenuCard(null);
+  };
+
+  // Move a card by index (prev or next)
+  const handleMoveCard = (id: AppView, direction: 'prev' | 'next', e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const index = sections.findIndex((s) => s.id === id);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'prev' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sections.length) return;
+
+    const newSections = [...sections];
+    const temp = newSections[index];
+    newSections[index] = newSections[targetIndex];
+    newSections[targetIndex] = temp;
+
+    setSections(newSections);
+
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      try {
+        window.navigator.vibrate(12);
+      } catch (e) {}
+    }
+  };
+
+  // Reset to default layout
+  const handleResetOrder = () => {
+    if (window.confirm(isAr ? 'هل تريد استعادة الترتيب الافتراضي للبطاقات؟' : 'Reset cards to default order?')) {
+      setSections(ALL_SECTIONS);
+      setIsReorderMode(false);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, id: AppView) => {
@@ -127,103 +811,248 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setDraggedId(null);
   };
 
+  // Helper to get real live stats badges for each card
+  const getStatBadge = (id: AppView): string | undefined => {
+    switch (id) {
+      case 'expenses':
+        return expenses.length > 0 ? `${expenses.length} سجل` : undefined;
+      case 'notes':
+        return notes.length > 0 ? `${notes.length} ملاحظة` : undefined;
+      case 'food':
+        return recipes.length > 0 ? `${recipes.length} وصفة` : undefined;
+      case 'vehicles':
+        return vehicles.length > 0 ? `${vehicles.length} مركبة` : undefined;
+      case 'chat':
+        return chatRooms.length > 0 ? `${chatRooms.length} غرف` : undefined;
+      case 'ai':
+        return 'نشط ⚡';
+      case 'vault':
+        return 'مشفر 🛡️';
+      default:
+        return undefined;
+    }
+  };
+
+  const hiddenIds = preferences.hiddenCardIds || [];
+  const cardSizes = preferences.cardSizes || {};
+
+  // Filter cards: In Reorder Mode show all cards so user can toggle visibility. In normal mode filter hidden out.
+  const visibleSections = sections.filter((s) => {
+    if (!isReorderMode && hiddenIds.includes(s.id)) return false;
+    if (activeFilter === 'favorites') return s.isFavorite;
+    return true;
+  });
+
+  const favoritesCount = sections.filter((s) => s.isFavorite).length;
+
   return (
     <div
       className="w-full min-h-full flex flex-col pb-16 select-none animate-fade-in space-y-4"
       id="android-dashboard-grid-view"
       dir={isAr ? 'rtl' : 'ltr'}
     >
-      {/* Top Greeting & Favorites Count */}
-      <div className="px-1 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            {isAr ? `مرحباً، ${user.name || 'مستخدم SMART TIME'}` : `Welcome, ${user.name || 'User'}`}
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {isAr ? 'الأقسام الرئيسية - وقتك من ذهب' : 'Main Sections - Your Time is Gold'}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-accent-500 bg-accent-500/10 px-2.5 py-1 rounded-full border border-accent-500/30">
-          <Star className="w-3.5 h-3.5 fill-accent-500 text-accent-500" />
-          <span>{sections.filter((s) => s.isFavorite).length} {isAr ? 'مفضلات' : 'Favorites'}</span>
-        </div>
-      </div>
-
-      {/* Grid of Square 3D Neumorphic Cards (2 or 3 columns) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 w-full">
-        {sections.map((section) => {
-          const IconComponent = section.icon;
-          return (
-            <div
-              key={section.id}
-              draggable
-              onDragStart={(e) => handleDragStart(e, section.id)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, section.id)}
-              onClick={() => handleCardClick(section.id)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setContextMenuCard(section);
-              }}
-              className={`dashboard-section-card dashboard-section-${section.tone} group relative aspect-square rounded-[22px] border p-3 flex flex-col items-center justify-center text-center cursor-pointer active:scale-[0.97] transition-all duration-150 transform hover:-translate-y-0.5`}
-            >
-              {section.isFavorite && (
-                <div className="absolute top-2.5 left-2.5 text-accent-500 z-10">
-                  <Star className="w-3.5 h-3.5 fill-accent-500" />
-                </div>
-              )}
-
-              <div className="absolute top-2.5 right-2.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
-                <GripVertical className="w-3.5 h-3.5" />
-              </div>
-
-              <div className="dashboard-section-emoji relative w-11 h-8 sm:w-12 sm:h-9 rounded-xl flex items-center justify-center text-2xl sm:text-[27px] leading-none mb-2" aria-hidden="true">{section.emoji}<span className="dashboard-section-mini-icon absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-current ring-2 ring-white dark:ring-slate-900" /></div>
-
-              <div className="dashboard-section-icon w-11 h-11 sm:w-12 sm:h-12 rounded-2xl border flex items-center justify-center mb-2 shadow-sm group-hover:scale-105 transition-transform">
-                <IconComponent className="w-5.5 h-5.5 sm:w-6 sm:h-6" />
-              </div>
-
-              <span className="dashboard-section-title font-bold text-xs sm:text-sm tracking-tight line-clamp-1">
-                {isAr ? section.titleAr : section.titleEn}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Context Menu Modal / Sheet for Long Press */}
-      {contextMenuCard && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" onClick={() => setContextMenuCard(null)}>
-          <div
-            className="bg-slate-900 border border-accent-500/40 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
+      {/* Top Minimal Toolbar: View switchers & Card Settings Gear at the top left */}
+      <div className="flex items-center justify-between gap-2 px-1 py-0.5">
+        {/* Quick Reorder Action */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsReorderMode(!isReorderMode)}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs ${
+              isReorderMode
+                ? 'bg-amber-500 text-slate-950 animate-pulse'
+                : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+            title={isAr ? 'تحريك وإعادة ترتيب البطاقات باللمس أو الأسهم' : 'Reorder cards'}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white">
-                {isAr ? contextMenuCard.titleAr : contextMenuCard.titleEn}
-              </h3>
-              <button onClick={() => setContextMenuCard(null)} className="text-slate-400 hover:text-white text-xs">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2">
-              <button
-                onClick={(e) => toggleFavorite(contextMenuCard.id, e)}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
-              >
-                <Star className={`w-4 h-4 ${contextMenuCard.isFavorite ? 'fill-accent-500 text-accent-500' : 'text-slate-400'}`} />
-                <span>{contextMenuCard.isFavorite ? (isAr ? 'إزالة من المفضلة' : 'Remove from Favorites') : (isAr ? 'إضافة للمفضلة' : 'Add to Favorites')}</span>
-              </button>
-            </div>
+            <Move className="w-3.5 h-3.5" />
+            <span>{isReorderMode ? (isAr ? 'إنهاء الترتيب ✓' : 'Done') : (isAr ? 'ترتيب البطاقات ⇅' : 'Reorder')}</span>
+          </button>
+
+          {isReorderMode && (
             <button
-              onClick={() => setContextMenuCard(null)}
-              className="w-full py-2 rounded-xl bg-accent-500 text-slate-950 font-bold text-xs shadow hover:bg-accent-600 transition-all"
+              type="button"
+              onClick={handleResetOrder}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-rose-50 dark:bg-rose-950/40 text-rose-600 hover:bg-rose-100 flex items-center gap-1 border border-rose-200 dark:border-rose-800 transition shadow-xs"
+              title={isAr ? 'الترتيب الافتراضي' : 'Reset default'}
             >
-              {isAr ? 'إغلاق' : 'Close'}
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>{isAr ? 'افتراضي' : 'Reset'}</span>
             </button>
+          )}
+
+          {favoritesCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveFilter(activeFilter === 'favorites' ? 'all' : 'favorites')}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 transition-all border ${
+                activeFilter === 'favorites'
+                  ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-xs'
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200/80 dark:border-slate-800 hover:text-amber-500'
+              }`}
+              title={isAr ? 'المفضلة' : 'Favorites'}
+            >
+              <Star className="w-3.5 h-3.5 fill-current" />
+              <span>{favoritesCount}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Top Left in RTL (Screen Left): View Modes & Card Settings Gear */}
+        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-1 rounded-2xl shadow-xs">
+          <button
+            type="button"
+            onClick={() => setLayoutMode('grid')}
+            className={`p-1.5 rounded-xl transition-all ${
+              layoutMode === 'grid'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            }`}
+            title={isAr ? 'عرض شبكة 3D' : 'Grid view'}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayoutMode('detailed')}
+            className={`p-1.5 rounded-xl transition-all ${
+              layoutMode === 'detailed'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            }`}
+            title={isAr ? 'عرض بطاقات تفصيلية' : 'Detailed cards'}
+          >
+            <Layers className="w-4 h-4" />
+          </button>
+          <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          {/* Gear Cog Icon for Card Customizer Studio */}
+          <button
+            type="button"
+            onClick={() => setIsCustomizerOpen(true)}
+            className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90"
+            title={isAr ? 'ضبط وتخصيص نمط وتصميم البطاقات' : 'Card Design & Settings'}
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Helper Bar when Reorder Mode is active */}
+      {isReorderMode && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-2xl flex items-center justify-between gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-2 flex-wrap">
+            <GripVertical className="w-4 h-4 text-amber-600" />
+            <span>
+              {isAr
+                ? 'اسحب أي بطاقة باللمس لتغيير موضعها، أو استخدم أزرار الأسهم، واضغط رمز العين لإظهار/إخفاء البطاقة.'
+                : 'Drag any card by touch to reposition, or use arrow buttons, and tap the eye icon to hide/show.'}
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsReorderMode(false)}
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-black text-xs shrink-0"
+          >
+            {isAr ? 'حفظ والانتهاء ✓' : 'Done'}
+          </button>
         </div>
       )}
+
+      {/* Grid or Detailed 3D Cards Render */}
+      {visibleSections.length === 0 ? (
+        <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-2">
+          <Star className="w-10 h-10 mx-auto text-amber-400" />
+          <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+            {isAr ? 'لا توجد بطاقات معروضة' : 'No cards displayed'}
+          </p>
+          <p className="text-xs text-slate-400">
+            {isAr
+              ? 'تأكد من عدم إخفاء جميع البطاقات أو إلغاء فلتر المفضلة.'
+              : 'Make sure cards are not hidden or disable the favorites filter.'}
+          </p>
+        </div>
+      ) : layoutMode === 'grid' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 w-full">
+          {visibleSections.map((section, index) => {
+            const isHidden = hiddenIds.includes(section.id);
+            const isWide = cardSizes[section.id] === 'wide';
+            return (
+              <Interactive3DCard
+                key={section.id}
+                section={section}
+                index={index}
+                totalCards={visibleSections.length}
+                isAr={isAr}
+                statBadge={getStatBadge(section.id)}
+                isReorderMode={isReorderMode}
+                isHidden={isHidden}
+                isWide={isWide}
+                onClick={() => handleCardClick(section.id)}
+                onToggleFavorite={(e) => toggleFavorite(section.id, e)}
+                onToggleVisibility={(e) => {
+                  e?.stopPropagation();
+                  toggleCardVisibility(section.id);
+                }}
+                onToggleSize={(e) => {
+                  e?.stopPropagation();
+                  setCardSize(section.id, isWide ? 'medium' : 'wide');
+                }}
+                onMoveCard={(direction, e) => handleMoveCard(section.id, direction, e)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDragStart={(e) => handleDragStart(e, section.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, section.id)}
+                layoutMode="grid"
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-2.5 w-full">
+          {visibleSections.map((section, index) => {
+            const isHidden = hiddenIds.includes(section.id);
+            return (
+              <Interactive3DCard
+                key={section.id}
+                section={section}
+                index={index}
+                totalCards={visibleSections.length}
+                isAr={isAr}
+                statBadge={getStatBadge(section.id)}
+                isReorderMode={isReorderMode}
+                isHidden={isHidden}
+                isWide={false}
+                onClick={() => handleCardClick(section.id)}
+                onToggleFavorite={(e) => toggleFavorite(section.id, e)}
+                onToggleVisibility={(e) => {
+                  e?.stopPropagation();
+                  toggleCardVisibility(section.id);
+                }}
+                onMoveCard={(direction, e) => handleMoveCard(section.id, direction, e)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDragStart={(e) => handleDragStart(e, section.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, section.id)}
+                layoutMode="detailed"
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Card Customizer Studio Modal (triggered via top gear icon) */}
+      <CardCustomizerModal
+        isOpen={isCustomizerOpen}
+        onClose={() => setIsCustomizerOpen(false)}
+        language={user.language || 'ar'}
+      />
     </div>
   );
 };
+

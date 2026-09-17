@@ -4,6 +4,7 @@ import { getStoredSession, authHeaders } from './authService';
 export interface WalletInfo {
   balance: number;
   tripCost: number;
+  freeSearches?: number;
   isOwner?: boolean;
   walletNumber?: string;
   instapayAddress?: string;
@@ -36,7 +37,7 @@ async function request(path: string, options: RequestInit = {}) {
     ...authHeaders(),
     ...(options.headers as any || {}),
   };
-  const res = await fetch(apiUrl(path), { ...options, credentials: 'include', headers });
+  const res = await fetch(apiUrl(path), { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err: any = new Error(data.error || 'حدث خطأ في خدمة المحفظة');

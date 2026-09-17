@@ -1,5 +1,5 @@
 import { ChatRoom, ChatMessage, ChatMember, SavedMessageItem } from '../types';
-import { authHeaders } from './authService';
+import { getStoredSession, authHeaders } from './authService';
 import { apiUrl, wsUrl } from './apiConfig';
 
 type ChatEventListener = (payload: any) => void;
@@ -61,8 +61,11 @@ class ChatService {
         this.isConnecting = false;
         this.emit('connection_status', { isConnected: true });
 
-        // The browser sends the HttpOnly session cookie during the WebSocket handshake.
-        this.sendWs('auth', {});
+        // Authenticate with token
+        const session = getStoredSession();
+        if (session?.token) {
+          this.sendWs('auth', { token: session.token });
+        }
 
         // Re-join active room if any
         if (this.activeRoomId) {
@@ -139,7 +142,10 @@ class ChatService {
   }
 
   authenticateSocket() {
-    this.sendWs('auth', {});
+    const session = getStoredSession();
+    if (session?.token) {
+      this.sendWs('auth', { token: session.token });
+    }
   }
 
   // API helper
@@ -150,7 +156,7 @@ class ChatService {
       ...(options.headers as any || {}),
     };
 
-    const res = await fetch(apiUrl(path), { ...options, credentials: 'include', headers });
+    const res = await fetch(apiUrl(path), { ...options, headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || 'حدث خطأ في خدمة المحادثة');

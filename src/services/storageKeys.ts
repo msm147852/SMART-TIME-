@@ -29,4 +29,6 @@ export const STORAGE_KEYS = {
   ATHKAR_ITEMS: 'smart_time_athkar_items',
   AI_CHAT_HISTORY: 'smart_time_ai_chat_history',
   NOTIFICATION_SOUND: 'smart_time_notification_sound',
+  FOOD_IMAGE_CACHE: 'smart_time_food_image_cache_v2',
+  VIRTUAL_PHOTOS_CACHE: 'smart_time_virtual_photos_cache',
 } as const;

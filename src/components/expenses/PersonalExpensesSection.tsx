@@ -10,7 +10,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const monthDiff=(a:string,b:string)=>{const x=new Date(a+'T12:00:00'),y=new Date(b+'-01T12:00:00'); return (y.getFullYear()-x.getFullYear())*12+y.getMonth()-x.getMonth();};
 const installmentForDate=(a:AssociationRecord,date:string)=>{if(!a.startDate||date<a.startDate)return 0; const n=monthDiff(a.startDate,date)+1; return Math.max(0,Math.min(a.memberCount,n));};
 const installmentDate=(start:string,offset:number)=>{const d=new Date(start+'T12:00:00'); const target=new Date(d.getFullYear(),d.getMonth()+offset,d.getDate()); return target.toISOString().slice(0,10);};
-export const PersonalExpensesSection:React.FC<Props>=({language,currency,selectedMonth,onBack,expenses,onSaveExpenses,associations=[],onSaveAssociations=()=>{}})=>{
+export const PersonalExpensesSection:React.FC<Props>=({language,currency,selectedMonth,onBack,expenses,onSaveExpenses,associations=[],onSaveAssociations=(_list:AssociationRecord[])=>{}})=>{
  const isAr=language==='ar', BackIcon=isAr?ArrowRight:ArrowLeft; const [activeTab,setActiveTab]=useState<'personal'|'associations'>('personal');
  const [q,setQ]=useState(''),[filter,setFilter]=useState('all'),[expenseModal,setExpenseModal]=useState(false),[editExpense,setEditExpense]=useState<string|null>(null);
  const [expenseType,setExpenseType]=useState('طعام ومشروبات'),[customType,setCustomType]=useState(''),[expenseAmount,setExpenseAmount]=useState(''),[expenseDate,setExpenseDate]=useState(today()),[expenseNotes,setExpenseNotes]=useState('');
