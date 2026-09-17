@@ -4,7 +4,8 @@ import { ExpensesRepository, NotesRepository } from './repositories';
 import { OfflineActionQueue } from './offlineActionQueue';
 
 export type ActionExecutionResult =
-  | { ok: true; type: 'created' | 'navigated'; id?: string; view?: SmartTimeAction extends { type: 'navigate' } ? never : never }
+  | { ok: true; type: 'created'; id?: string }
+  | { ok: true; type: 'navigated'; view: SmartTimeAction extends { type: 'navigate'; payload: infer P } ? P : never }
   | { ok: false; error: string };
 
 const makeId = (prefix: string) =>
@@ -31,7 +32,6 @@ export const AiActionExecutor = {
             createdAt: now,
           };
           ExpensesRepository.addExpense(expense);
-          OfflineActionQueue.enqueue(action);
           return { ok: true, type: 'created', id: expense.id };
         }
 
@@ -50,18 +50,17 @@ export const AiActionExecutor = {
             date: now.slice(0, 10),
           };
           NotesRepository.saveNotes([note, ...NotesRepository.getNotes()]);
-          OfflineActionQueue.enqueue(action);
           return { ok: true, type: 'created', id: note.id };
         }
 
         case 'task.create':
           // Task storage is not yet exposed through a dedicated repository.
-          // Keep the action durable until the task repository is introduced.
+          // Keep the action durable until that repository is introduced.
           OfflineActionQueue.enqueue(action);
           return { ok: true, type: 'created' };
 
         case 'navigate':
-          return { ok: true, type: 'navigated' };
+          return { ok: true, type: 'navigated', view: action.payload };
       }
     } catch (error) {
       console.error('[SMART TIME V9] AI action execution failed:', error);
