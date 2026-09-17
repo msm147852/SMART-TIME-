@@ -6,7 +6,9 @@ export * from './i18n';
 export * from './storageService';
 export * from './quranService';
 export * from './authService';
-
 export * from './notificationSoundService';
 export * from './permissionService';
 export * from './ridePriceEstimator';
+export * from './aiActionEngine';
+export * from './aiActionExecutor';
+export * from './offlineActionQueue';
