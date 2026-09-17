@@ -1,4 +1,4 @@
-import type { AppView, Expense, DailyTask, Note } from '../types';
+import type { AppView, ExpenseCategoryType } from '../types';
 
 /**
  * SMART TIME V9 — deterministic action extraction layer.
@@ -10,9 +10,12 @@ import type { AppView, Expense, DailyTask, Note } from '../types';
  * centralized.
  */
 export type SmartTimeAction =
-  | { type: 'expense.create'; payload: Pick<Expense, 'amount' | 'category' | 'description'> }
-  | { type: 'task.create'; payload: Pick<DailyTask, 'title'> }
-  | { type: 'note.create'; payload: Pick<Note, 'title' | 'content'> }
+  | {
+      type: 'expense.create';
+      payload: { amount: number; category: ExpenseCategoryType; description: string };
+    }
+  | { type: 'task.create'; payload: { title: string } }
+  | { type: 'note.create'; payload: { title: string; content: string } }
   | { type: 'navigate'; payload: { view: AppView } };
 
 export interface ActionParseResult {
@@ -41,7 +44,7 @@ export function parseSmartTimeAction(input: string): ActionParseResult {
   const text = normalize(input);
   if (!text) return { action: null, confidence: 'low', requiresConfirmation: false };
 
-  if (containsAny(text, ['المصاريف', 'المصاريف', 'المصروفات', 'فلوس', 'ميزانيه'])) {
+  if (containsAny(text, ['المصاريف', 'المصروفات', 'فلوس', 'ميزانيه'])) {
     return {
       action: { type: 'navigate', payload: { view: 'expenses' } },
       confidence: 'high',
@@ -74,14 +77,15 @@ export function parseSmartTimeAction(input: string): ActionParseResult {
     };
   }
 
-  if (containsAny(text, ['سجل', 'اضف', 'أضف', 'مصروف', 'دفعت', 'دفعت'])) {
+  if (containsAny(text, ['سجل', 'اضف', 'أضف', 'مصروف', 'دفعت'])) {
     const amount = parseAmount(text);
     if (amount !== null) {
-      let category = 'عام';
-      if (containsAny(text, ['بنزين', 'وقود', 'سولار'])) category = 'بنزين';
-      else if (containsAny(text, ['اكل', 'طعام', 'مطعم'])) category = 'طعام';
-      else if (containsAny(text, ['مواصلات', 'تاكسي', 'اوبر'])) category = 'مواصلات';
-      else if (containsAny(text, ['صيان', 'عربيه', 'سياره'])) category = 'سيارة';
+      let category: ExpenseCategoryType = 'other';
+      if (containsAny(text, ['بنزين', 'وقود', 'سولار', 'صيانه', 'عربيه', 'سياره'])) category = 'vehicle';
+      else if (containsAny(text, ['اكل', 'طعام', 'مطعم'])) category = 'food';
+      else if (containsAny(text, ['مواصلات', 'تاكسي', 'اوبر'])) category = 'transport';
+      else if (containsAny(text, ['فاتوره', 'كهرباء', 'مياه', 'غاز'])) category = 'bills';
+      else if (containsAny(text, ['شراء', 'مشتريات'])) category = 'shopping';
 
       return {
         action: {
@@ -92,7 +96,7 @@ export function parseSmartTimeAction(input: string): ActionParseResult {
             description: input.trim().slice(0, 160),
           },
         },
-        confidence: category === 'عام' ? 'medium' : 'high',
+        confidence: category === 'other' ? 'medium' : 'high',
         requiresConfirmation: true,
       };
     }
