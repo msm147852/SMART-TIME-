@@ -12,3 +12,7 @@ export * from './ridePriceEstimator';
 export * from './aiActionEngine';
 export * from './aiActionExecutor';
 export * from './offlineActionQueue';
+export * from './syncMetadata';
+export * from './indexedDbActionQueue';
+export * from './syncService';
+export * from './nativeBridge';
