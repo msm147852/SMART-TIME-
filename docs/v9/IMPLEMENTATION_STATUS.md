@@ -10,26 +10,34 @@
 - The large-screen shell removes the artificial phone frame.
 - Reduced-motion preferences are respected.
 
-These breakpoints are implementation references, not device detection. The UI is expected to react to the available application window because Android window size can change during rotation, multi-window, folding and desktop windowing.
+### AI action architecture
+- Typed parser: `src/services/aiActionEngine.ts`.
+- Repository boundary: `src/services/aiActionExecutor.ts`.
+- Reusable confirmation UI: `src/components/AiActionConfirmation.tsx`.
+- Expense, note and daily-task actions are mapped to existing repositories.
+- AI providers are kept outside the mutation boundary.
 
-### AI action layer
-`src/services/aiActionEngine.ts` converts selected natural-language commands into typed actions without writing directly to storage.
+### Offline-first foundation
+- `offlineActionQueue.ts`: dependency-free compatibility queue.
+- `indexedDbActionQueue.ts`: production-oriented IndexedDB adapter.
+- `syncMetadata.ts`: clientId/version/timestamps/sync-state contract.
+- `syncService.ts`: retryable `/api/sync/actions` client contract with online lifecycle.
 
-Supported foundation actions:
-- create expense
-- create daily task
-- create note
-- navigate to a section
+### Android foundation
+- Capacitor configuration is present.
+- `nativeBridge.ts` detects native/web runtime without forcing optional plugins into the web bundle.
 
-Actions that mutate user data require confirmation. This is intentional: the AI should propose an operation, while the application layer decides whether and how to execute it.
+## Remaining integration gates
+1. Connect `AiCenterView` input flow to parser → confirmation → executor and refresh App state.
+2. Wire the sync API route into `server.ts` with authenticated user ownership.
+3. Add PostgreSQL production persistence/sync when the Railway database is provisioned; local SQLite remains the current server database.
+4. Migrate the compatibility queue to IndexedDB as the primary adapter after browser support testing.
+5. Add Capacitor Android plugins only for capabilities actually used (notifications, biometric, filesystem/share, etc.).
+6. Run `npm run lint`, `npm run build`, `npm run android:build` and a real Android emulator/device smoke test before merging to `main`.
 
-### Offline action queue
-`src/services/offlineActionQueue.ts` provides a storage-independent queue contract for actions created while offline. The first implementation uses localStorage only as a temporary dependency-free adapter. The planned production adapter is IndexedDB.
-
-## Next implementation stage
-1. Wire `AiCenterView` to the action parser and confirmation UI.
-2. Add a single action executor that delegates to existing repositories.
-3. Add an IndexedDB adapter behind the same offline queue contract.
-4. Introduce sync metadata (`clientId`, `updatedAt`, `deletedAt`, `syncState`) without breaking existing local data.
-5. Add PostgreSQL-backed sync endpoints on Railway.
-6. Add Android native integrations through Capacitor after the web data flow is stable.
+## Safety rules for sync
+- Never trust a client-supplied user id.
+- Authenticate sync requests server-side and derive ownership from the session.
+- Use idempotent action IDs to prevent duplicate mutations.
+- Keep deletes as tombstones (`deletedAt`) until all active clients have acknowledged them.
+- Do not silently overwrite concurrent edits; return conflicts for reconciliation.
