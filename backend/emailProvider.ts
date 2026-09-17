@@ -58,9 +58,25 @@ export async function sendPasswordResetEmail(email: string, code: string, expiry
   if (provider === 'smtp' || provider === 'brevo') return sendViaSmtp(email, subject, text);
   if (provider === 'resend') return sendViaResend(email, subject, text);
   if (provider === 'development' && !isProduction() && env('ALLOW_DEV_EMAIL_CODE').toLowerCase() === 'true') {
-    return { provider: 'development', devCode: code };
+    console.info(`[EMAIL OTP][development] ${email}: ${code}`);
+    return { provider: 'development' };
   }
 
+  if (!provider) throw new Error('خدمة البريد غير مكوّنة. اضبط EMAIL_PROVIDER أو فعّل وضع التطوير محليًا.');
+  throw new Error(`مزود البريد غير مدعوم أو غير مكوّن: ${provider}.`);
+}
+
+export async function sendEmailVerificationEmail(email: string, code: string, expiryMinutes: number): Promise<EmailProviderResult> {
+  const provider = env('EMAIL_PROVIDER').toLowerCase();
+  const subject = 'SMART TIME - رمز تأكيد البريد الإلكتروني';
+  const text = `رمز تأكيد البريد الإلكتروني في SMART TIME هو: ${code}. صالح لمدة ${expiryMinutes} دقيقة. إذا لم تطلب إنشاء الحساب، تجاهل هذه الرسالة.`;
+  if (provider === 'gmail') return { ...(await sendViaSmtp(email, subject, text)), provider: 'gmail' };
+  if (provider === 'smtp' || provider === 'brevo') return sendViaSmtp(email, subject, text);
+  if (provider === 'resend') return sendViaResend(email, subject, text);
+  if (provider === 'development' && !isProduction() && env('ALLOW_DEV_EMAIL_CODE').toLowerCase() === 'true') {
+    console.info(`[EMAIL OTP][development] ${email}: ${code}`);
+    return { provider: 'development' };
+  }
   if (!provider) throw new Error('خدمة البريد غير مكوّنة. اضبط EMAIL_PROVIDER أو فعّل وضع التطوير محليًا.');
   throw new Error(`مزود البريد غير مدعوم أو غير مكوّن: ${provider}.`);
 }

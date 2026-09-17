@@ -36,7 +36,7 @@ async function request(path: string, options: RequestInit = {}) {
     ...authHeaders(),
     ...(options.headers as any || {}),
   };
-  const res = await fetch(apiUrl(path), { ...options, headers });
+  const res = await fetch(apiUrl(path), { ...options, credentials: 'include', headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err: any = new Error(data.error || 'حدث خطأ في خدمة المحفظة');

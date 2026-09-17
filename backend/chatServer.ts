@@ -94,6 +94,12 @@ export function getAuthUserFromToken(token: string) {
   }
 }
 
+function getCookie(req: http.IncomingMessage, name: string): string {
+  const raw=String(req.headers.cookie||'');
+  const item=raw.split(';').map(v=>v.trim()).find(v=>v.startsWith(`${name}=`));
+  return item ? decodeURIComponent(item.slice(name.length+1)) : '';
+}
+
 // Verify conversation membership or public access
 export function verifyConversationAccess(userId: string, roomId: string): { allowed: boolean; role?: string; isPublic?: boolean } {
   try {
@@ -137,13 +143,24 @@ export function setupChatWebSocket(httpServer: http.Server) {
       ws.isAlive = true;
     });
 
+    const cookieUser = getAuthUserFromToken(getCookie(req, 'smart_time_session'));
+    if (cookieUser) {
+      ws.userId = cookieUser.id;
+      ws.userName = cookieUser.name;
+      ws.userAvatar = cookieUser.avatar;
+      if (!userConnections.has(cookieUser.id)) userConnections.set(cookieUser.id, new Set());
+      userConnections.get(cookieUser.id)!.add(ws);
+      onlineUserIds.add(cookieUser.id);
+      ws.send(JSON.stringify({ type: 'auth_success', payload: { userId: cookieUser.id, onlineUsers: getOnlineUsers() } }));
+    }
+
     ws.on('message', (raw) => {
       try {
         const data = JSON.parse(raw.toString());
         const { type, payload } = data;
 
         if (type === 'auth') {
-          const user = getAuthUserFromToken(payload?.token);
+          const user = getAuthUserFromToken(payload?.token) || cookieUser;
           if (user) {
             ws.userId = user.id;
             ws.userName = user.name;
@@ -172,7 +189,7 @@ export function setupChatWebSocket(httpServer: http.Server) {
 
         if (type === 'join_room') {
           const { roomId } = payload || {};
-          if (roomId) {
+          if (roomId && ws.userId && verifyConversationAccess(ws.userId, roomId).allowed) {
             if (!roomSubscriptions.has(roomId)) {
               roomSubscriptions.set(roomId, new Set());
             }
