@@ -896,6 +896,8 @@ export type CardShadow = 'none' | 'subtle' | 'medium' | 'deep' | 'glow';
 export type CardBlur = 'none' | 'low' | 'medium' | 'high';
 export type CardAnimation = 'off' | 'subtle' | 'normal' | 'dynamic';
 export type CardDensity = 'compact' | 'normal' | 'spacious';
+export type CardIconSize = 'small' | 'medium' | 'large';
+export type CardBackgroundTheme = 'default' | 'sky' | 'mint' | 'lavender' | 'peach' | 'candy';
 export type CardPresetId =
   | 'elegant'
   | 'darkPremium'
@@ -916,6 +918,8 @@ export interface CardPreferences {
   showBadges: boolean;
   showGlow: boolean;
   tilt3D: boolean;
+  iconSize?: CardIconSize;
+  backgroundTheme?: CardBackgroundTheme;
   activePreset?: CardPresetId;
   hiddenCardIds?: string[];
   cardSizes?: Record<string, 'small' | 'medium' | 'large' | 'wide'>;
