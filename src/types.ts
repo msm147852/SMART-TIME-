@@ -13,7 +13,6 @@ export type AppView =
   | 'trips'
   | 'vehicles'
   | 'education'
-  | 'food'
   | 'religious'
   | 'vault'
   | 'ai'
@@ -90,12 +89,6 @@ export interface ReligiousDetails {
   athkarReminderEnabled?: boolean;
 }
 
-export interface FoodPreferences {
-  dietType?: 'balanced' | 'keto' | 'vegetarian' | 'lowCalorie';
-  favoriteDish?: string;
-  autoAddToShoppingList?: boolean;
-}
-
 export interface EducationPreferences {
   defaultGradeLevel?: string;
   homeworkAlerts?: boolean;
@@ -128,7 +121,6 @@ export interface UserProfile {
   vehiclePreferences?: VehiclePreferences;
   budgetPreferences?: BudgetPreferences;
   religiousDetails?: ReligiousDetails;
-  foodPreferences?: FoodPreferences;
   educationPreferences?: EducationPreferences;
 }
 
@@ -392,72 +384,6 @@ export interface EducationExpense {
   category: 'tuition' | 'lessons' | 'books' | 'supplies' | 'transport' | 'private_tutor' | 'activities';
   date: string;
   notes?: string;
-}
-
-// ---------------------------
-// 5. FOOD & SHOPPING
-// ---------------------------
-export type RecipeCategory =
-  | 'normal'
-  | 'keto'
-  | 'tayyibat'
-  | 'sports'
-  | 'weight_loss'
-  | 'family'
-  | 'fast'
-  | 'desserts'
-  | 'favorites'
-  | string;
-
-export type DietCategory = RecipeCategory;
-
-export interface RecipeIngredient {
-  name: string;
-  amount: string;
-  unit: string;
-}
-
-export type FoodMainSection = 'eastern' | 'eastern_desserts' | 'diet';
-export type FoodSubcategory = 'starches' | 'pastries' | 'desserts';
-export type DietSystem = 'keto' | 'tayyibat' | 'common';
-export type FoodCompatibility = 'allowed' | 'not_allowed' | 'needs_review';
-
-export interface Recipe {
-  id: string;
-  title: string;
-  category: RecipeCategory;
-  image: string;
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  ingredients: RecipeIngredient[];
-  steps: string[];
-  isFavorite: boolean;
-  mainSection?: FoodMainSection;
-  subcategory?: FoodSubcategory;
-  dietSystems?: DietSystem[];
-  compatibility?: Partial<Record<DietSystem, FoodCompatibility>>;
-  source?: string;
-  sourceAuthor?: string;
-  sourcePage?: string;
-  sourceUrl?: string;
-  tags?: string[];
-  notes?: string;
-  servings?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
-}
-
-export interface ShoppingItem {
-  id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  isCompleted: boolean;
-  category: string;
-  addedFromRecipeId?: string;
 }
 
 // ---------------------------
@@ -896,6 +822,8 @@ export type CardShadow = 'none' | 'subtle' | 'medium' | 'deep' | 'glow';
 export type CardBlur = 'none' | 'low' | 'medium' | 'high';
 export type CardAnimation = 'off' | 'subtle' | 'normal' | 'dynamic';
 export type CardDensity = 'compact' | 'normal' | 'spacious';
+export type CardIconSize = 'small' | 'medium' | 'large';
+export type CardBackgroundTheme = 'default' | 'sky' | 'mint' | 'lavender' | 'peach' | 'candy';
 export type CardPresetId =
   | 'elegant'
   | 'darkPremium'
@@ -916,6 +844,8 @@ export interface CardPreferences {
   showBadges: boolean;
   showGlow: boolean;
   tilt3D: boolean;
+  iconSize?: CardIconSize;
+  backgroundTheme?: CardBackgroundTheme;
   activePreset?: CardPresetId;
   hiddenCardIds?: string[];
   cardSizes?: Record<string, 'small' | 'medium' | 'large' | 'wide'>;

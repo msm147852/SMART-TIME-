@@ -6,12 +6,11 @@ import {
   DollarSign,
   Car,
   GraduationCap,
-  UtensilsCrossed,
   ShieldCheck,
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
-import { Note, ExpenseItem, Vehicle, LessonItem, Recipe, Language, AppView } from '../types';
+import { Note, ExpenseItem, Vehicle, LessonItem, Language, AppView } from '../types';
 import { translations } from '../services/i18n';
 
 interface GlobalSearchModalProps {
@@ -22,7 +21,6 @@ interface GlobalSearchModalProps {
   expenses: ExpenseItem[];
   vehicles: Vehicle[];
   lessons: LessonItem[];
-  recipes: Recipe[];
   onNavigate: (view: AppView) => void;
 }
 
@@ -34,7 +32,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   expenses,
   vehicles,
   lessons,
-  recipes,
   onNavigate,
 }) => {
   const t = translations[language];
@@ -59,7 +56,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   const matchingExpenses = expenses.filter((e) => e.title.toLowerCase().includes(q) || e.notes?.toLowerCase().includes(q));
   const matchingVehicles = vehicles.filter((v) => v.name.toLowerCase().includes(q) || v.model.toLowerCase().includes(q));
   const matchingLessons = lessons.filter((l) => l.subject.toLowerCase().includes(q) || l.tutorName?.toLowerCase().includes(q));
-  const matchingRecipes = recipes.filter((r) => r.title.toLowerCase().includes(q) || r.category.toLowerCase().includes(q));
 
   const totalResults =
     q === ''
@@ -68,7 +64,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         matchingExpenses.length +
         matchingVehicles.length +
         matchingLessons.length +
-        matchingRecipes.length;
+        0;
 
   const handleSelectResult = (view: AppView) => {
     onNavigate(view);
@@ -87,8 +83,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={
               language === 'ar'
-                ? 'ابحث في كل شيء: ملاحظات، مصاريف، سيارات، دروس، وصفات...'
-                : 'Search everything: notes, expenses, cars, lessons, recipes...'
+                ? 'ابحث في كل شيء: ملاحظات، مصاريف، سيارات، ودروس...'
+                : 'Search everything: notes, expenses, cars, and lessons...'
             }
             className="w-full ps-12 pe-10 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500"
             autoFocus
@@ -151,26 +147,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     >
                       <span className="font-bold text-slate-900 dark:text-white">{exp.title}</span>
                       <span className="font-bold font-mono-num text-rose-500">{exp.amount}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Recipes */}
-              {matchingRecipes.length > 0 && (
-                <div className="space-y-1.5 pt-2">
-                  <div className="text-[11px] font-bold text-slate-400 px-2 flex items-center gap-1.5">
-                    <UtensilsCrossed className="w-3.5 h-3.5 text-orange-500" />
-                    <span>{language === 'ar' ? 'الوصفات والطبخ' : 'Recipes'}</span>
-                  </div>
-                  {matchingRecipes.map((r) => (
-                    <div
-                      key={r.id}
-                      onClick={() => handleSelectResult('food')}
-                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 hover:bg-orange-50 dark:hover:bg-orange-950/40 border border-slate-100 dark:border-slate-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
-                    >
-                      <span className="font-bold text-slate-900 dark:text-white">{r.title}</span>
-                      <span className="text-[11px] text-orange-500 font-bold">{r.calories} سعرة</span>
                     </div>
                   ))}
                 </div>

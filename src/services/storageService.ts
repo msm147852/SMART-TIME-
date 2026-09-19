@@ -12,8 +12,6 @@ import {
   Student,
   LessonItem,
   EducationExpense,
-  Recipe,
-  ShoppingItem,
   FavoritePlace,
   RecentTrip,
   SecureRecord,
@@ -31,7 +29,6 @@ import {
   ExpensesRepository,
   VehiclesRepository,
   EducationRepository,
-  FoodRepository,
   ReligiousRepository,
   VaultRepository,
   TripsRepository,
@@ -140,20 +137,6 @@ export class StorageService {
   }
   static saveEducationExpenses(expenses: EducationExpense[]): void {
     EducationRepository.saveEducationExpenses(expenses);
-  }
-
-  // Food & Shopping
-  static getRecipes(): Recipe[] {
-    return FoodRepository.getRecipes();
-  }
-  static saveRecipes(recipes: Recipe[]): void {
-    FoodRepository.saveRecipes(recipes);
-  }
-  static getShoppingList(): ShoppingItem[] {
-    return FoodRepository.getShoppingList();
-  }
-  static saveShoppingList(items: ShoppingItem[]): void {
-    FoodRepository.saveShoppingList(items);
   }
 
   // Trips & Places

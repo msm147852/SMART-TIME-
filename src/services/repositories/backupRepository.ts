@@ -5,7 +5,6 @@ import { NotesRepository } from './notesRepository';
 import { ExpensesRepository } from './expensesRepository';
 import { VehiclesRepository } from './vehiclesRepository';
 import { EducationRepository } from './educationRepository';
-import { FoodRepository } from './foodRepository';
 import { TripsRepository } from './tripsRepository';
 import { VaultRepository } from './vaultRepository';
 import { ChatRepository } from './chatRepository';
@@ -35,8 +34,6 @@ export class BackupRepository {
         students: EducationRepository.getStudents(),
         lessons: EducationRepository.getLessons(),
         educationExpenses: EducationRepository.getEducationExpenses(),
-        recipes: FoodRepository.getRecipes(),
-        shoppingList: FoodRepository.getShoppingList(),
         favoritePlaces: TripsRepository.getFavoritePlaces(),
         recentTrips: TripsRepository.getRecentTrips(),
         secureRecords: VaultRepository.getRecords(),
@@ -73,8 +70,6 @@ export class BackupRepository {
       if (d.students) EducationRepository.saveStudents(d.students);
       if (d.lessons) EducationRepository.saveLessons(d.lessons);
       if (d.educationExpenses) EducationRepository.saveEducationExpenses(d.educationExpenses);
-      if (d.recipes) FoodRepository.saveRecipes(d.recipes);
-      if (d.shoppingList) FoodRepository.saveShoppingList(d.shoppingList);
       if (d.favoritePlaces) TripsRepository.saveFavoritePlaces(d.favoritePlaces);
       if (d.recentTrips) TripsRepository.saveRecentTrips(d.recentTrips);
       if (d.secureRecords) VaultRepository.saveRecords(d.secureRecords);

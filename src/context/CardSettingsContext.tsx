@@ -46,6 +46,8 @@ export const CardSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ...found.preferences,
         hiddenCardIds: prev.hiddenCardIds,
         cardSizes: prev.cardSizes,
+        iconSize: prev.iconSize,
+        backgroundTheme: prev.backgroundTheme,
       }));
     }
   };

@@ -1,7 +1,9 @@
 import express from "express";
 import http from "node:http";
 import path from "path";
-import { GoogleGenAI } from "@google/genai";
+import { createRequire } from "node:module";
+const require = createRequire(path.resolve(process.cwd(), "server.ts"));
+const { GoogleGenAI } = require("@google/genai") as { GoogleGenAI: new (options: { apiKey: string }) => any };
 import dotenv from "dotenv";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
@@ -13,8 +15,8 @@ import { estimateProviderPrice, type RideProvider, type RideCategory } from "./s
 
 dotenv.config();
 
-let geminiClient: GoogleGenAI | null = null;
-function getGemini(): GoogleGenAI {
+let geminiClient: any | null = null;
+function getGemini(): any {
   if (!geminiClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -28,6 +30,26 @@ function getGemini(): GoogleGenAI {
 const app = express();
 app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT || 3000);
+
+// CORS for the Vercel-hosted frontend talking to the Railway API.
+// Keep credentials disabled; SMART TIME auth uses bearer tokens explicitly.
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || "");
+  const allowed =
+    !origin ||
+    /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin) ||
+    /^https?:\/\/localhost(?::\\d+)?$/i.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(?::\\d+)?$/i.test(origin);
+
+  if (allowed && origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 seedServiceStatuses();
 seedDefaultChatRooms();
 app.use(express.json({ limit: "50mb" }));
@@ -37,65 +59,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use("/api/chat", chatRouter);
 
 
-// ----------------------------------------------------
-// AI-generated food images
-// Each dish gets a dedicated image based on its exact Arabic name/category.
-// Images are generated server-side so GEMINI_API_KEY never reaches the browser.
-// ----------------------------------------------------
-const foodImageCache = new Map<string, Buffer>();
 
-function foodImagePrompt(title: string, category: string, group: string) {
-  const t = `${title} ${category} ${group}`.toLowerCase();
-  const drink = /مشروب|عصير|شاي|قهوة|كركديه|سحلب|ليمون|تمر هندي|كوكتيل|سوبيا|drink|juice|tea|coffee/.test(t);
-  const dessert = /حلويات|حلو|كنافة|بسبوسة|كيك|كيكة|أم علي|بتي فور|dessert|cake|kunafa/.test(t);
-  const promptType = drink ? 'Egyptian beverage photography' : dessert ? 'Egyptian dessert photography' : 'Egyptian food photography';
-  return `Create one highly realistic ${promptType} image for a recipe app.\n` +
-    `The exact dish is: "${title}". Category: "${category}". Group: "${group}".\n` +
-    `Show ONLY the actual dish or beverage named above, prepared in authentic Egyptian style. ` +
-    `Make the ingredients, color, texture and serving vessel match the dish. ` +
-    `For drinks, show the exact beverage in a clear or appropriate Egyptian serving glass/cup; do not substitute food. ` +
-    `For desserts, show the exact named dessert; do not substitute cake or another sweet. ` +
-    `For savory food, show the exact named recipe; do not use a generic mixed dish. ` +
-    `Natural appetizing restaurant-quality daylight, clean light background, close three-quarter food photograph, ` +
-    `no people, no hands, no logos, no text, no labels, no collage, no multiple dishes, no watermark. ` +
-    `Square composition suitable for a recipe card.`;
-}
-
-app.get('/api/food/generated-image', async (req, res) => {
-  try {
-    const title = String(req.query.title || '').trim();
-    const category = String(req.query.category || '').trim();
-    const group = String(req.query.group || '').trim();
-    if (!title) return res.status(400).json({ error: 'Food title is required' });
-
-    const cacheKey = `${title}|${category}|${group}`.toLowerCase();
-    const cached = foodImageCache.get(cacheKey);
-    if (cached) {
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.type('png').send(cached);
-    }
-
-    const gemini = getGemini();
-    const response = await gemini.models.generateContent({
-      model: 'gemini-3.1-flash-image',
-      contents: foodImagePrompt(title, category, group),
-      config: { responseModalities: ['IMAGE'] } as any,
-    });
-
-    const parts = (response as any).parts || response.candidates?.[0]?.content?.parts;
-    const imagePart = parts?.find((part: any) => part.inlineData?.data);
-    const base64 = imagePart?.inlineData?.data;
-    if (!base64) return res.status(502).json({ error: 'Image generation returned no image' });
-
-    const buffer = Buffer.from(base64, 'base64');
-    foodImageCache.set(cacheKey, buffer);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.type(imagePart?.inlineData?.mimeType || 'png').send(buffer);
-  } catch (err: any) {
-    console.error('[FOOD IMAGE]', err?.message || err);
-    return res.status(503).json({ error: 'Unable to generate food image' });
-  }
-});
 
 const TRIAL_MODE = String(process.env.TRIAL_MODE || 'true').trim().toLowerCase() !== 'false';
 const TRIAL_USER_ID = 'smart-time-trial-user';
@@ -404,74 +368,143 @@ app.get("/api/database/health", (_req, res) => {
 });
 
 // ----------------------------------------------------
-// 2. AI Center - Real Server-Side Gemini Chat
+// 2. AI Center - SMART AI (Gemini)
 // ----------------------------------------------------
+const SMART_AI_DEFAULT_MODEL = String(process.env.GEMINI_MODEL || "gemini-3.8-flash").trim();
+
+function smartAiSystemPrompt(language: string) {
+  return language === "en"
+    ? `You are SMART AI, the unified assistant inside the SMART TIME app.
+Analyze only the APP_CONTEXT_JSON supplied by the client. Never invent missing user data.
+You may propose ONE write action when the user's request is explicit and all required values are present.
+Allowed actions: add_expense, add_education_expense, add_fuel_record, add_daily_task.
+Never access, request, expose, or summarize passwords, PINs, authentication tokens, API keys, secure-vault secrets, or raw private files.
+The Food section has been removed from SMART TIME. Do not suggest or create food-module records. Expense category "food" remains valid as an ordinary expense classification.
+For education expenses, match the exact studentId from the provided students list whenever possible.
+For fuel records, match the exact vehicleId from the provided vehicles list whenever possible.
+If a write request is ambiguous or missing a required value/identifier, set action to null and needsClarification=true and state what is missing.
+For analytical questions, calculate from the provided context and return action=null.
+Return strict JSON only with keys: reply, action, actionSummary, requiresConfirmation, needsClarification, model, provider.
+`
+    : `أنت SMART AI، المساعد الموحد داخل تطبيق SMART TIME.
+حلل فقط بيانات التطبيق الموجودة في APP_CONTEXT_JSON المرسل مع الطلب، ولا تخترع بيانات غير موجودة.
+يمكنك اقتراح إجراء كتابة واحد فقط عندما يكون طلب المستخدم واضحًا وكل القيم الأساسية موجودة.
+الإجراءات المسموحة: add_expense, add_education_expense, add_fuel_record, add_daily_task.
+ممنوع طلب أو كشف كلمات المرور أو PIN أو رموز التوثيق أو مفاتيح API أو أسرار الخزنة الآمنة أو الملفات الخاصة الخام.
+قسم الطعام تم حذفه من SMART TIME؛ لا تقترح أو تنشئ سجلات لوحدة الطعام. تصنيف المصروف "food" يظل مسموحًا كمجرد تصنيف للمصروف العادي.
+في مصروف التعليم استخدم studentId المطابق من قائمة الطلاب قدر الإمكان.
+في التموين استخدم vehicleId المطابق من قائمة السيارات قدر الإمكان.
+إذا كان طلب الكتابة غير واضح أو ينقصه مبلغ/قيمة/معرّف أساسي، اجعل action=null وneedsClarification=true واشرح المطلوب تحديدًا.
+في الأسئلة التحليلية احسب من البيانات المرسلة وأعد action=null.
+أعد JSON صارمًا فقط بالمفاتيح: reply, action, actionSummary, requiresConfirmation, needsClarification, model, provider.
+`;
+}
+
+function parseSmartAiJson(text: string): any {
+  const cleaned = String(text || "")
+    .trim()
+    .replace(/^\`\`\`json\s*/i, "")
+    .replace(/^\`\`\`\s*/i, "")
+    .replace(/\s*\`\`\`$/, "");
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
+
 const handleAiChat = async (req: express.Request, res: express.Response) => {
   try {
-    const { message, prompt, modelProvider = "gemini", model, conversationHistory = [], history = [], systemPrompt } = req.body;
-    const userPrompt = message || prompt;
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول لاستخدام SMART AI." });
 
-    if (!userPrompt || typeof userPrompt !== "string") {
-      return res.status(400).json({ error: "Message is required" });
+    const userPrompt = String(req.body?.message || req.body?.prompt || "").trim();
+    const language = String(req.body?.language || "ar") === "en" ? "en" : "ar";
+    const requestedModel = String(req.body?.model || req.body?.modelProvider || SMART_AI_DEFAULT_MODEL).trim();
+    const model = requestedModel.startsWith("gemini-") ? requestedModel : SMART_AI_DEFAULT_MODEL;
+    const conversationHistory = Array.isArray(req.body?.conversationHistory)
+      ? req.body.conversationHistory.slice(-8)
+      : [];
+    const appContext = req.body?.appContext;
+
+    if (!userPrompt) return res.status(400).json({ error: "Message is required" });
+    if (!appContext || typeof appContext !== "object") {
+      return res.status(400).json({ error: "بيانات سياق SMART TIME مطلوبة." });
     }
 
-    const activeProvider = modelProvider || model || "gemini";
-
-    // Default system instruction in Arabic & English
-    const baseSystemPrompt =
-      systemPrompt ||
-      `أنت المساعد الذكي لتطبيق "Smart Time — وقتك من ذهب" (Your Time. Your Gold). 
-أنت تجيب بلغة المستخدم (عربية أو إنجليزية) بأسلوب احترافي، موجز، ودقيق. 
-تساعد المستخدم في تنظيم وقته، حساباته ومصروفاته، سياراته، دراسة أبنائه، وصفات طعامه، رحلاته، واستفساراته اليومية.
-إذا كان النموذج المحدد هو ${activeProvider}، قم بمحاكاته بأسلوبه المميز مع الحفاظ على الكفاءة العالية.`;
+    const prompt = [
+      smartAiSystemPrompt(language),
+      "",
+      "APP_CONTEXT_JSON:",
+      JSON.stringify(appContext),
+      "",
+      "CONVERSATION_HISTORY_JSON:",
+      JSON.stringify(conversationHistory),
+      "",
+      "USER_REQUEST:",
+      userPrompt,
+      "",
+      "OUTPUT_REQUIREMENTS:",
+      "- action must be null or exactly one allowed action object.",
+      "- requiresConfirmation must be true only when action is present.",
+      "- Do not claim that a write action has already been executed.",
+      "- Never fabricate a studentId or vehicleId when a matching record is not present in the context.",
+    ].join("\n");
 
     try {
       const ai = getGemini();
-      
-      // Build contents array with context
-      const chatHistory = conversationHistory.length > 0 ? conversationHistory : history;
-      const formattedHistory = chatHistory.slice(-6).map((msg: any) => {
-        const role = msg.sender === "user" || msg.role === "user" ? "user" : "model";
-        const text = msg.text || (msg.parts && msg.parts[0]?.text) || "";
-        return {
-          role,
-          parts: [{ text }],
-        };
-      });
-
-      const contents = [
-        ...formattedHistory,
-        { role: "user", parts: [{ text: userPrompt }] },
-      ];
-
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: contents,
+        model,
+        contents: prompt,
         config: {
-          systemInstruction: baseSystemPrompt,
-          temperature: 0.7,
-        },
+          responseMimeType: "application/json",
+          temperature: 0.2,
+        } as any,
       });
 
-      const responseText = response.text || "عذرًا، لم أتمكن من معالجة الطلب في الوقت الحالي.";
+      const rawText = String(response?.text || "").trim();
+      const parsed = parseSmartAiJson(rawText);
+
+      if (!parsed) {
+        return res.json({
+          reply: rawText || (language === "ar" ? "تعذر الحصول على رد واضح من Gemini." : "Gemini returned no usable response."),
+          action: null,
+          requiresConfirmation: false,
+          needsClarification: false,
+          model,
+          provider: "gemini",
+        });
+      }
+
+      const allowedActions = new Set([
+        "add_expense",
+        "add_education_expense",
+        "add_fuel_record",
+        "add_daily_task",
+      ]);
+      const action = parsed.action && allowedActions.has(parsed.action.type) ? parsed.action : null;
+
       return res.json({
-        reply: responseText,
-        provider: activeProvider,
-        timestamp: new Date().toISOString(),
+        reply: String(parsed.reply || ""),
+        action,
+        actionSummary: action ? String(parsed.actionSummary || "") : "",
+        requiresConfirmation: !!(action && parsed.requiresConfirmation),
+        needsClarification: !!parsed.needsClarification,
+        model,
+        provider: "gemini",
       });
     } catch (aiErr: any) {
-      console.warn("Gemini call fallback:", aiErr?.message);
-      // Fallback response for offline or unconfigured API keys
-      return res.json({
-        reply: `[${activeProvider.toUpperCase()}] تم استلام استفسارك: "${userPrompt}". النظام يعمل في وضع Offline المدمج بنجاح. يمكنك استعراض كافة أقسام التطبيق وتخزين بياناتك محليًا بأمان.`,
-        provider: activeProvider,
-        offlineMode: true,
-        timestamp: new Date().toISOString(),
+      console.warn("Gemini SMART AI error:", aiErr?.message || aiErr);
+      return res.status(503).json({
+        error:
+          process.env.NODE_ENV === "production"
+            ? "خدمة SMART AI غير متاحة الآن. تأكد من إعداد GEMINI_API_KEY."
+            : "تعذر تشغيل Gemini محليًا. تأكد من إعداد GEMINI_API_KEY.",
       });
     }
   } catch (error: any) {
     console.error("AI Chat error:", error);
-    res.status(500).json({ error: error?.message || "Internal server error" });
+    return res.status(500).json({ error: error?.message || "Internal server error" });
   }
 };
 

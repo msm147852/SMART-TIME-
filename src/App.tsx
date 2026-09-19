@@ -12,14 +12,13 @@ import {
   CalculatorHistoryItem,
   Expense,
   BudgetSummary,
+  MonthlyIncome,
   Vehicle,
   FuelRecord,
   MaintenanceRecord,
   Student,
   LessonItem,
   EducationExpense,
-  Recipe,
-  ShoppingItem,
   AthkarItem,
   SecureRecord,
   MediaFolder,
@@ -36,7 +35,6 @@ import {
   ExpensesRepository,
   VehiclesRepository,
   EducationRepository,
-  FoodRepository,
   ReligiousRepository,
   VaultRepository,
   TripsRepository,
@@ -57,7 +55,6 @@ import WalletView from './components/WalletView';
 import AdminWalletPanel from './components/AdminWalletPanel';
 import { VehiclesView } from './components/VehiclesView';
 import { EducationView } from './components/EducationView';
-import FoodSection from './components/FoodSection';
 import { ReligiousView } from './components/ReligiousView';
 import { SecureVaultView } from './components/SecureVaultView';
 import { AiCenterView } from './components/AiCenterView';
@@ -70,6 +67,7 @@ import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
 import { startTrialSession } from './services/authService';
+import { SmartAiAction } from './services/aiService';
 
 // Icons
 import {
@@ -121,6 +119,7 @@ export default function App() {
   const [calcHistory, setCalcHistory] = useState<CalculatorHistoryItem[]>(() => NotesRepository.getCalculatorHistory());
   const [expenses, setExpenses] = useState<Expense[]>(() => ExpensesRepository.getExpenses());
   const [budget, setBudget] = useState<BudgetSummary>(() => ExpensesRepository.getBudget());
+  const [monthlyIncome, setMonthlyIncome] = useState<MonthlyIncome[]>(() => ExpensesRepository.getMonthlyIncome());
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => VehiclesRepository.getVehicles());
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>(() => VehiclesRepository.getFuelRecords());
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(() =>
@@ -131,8 +130,6 @@ export default function App() {
   const [educationExpenses, setEducationExpenses] = useState<EducationExpense[]>(() =>
     EducationRepository.getEducationExpenses()
   );
-  const [recipes, setRecipes] = useState<Recipe[]>(() => FoodRepository.getRecipes());
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => FoodRepository.getShoppingList());
   const [athkarItems, setAthkarItems] = useState<AthkarItem[]>(() => ReligiousRepository.getAthkarItems());
   const [secureRecords, setSecureRecords] = useState<SecureRecord[]>(() => VaultRepository.getRecords());
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>(() => ChatRepository.getChatRooms());
@@ -156,6 +153,99 @@ export default function App() {
   }, []);
 
   const handleNavigateSafe = (nextView: AppView) => handleNavigate(nextView);
+
+  const handleApplySmartAiAction = (action: SmartAiAction) => {
+    if (!action) return 'لم يتم تنفيذ أي إجراء.';
+    const now = new Date().toISOString();
+
+    if (action.type === 'add_expense') {
+      const payload = action.payload;
+      const safeCategory: Expense['category'] =
+        ['food', 'transport', 'vehicle', 'education', 'bills', 'shopping', 'health', 'entertainment', 'other'].includes(payload.category)
+          ? payload.category
+          : 'other';
+      const safePayment: Expense['paymentMethod'] =
+        ['cash', 'card', 'wallet'].includes(payload.paymentMethod || '') ? (payload.paymentMethod as Expense['paymentMethod']) : 'cash';
+      const expense: Expense = {
+        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 'exp_ai_' + crypto.randomUUID() : 'exp_ai_' + Date.now(),
+        title: payload.title.trim(),
+        amount: Number(payload.amount),
+        category: safeCategory,
+        date: payload.date || now.slice(0, 10),
+        paymentMethod: safePayment,
+        notes: payload.notes?.trim() || undefined,
+        createdAt: now,
+      };
+      const updated = ExpensesRepository.addExpense(expense);
+      setExpenses(updated);
+      return `تم تسجيل مصروف «${expense.title}» بقيمة ${expense.amount} ${userProfile.currency}.`;
+    }
+
+    if (action.type === 'add_education_expense') {
+      const payload = action.payload;
+      const student = payload.studentId
+        ? students.find((s) => s.id === payload.studentId)
+        : students.find((s) => s.name.trim() === (payload.studentName || '').trim());
+      if (!student) throw new Error('لم أتمكن من تحديد الطالب المقصود.');
+      const categories: EducationExpense['category'][] = ['tuition', 'lessons', 'books', 'supplies', 'transport', 'private_tutor', 'activities'];
+      const category = categories.includes(payload.category) ? payload.category : 'supplies';
+      const expense: EducationExpense = {
+        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 'edu_ai_' + crypto.randomUUID() : 'edu_ai_' + Date.now(),
+        studentId: student.id,
+        title: payload.title.trim(),
+        amount: Number(payload.amount),
+        category,
+        date: payload.date || now.slice(0, 10),
+        notes: payload.notes?.trim() || undefined,
+      };
+      const updated = EducationRepository.addEducationExpense(expense);
+      setEducationExpenses(updated);
+      return `تم تسجيل مصروف تعليمي لـ«${student.name}» بقيمة ${expense.amount} ${userProfile.currency}.`;
+    }
+
+    if (action.type === 'add_fuel_record') {
+      const payload = action.payload;
+      const vehicle = payload.vehicleId
+        ? vehicles.find((v) => v.id === payload.vehicleId)
+        : vehicles.find((v) => v.name.trim() === (payload.vehicleName || '').trim());
+      if (!vehicle) throw new Error('لم أتمكن من تحديد السيارة المقصودة.');
+      const liters = Number(payload.liters);
+      const pricePerLiter = Number(payload.pricePerLiter);
+      const totalCost = Number(payload.totalCost ?? liters * pricePerLiter);
+      const record: FuelRecord = {
+        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 'fuel_ai_' + crypto.randomUUID() : 'fuel_ai_' + Date.now(),
+        vehicleId: vehicle.id,
+        liters,
+        pricePerLiter,
+        totalCost,
+        mileage: Number(payload.mileage),
+        date: payload.date || now.slice(0, 10),
+        stationName: payload.stationName?.trim() || undefined,
+        notes: payload.notes?.trim() || undefined,
+      };
+      const updated = VehiclesRepository.addFuelRecord(record);
+      setFuelRecords(updated);
+      return `تم تسجيل تموين «${vehicle.name}» بـ${liters} لتر بقيمة ${totalCost} ${userProfile.currency} وعلى عداد ${record.mileage} كم.`;
+    }
+
+    if (action.type === 'add_daily_task') {
+      const task = {
+        title: action.payload.title.trim(),
+        completed: false,
+        priority: action.payload.priority || 'medium',
+        category: action.payload.category || 'general',
+        dueDate: action.payload.dueDate,
+        dueTime: action.payload.dueTime,
+        noteId: action.payload.noteId,
+        reminderEnabled: action.payload.reminderEnabled ?? true,
+      };
+      const updated = NotesRepository.addDailyTask(task);
+      setDailyTasks(updated);
+      return `تمت إضافة تذكير «${task.title}» إلى ذكرني.`;
+    }
+
+    return 'لم يتم تنفيذ الإجراء.';
+  };
 
 
   const handleToggleDailyTask = (id: string) => {
@@ -299,7 +389,6 @@ export default function App() {
               user={userProfile}
               expenses={expenses}
               notes={notes}
-              recipes={recipes}
               vehicles={vehicles}
               chatRooms={chatRooms}
               onNavigate={(tab) => handleNavigateSafe(tab as AppView)}
@@ -420,10 +509,6 @@ export default function App() {
             />
           )}
 
-          {currentView === 'food' && (
-            <FoodSection onBack={() => handleNavigateSafe('dashboard' as AppView)} />
-          )}
-
           {currentView === 'religious' && (
             <ReligiousView
               language={language}
@@ -449,7 +534,24 @@ export default function App() {
           )}
 
           {currentView === 'ai' && (
-            <AiCenterView language={language} onOpenVoiceSearch={() => setIsVoiceOpen(true)} />
+            <AiCenterView
+              language={language}
+              onOpenVoiceSearch={() => setIsVoiceOpen(true)}
+              appContext={{
+                profile: userProfile,
+                expenses,
+                monthlyIncome,
+                vehicles,
+                fuelRecords,
+                students,
+                lessons,
+                educationExpenses,
+                notes,
+                dailyTasks,
+                recentTrips,
+              }}
+              onApplyAction={handleApplySmartAiAction}
+            />
           )}
 
           {currentView === 'chat' && (
@@ -520,7 +622,6 @@ export default function App() {
           expenses={expenses}
           vehicles={vehicles}
           lessons={lessons}
-          recipes={recipes}
           onNavigate={(view) => handleNavigateSafe(view)}
         />
 
