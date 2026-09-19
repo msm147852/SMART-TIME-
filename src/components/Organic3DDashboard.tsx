@@ -634,7 +634,7 @@ const OrganicCardButton: React.FC<OrganicCardButtonProps> = ({
     >
       {/* Organic Glassmorphic Card Container with Soft Light Gradient */}
       <div
-        className={`relative w-full rounded-3xl p-3 sm:p-4 border shadow-sm hover:shadow-md transition-all backdrop-blur-md overflow-hidden ${card.themeColor.bgLight} ${card.themeColor.border}`}
+        className={`smart-organic-card smart-organic-card--${card.id} relative w-full p-3 sm:p-4 border shadow-sm hover:shadow-md transition-all backdrop-blur-md overflow-hidden ${card.themeColor.bgLight} ${card.themeColor.border}`}
         style={{
           boxShadow: `0 8px 24px -6px ${card.themeColor.glow}, 0 2px 8px -2px rgba(0,0,0,0.04)`,
         }}
