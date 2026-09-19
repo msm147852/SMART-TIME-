@@ -1,7 +1,9 @@
 import express from "express";
 import http from "node:http";
 import path from "path";
-import { GoogleGenAI } from "@google/genai";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const { GoogleGenAI } = require("@google/genai") as { GoogleGenAI: new (options: { apiKey: string }) => any };
 import dotenv from "dotenv";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
@@ -13,8 +15,8 @@ import { estimateProviderPrice, type RideProvider, type RideCategory } from "./s
 
 dotenv.config();
 
-let geminiClient: GoogleGenAI | null = null;
-function getGemini(): GoogleGenAI {
+let geminiClient: any | null = null;
+function getGemini(): any {
   if (!geminiClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
