@@ -12,6 +12,7 @@ import {
   CalculatorHistoryItem,
   Expense,
   BudgetSummary,
+  MonthlyIncome,
   Vehicle,
   FuelRecord,
   MaintenanceRecord,
@@ -187,13 +188,13 @@ export default function App() {
         : students.find((s) => s.name.trim() === (payload.studentName || '').trim());
       if (!student) throw new Error('لم أتمكن من تحديد الطالب المقصود.');
       const categories: EducationExpense['category'][] = ['tuition', 'lessons', 'books', 'supplies', 'transport', 'private_tutor', 'activities'];
-      const category = categories.includes(payload.category) ? payload.category : 'other' as EducationExpense['category'];
+      const category = categories.includes(payload.category) ? payload.category : 'supplies';
       const expense: EducationExpense = {
         id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 'edu_ai_' + crypto.randomUUID() : 'edu_ai_' + Date.now(),
         studentId: student.id,
         title: payload.title.trim(),
         amount: Number(payload.amount),
-        category: category === 'other' as any ? 'supplies' : category,
+        category,
         date: payload.date || now.slice(0, 10),
         notes: payload.notes?.trim() || undefined,
       };
@@ -533,7 +534,24 @@ export default function App() {
           )}
 
           {currentView === 'ai' && (
-            <AiCenterView language={language} onOpenVoiceSearch={() => setIsVoiceOpen(true)} />
+            <AiCenterView
+              language={language}
+              onOpenVoiceSearch={() => setIsVoiceOpen(true)}
+              appContext={{
+                profile: userProfile,
+                expenses,
+                monthlyIncome,
+                vehicles,
+                fuelRecords,
+                students,
+                lessons,
+                educationExpenses,
+                notes,
+                dailyTasks,
+                recentTrips,
+              }}
+              onApplyAction={handleApplySmartAiAction}
+            />
           )}
 
           {currentView === 'chat' && (
