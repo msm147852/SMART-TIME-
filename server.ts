@@ -39,63 +39,118 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use("/api/chat", chatRouter);
 
 
-// ----------------------------------------------------
-// AI-generated food images
-// Each dish gets a dedicated image based on its exact Arabic name/category.
-// Images are generated server-side so GEMINI_API_KEY never reaches the browser.
-// ----------------------------------------------------
-const foodImageCache = new Map<string, Buffer>();
 
-function foodImagePrompt(title: string, category: string, group: string) {
-  const t = `${title} ${category} ${group}`.toLowerCase();
-  const drink = /مشروب|عصير|شاي|قهوة|كركديه|سحلب|ليمون|تمر هندي|كوكتيل|سوبيا|drink|juice|tea|coffee/.test(t);
-  const dessert = /حلويات|حلو|كنافة|بسبوسة|كيك|كيكة|أم علي|بتي فور|dessert|cake|kunafa/.test(t);
-  const promptType = drink ? 'Egyptian beverage photography' : dessert ? 'Egyptian dessert photography' : 'Egyptian food photography';
-  return `Create one highly realistic ${promptType} image for a recipe app.\n` +
-    `The exact dish is: "${title}". Category: "${category}". Group: "${group}".\n` +
-    `Show ONLY the actual dish or beverage named above, prepared in authentic Egyptian style. ` +
-    `Make the ingredients, color, texture and serving vessel match the dish. ` +
-    `For drinks, show the exact beverage in a clear or appropriate Egyptian serving glass/cup; do not substitute food. ` +
-    `For desserts, show the exact named dessert; do not substitute cake or another sweet. ` +
-    `For savory food, show the exact named recipe; do not use a generic mixed dish. ` +
-    `Natural appetizing restaurant-quality daylight, clean light background, close three-quarter food photograph, ` +
-    `no people, no hands, no logos, no text, no labels, no collage, no multiple dishes, no watermark. ` +
-    `Square composition suitable for a recipe card.`;
+const SMART_AI_DEFAULT_MODEL = String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim();
+
+const SMART_AI_ACTIONS_SCHEMA_NOTE = [
+  'add_expense',
+  'add_education_expense',
+  'add_fuel_record',
+  'add_daily_task',
+].join(', ');
+
+function smartAiSystemPrompt(language: string) {
+  return language === 'en'
+    ? `You are SMART AI, the unified assistant inside the SMART TIME app.
+You can analyze only the app data provided in the request. Do not invent missing values.
+You may propose ONE write action when the user's intent is explicit and the required fields are present.
+Available write actions: ${SMART_AI_ACTIONS_SCHEMA_NOTE}.
+Never access or expose passwords, PINs, secure-vault secrets, authentication tokens, API keys, or raw private files.
+The Food section has been removed from SMART TIME. Do not suggest or create food-module records.
+Expense category "food" is still valid for ordinary expense classification.
+If a write request is ambiguous or missing a required identifier/value, set action to null and needsClarification=true, and explain exactly what is missing.
+For fuel records, use the vehicleId from the provided vehicles array when possible. For education expenses, match the studentId from the provided students array when possible.
+Return strict JSON with keys: reply, action, actionSummary, requiresConfirmation, needsClarification, model, provider.
+`
+    : `أنت SMART AI، المساعد الموحد داخل تطبيق SMART TIME.
+حلل فقط بيانات التطبيق المرسلة مع الطلب ولا تخترع بيانات مفقودة.
+يمكنك اقتراح إجراء كتابة واحد فقط عندما تكون نية المستخدم واضحة وتكون الحقول المطلوبة موجودة.
+الإجراءات المتاحة: ${SMART_AI_ACTIONS_SCHEMA_NOTE}.
+ممنوع الوصول إلى أو كشف كلمات المرور أو PIN أو أسرار الخزنة الآمنة أو رموز التوثيق أو مفاتيح API أو الملفات الخاصة الخام.
+قسم الطعام تم حذفه من SMART TIME؛ لا تقترح أو تنشئ سجلات تخص وحدة الطعام.
+تصنيف المصروف "food" ما زال مسموحًا كمجرد تصنيف للمصروفات العادية.
+إذا كان طلب الكتابة غير واضح أو ينقصه معرّف/قيمة أساسية، اجعل action=null وneedsClarification=true واشرح المطلوب تحديدًا.
+في التموين استخدم vehicleId من قائمة vehicles إن أمكن. وفي مصروف التعليم استخدم studentId من قائمة students إن أمكن.
+أعد JSON صارمًا بالمفاتيح: reply, action, actionSummary, requiresConfirmation, needsClarification, model, provider.
+`;
 }
 
-app.get('/api/food/generated-image', async (req, res) => {
-  try {
-    const title = String(req.query.title || '').trim();
-    const category = String(req.query.category || '').trim();
-    const group = String(req.query.group || '').trim();
-    if (!title) return res.status(400).json({ error: 'Food title is required' });
+function parseSmartAiJson(text: string): any {
+  const cleaned = String(text || '').trim().replace(/^\`\`\`json\s*/i, '').replace(/^\`\`\`\s*/i, '').replace(/\s*\`\`\`$/, '');
+  try { return JSON.parse(cleaned); } catch { return null; }
+}
 
-    const cacheKey = `${title}|${category}|${group}`.toLowerCase();
-    const cached = foodImageCache.get(cacheKey);
-    if (cached) {
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.type('png').send(cached);
-    }
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول لاستخدام SMART AI.' });
+
+    const message = String(req.body?.message || '').trim();
+    const language = String(req.body?.language || 'ar') === 'en' ? 'en' : 'ar';
+    const model = String(req.body?.model || SMART_AI_DEFAULT_MODEL).trim() || SMART_AI_DEFAULT_MODEL;
+    const context = req.body?.appContext;
+    const history = Array.isArray(req.body?.conversationHistory) ? req.body.conversationHistory.slice(-8) : [];
+
+    if (!message) return res.status(400).json({ error: 'رسالة SMART AI مطلوبة.' });
+    if (!context || typeof context !== 'object') return res.status(400).json({ error: 'بيانات سياق التطبيق مطلوبة.' });
+
+    const prompt = [
+      smartAiSystemPrompt(language),
+      '',
+      'APP_CONTEXT_JSON:',
+      JSON.stringify(context),
+      '',
+      'CONVERSATION_HISTORY_JSON:',
+      JSON.stringify(history),
+      '',
+      'USER_REQUEST:',
+      message,
+      '',
+      'OUTPUT_REQUIREMENTS:',
+      '- action must be null or exactly one allowed action object.',
+      '- requiresConfirmation must be true only when action is present.',
+      '- Do not claim an action was executed; it is only proposed until the app confirms it.',
+      '- For analytical questions, answer from the supplied context and return action=null.',
+    ].join('\n');
 
     const gemini = getGemini();
     const response = await gemini.models.generateContent({
-      model: 'gemini-3.1-flash-image',
-      contents: foodImagePrompt(title, category, group),
-      config: { responseModalities: ['IMAGE'] } as any,
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      } as any,
     });
 
-    const parts = (response as any).parts || response.candidates?.[0]?.content?.parts;
-    const imagePart = parts?.find((part: any) => part.inlineData?.data);
-    const base64 = imagePart?.inlineData?.data;
-    if (!base64) return res.status(502).json({ error: 'Image generation returned no image' });
+    const rawText = String(response?.text || '').trim();
+    const parsed = parseSmartAiJson(rawText);
+    if (!parsed) {
+      return res.json({
+        reply: rawText || (language === 'ar' ? 'تعذر الحصول على رد من Gemini.' : 'Gemini returned no usable response.'),
+        action: null,
+        requiresConfirmation: false,
+        needsClarification: false,
+        model,
+        provider: 'gemini',
+      });
+    }
 
-    const buffer = Buffer.from(base64, 'base64');
-    foodImageCache.set(cacheKey, buffer);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.type(imagePart?.inlineData?.mimeType || 'png').send(buffer);
+    const allowed = new Set(['add_expense', 'add_education_expense', 'add_fuel_record', 'add_daily_task']);
+    const action = parsed.action && allowed.has(parsed.action.type) ? parsed.action : null;
+
+    return res.json({
+      reply: String(parsed.reply || ''),
+      action,
+      actionSummary: action ? String(parsed.actionSummary || '') : '',
+      requiresConfirmation: !!(action && parsed.requiresConfirmation),
+      needsClarification: !!parsed.needsClarification,
+      model,
+      provider: 'gemini',
+    });
   } catch (err: any) {
-    console.error('[FOOD IMAGE]', err?.message || err);
-    return res.status(503).json({ error: 'Unable to generate food image' });
+    console.error('[SMART AI]', err?.message || err);
+    return res.status(503).json({ error: err?.message || 'تعذر تشغيل SMART AI الآن.' });
   }
 });
 
