@@ -493,3 +493,20 @@ html[class*="theme-"] nav button[class*="text-accent-600"] {
 .smart-trip-all-points .smart-saved-choice{top:calc(100% + 6px)}
 @media(max-width:760px){.smart-trip-all-points{grid-template-columns:repeat(2,minmax(0,1fr))}.smart-trip-all-points .smart-trip-swap-button{top:50%}}
 @media(max-width:420px){.smart-trip-all-points{gap:7px}.smart-trip-all-points .smart-trip-point-tab,.smart-trip-all-points .smart-saved-place{padding:8px 7px}}
+
+/* =========================================================
+   Skeleton Loading Shimmer Animation
+   ========================================================= */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s infinite;
+}
+

@@ -219,6 +219,8 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
 
   // 2. تفضيلات شريط الأخبار المباشرة
   const initialTicker: TickerPreferences = {
+    showDailyTasks: true,
+    showZakkirni: true,
     showTimeAndDate: true,
     showGold: true,
     showSilver: true,
@@ -1212,6 +1214,33 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                       setTickerPrefs({ ...tickerPrefs, showZodiac: e.target.checked })
                     }
                     className="w-4 h-4 rounded text-purple-600 cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* 4.5. مهام وتنبيهات ذكرني */}
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📋</span>
+                    <div>
+                      <span className="font-bold block text-slate-900 dark:text-white">
+                        {isAr ? 'مهام وتنبيهات ذكرني (المهمات اليومية)' : 'Zakkirni Reminders & Tasks'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {isAr ? 'عرض مهامك وتنبيهات اليوم في شريط الأخبار' : 'Display tasks in header ticker'}
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={tickerPrefs.showDailyTasks !== false && tickerPrefs.showZakkirni !== false}
+                    onChange={(e) =>
+                      setTickerPrefs({
+                        ...tickerPrefs,
+                        showDailyTasks: e.target.checked,
+                        showZakkirni: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded text-amber-600 cursor-pointer accent-amber-500"
                   />
                 </div>
 

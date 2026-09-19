@@ -340,6 +340,10 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               language={language}
               onGoHome={() => onNavigate('dashboard')}
               isHomeActive={isHomeActive}
+              dailyTasks={dailyTasks}
+              onToggleDailyTask={onToggleDailyTask}
+              onAddDailyTask={onAddDailyTask}
+              onNavigate={onNavigate}
             />
           </div>
 

@@ -19,8 +19,15 @@ import {
   Newspaper,
   ArrowRight,
   ArrowLeft,
+  ListTodo,
+  CheckCircle2,
+  Circle,
+  Plus,
+  ExternalLink,
+  BellRing,
 } from 'lucide-react';
-import { Language, UserProfile } from '../types';
+import { Language, UserProfile, DailyTask, TaskPriority, TaskCategory } from '../types';
+import { NotesRepository } from '../services/repositories/notesRepository';
 import { fetchLiveMarket, fetchLiveNews, fetchLiveSports, fetchLiveWeather, LiveMarketData, LiveNewsArticle, LiveSportsMatch, LiveWeatherData } from '../services/liveDataService';
 import {
   MOCK_CRYPTO_RATES,
@@ -45,6 +52,10 @@ interface LiveHeaderWidgetsProps {
   language: Language;
   onGoHome?: () => void;
   isHomeActive?: boolean;
+  dailyTasks?: DailyTask[];
+  onToggleDailyTask?: (id: string) => void;
+  onAddDailyTask?: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
+  onNavigate?: (tab: string) => void;
 }
 
 export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
@@ -52,6 +63,10 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   language,
   onGoHome,
   isHomeActive = false,
+  dailyTasks,
+  onToggleDailyTask,
+  onAddDailyTask,
+  onNavigate,
 }) => {
   const [now, setNow] = useState(new Date());
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -64,6 +79,71 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
   const [liveSports, setLiveSports] = useState<LiveSportsMatch[]>([]);
   const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null);
   const pointerDownTimeRef = useRef(0);
+
+  // مهام وتنبيهات قسم ذكرني (المهمات اليومية)
+  const [localDailyTasks, setLocalDailyTasks] = useState<DailyTask[]>(() => {
+    if (dailyTasks && dailyTasks.length > 0) return dailyTasks;
+    try {
+      return NotesRepository.getDailyTasks();
+    } catch {
+      return [];
+    }
+  });
+
+  // مزامنة المهام عند تحديث الـ props
+  useEffect(() => {
+    if (dailyTasks) {
+      setLocalDailyTasks(dailyTasks);
+    }
+  }, [dailyTasks]);
+
+  // حالة المهام التفاعلية في النافذة المنبثقة
+  const [selectedTaskForModal, setSelectedTaskForModal] = useState<DailyTask | null>(null);
+  const [quickTaskTitle, setQuickTaskTitle] = useState('');
+  const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>('medium');
+  const [quickTaskDueTime, setQuickTaskDueTime] = useState('');
+  const [taskFilter, setTaskFilter] = useState<'pending' | 'all'>('pending');
+
+  const pendingDailyTasks = localDailyTasks.filter((t) => !t.completed);
+  const completedDailyTasks = localDailyTasks.filter((t) => t.completed);
+
+  const handleToggleTask = (taskId: string) => {
+    if (onToggleDailyTask) {
+      onToggleDailyTask(taskId);
+    }
+    const updated = localDailyTasks.map((t) =>
+      t.id === taskId
+        ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined }
+        : t
+    );
+    setLocalDailyTasks(updated);
+    try {
+      NotesRepository.saveDailyTasks(updated);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleCreateQuickTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTaskTitle.trim()) return;
+    const newTask: Omit<DailyTask, 'id' | 'createdAt'> = {
+      title: quickTaskTitle.trim(),
+      completed: false,
+      priority: quickTaskPriority,
+      category: 'general' as TaskCategory,
+      dueTime: quickTaskDueTime || undefined,
+      dueDate: new Date().toISOString().split('T')[0],
+      reminderEnabled: true,
+    };
+    if (onAddDailyTask) {
+      onAddDailyTask(newTask);
+    }
+    const created = NotesRepository.addDailyTask(newTask);
+    setLocalDailyTasks(created);
+    setQuickTaskTitle('');
+    setQuickTaskDueTime('');
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -98,6 +178,8 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
   // تفضيلات الشريط من الملف الشخصي مع قيم افتراضية متكاملة
   const prefs = user.tickerPreferences || {
+    showDailyTasks: true,
+    showZakkirni: true,
     showTimeAndDate: true,
     showGold: true,
     showSilver: true,
@@ -271,6 +353,84 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         {marketIsLive ? (isAr ? 'مباشر' : 'LIVE') : (isAr ? 'احتياطي' : 'FALLBACK')}
       </span>
       
+      {/* 0. مهام وتنبيهات قسم ذكرني (Zakkirni Reminders & Tasks) */}
+      {prefs.showDailyTasks !== false && prefs.showZakkirni !== false && (
+        <>
+          {pendingDailyTasks.length > 0 ? (
+            pendingDailyTasks.slice(0, 6).map((task) => {
+              const isHigh = task.priority === 'high';
+              const isMed = task.priority === 'medium';
+              return (
+                <React.Fragment key={`ticker-task-${task.id}`}>
+                  <button
+                    onClick={() => {
+                      setSelectedTaskForModal(task);
+                      setActiveModal('zakkirni');
+                    }}
+                    className={`flex items-center gap-1.5 hover:scale-[1.03] cursor-pointer active:scale-95 transition-all shrink-0 px-2.5 py-1 rounded-lg border shadow-2xs group ${
+                      isHigh
+                        ? 'bg-rose-50/90 dark:bg-rose-950/60 border-rose-300 dark:border-rose-900/70 text-rose-900 dark:text-rose-200'
+                        : isMed
+                        ? 'bg-amber-50/90 dark:bg-amber-950/60 border-amber-300 dark:border-amber-900/70 text-amber-900 dark:text-amber-200'
+                        : 'bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-900/70 text-emerald-900 dark:text-emerald-200'
+                    }`}
+                    title={isAr ? `تذكير ذكرني: ${task.title} — انقر لعرض التفاصيل أو إكمال المهمة` : `Zakkirni Task: ${task.title}`}
+                  >
+                    <span className="flex items-center gap-1 font-black text-xs font-sans">
+                      <BellRing className={`w-3.5 h-3.5 shrink-0 ${isHigh ? 'text-rose-500 animate-pulse' : isMed ? 'text-amber-500' : 'text-emerald-500'}`} />
+                      <span className={isHigh ? 'text-rose-700 dark:text-rose-400' : isMed ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}>
+                        {isAr ? 'ذكرني:' : 'Remind:'}
+                      </span>
+                    </span>
+                    <span className="text-xs font-bold font-sans max-w-[180px] sm:max-w-[260px] truncate text-slate-900 dark:text-white">
+                      {task.title}
+                    </span>
+                    {task.dueTime && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <Clock className="w-2.5 h-2.5 text-amber-500" />
+                        {task.dueTime}
+                      </span>
+                    )}
+                    <span
+                      className={`text-[9px] font-sans font-black px-1.5 py-0.5 rounded border ${
+                        isHigh
+                          ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                          : isMed
+                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                      }`}
+                    >
+                      {isHigh ? (isAr ? 'عاجل' : 'High') : isMed ? (isAr ? 'مهم' : 'Med') : (isAr ? 'عادي' : 'Low')}
+                    </span>
+                  </button>
+                  <span className="text-slate-300 dark:text-slate-700 font-normal">/</span>
+                </React.Fragment>
+              );
+            })
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  setSelectedTaskForModal(null);
+                  setActiveModal('zakkirni');
+                }}
+                className="flex items-center gap-1.5 hover:scale-[1.03] cursor-pointer active:scale-95 transition-all shrink-0 bg-emerald-50/80 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-300 shadow-2xs"
+                title={isAr ? 'ذكرني: لا توجد مهام معلقة — انقر لإضافة مهمة أو فتح المفكرة' : 'Zakkirni: All caught up!'}
+              >
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1 font-sans">
+                  <span>✨</span>
+                  <span>{isAr ? 'ذكرني:' : 'Zakkirni:'}</span>
+                </span>
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-sans">
+                  {isAr ? 'تم إنجاز كافة مهام اليوم بنجاح 👏' : 'All today tasks completed 👏'}
+                </span>
+              </button>
+              <span className="text-slate-300 dark:text-slate-700 font-normal">/</span>
+            </>
+          )}
+        </>
+      )}
+
       {/* 1. التاريخ الهجري والميلادي */}
       {prefs.showTimeAndDate !== false && (
         <>
@@ -1338,6 +1498,228 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
                 <span>{weatherIsLive ? 'LIVE · Open-Meteo' : (isAr ? 'لا توجد بيانات حية' : 'No live data')}</span>
                 {weatherIsLive && <span>{new Date(liveWeather!.fetchedAt).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تفاصيل مهام وتنبيهات ذكرني (Zakkirni Daily Tasks Modal) */}
+      {activeModal === 'zakkirni' && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+          onClick={() => setActiveModal(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-scaleUp text-xs max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            dir={isAr ? 'rtl' : 'ltr'}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 mb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-xs">
+                  <BellRing className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white font-sans flex items-center gap-2">
+                    {isAr ? 'تنبيهات ومهام ذكرني' : 'Zakkirni Reminders & Tasks'}
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                      {pendingDailyTasks.length} {isAr ? 'متبقية' : 'Pending'}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-sans">
+                    {isAr ? 'مهامك المعروضة في شريط الأخبار العلوي مع إمكانية الإنجاز الفوري' : 'Your live tasks from header ticker'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-2 mb-3 shrink-0">
+              <button
+                onClick={() => setTaskFilter('pending')}
+                className={`flex-1 py-1.5 px-3 rounded-xl font-bold font-sans transition-all text-xs flex items-center justify-center gap-1.5 ${
+                  taskFilter === 'pending'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-750'
+                }`}
+              >
+                <span>{isAr ? 'المهام المعلقة' : 'Pending Tasks'}</span>
+                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-white">
+                  {pendingDailyTasks.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setTaskFilter('all')}
+                className={`flex-1 py-1.5 px-3 rounded-xl font-bold font-sans transition-all text-xs flex items-center justify-center gap-1.5 ${
+                  taskFilter === 'all'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-750'
+                }`}
+              >
+                <span>{isAr ? 'جميع المهام' : 'All Tasks'}</span>
+                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-white">
+                  {localDailyTasks.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Task list scrollable */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-3">
+              {(taskFilter === 'pending' ? pendingDailyTasks : localDailyTasks).length === 0 ? (
+                <div className="py-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-850/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-600 dark:text-slate-300 font-sans mb-1">
+                    {taskFilter === 'pending'
+                      ? (isAr ? '✨ لا توجد مهام معلقة! جميع المهام منجزة 👏' : '✨ No pending tasks! All caught up 👏')
+                      : (isAr ? 'لا توجد مهام حالياً في قسم ذكرني' : 'No tasks in Zakkirni')}
+                  </p>
+                  <p className="text-xs font-sans text-slate-400">
+                    {isAr ? 'يمكنك إضافة مهمة جديدة بالأسفل أو فتح قسم ذكرني' : 'Add a new task below'}
+                  </p>
+                </div>
+              ) : (
+                (taskFilter === 'pending' ? pendingDailyTasks : localDailyTasks).map((t) => {
+                  const isHigh = t.priority === 'high';
+                  const isMed = t.priority === 'medium';
+                  return (
+                    <div
+                      key={t.id}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-2.5 ${
+                        t.completed
+                          ? 'bg-slate-50/80 dark:bg-slate-850/50 border-slate-200 dark:border-slate-800 opacity-60'
+                          : isHigh
+                          ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60'
+                          : isMed
+                          ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/60'
+                          : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-750'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTask(t.id)}
+                        className="flex items-center gap-2.5 text-right flex-1 min-w-0 cursor-pointer"
+                      >
+                        <div
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors border ${
+                            t.completed
+                              ? 'bg-emerald-500 border-emerald-500 text-white'
+                              : 'border-slate-300 dark:border-slate-600 hover:border-amber-500 text-transparent hover:text-amber-500'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={`font-bold font-sans text-xs truncate ${
+                              t.completed
+                                ? 'line-through text-slate-400 dark:text-slate-500'
+                                : 'text-slate-900 dark:text-white'
+                            }`}
+                          >
+                            {t.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-sans">
+                            {t.dueTime && (
+                              <span className="flex items-center gap-0.5 font-mono">
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                {t.dueTime}
+                              </span>
+                            )}
+                            {t.dueDate && <span>{t.dueDate}</span>}
+                          </div>
+                        </div>
+                      </button>
+                      <span
+                        className={`text-[9px] font-sans font-black px-2 py-0.5 rounded-full shrink-0 border ${
+                          t.completed
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                            : isHigh
+                            ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                            : isMed
+                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                            : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                        }`}
+                      >
+                        {t.completed
+                          ? (isAr ? 'مكتملة' : 'Done')
+                          : isHigh
+                          ? (isAr ? 'عاجل' : 'High')
+                          : isMed
+                          ? (isAr ? 'مهم' : 'Med')
+                          : (isAr ? 'عادي' : 'Low')}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Quick Add Task Form */}
+            <form onSubmit={handleCreateQuickTask} className="p-3 bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 mb-3 shrink-0">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5 font-sans">
+                {isAr ? '⚡ إضافة مهمة سريعة لذكرني:' : '⚡ Quick Add to Zakkirni:'}
+              </span>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  type="text"
+                  value={quickTaskTitle}
+                  onChange={(e) => setQuickTaskTitle(e.target.value)}
+                  placeholder={isAr ? 'عنوان المهمة والتذكير...' : 'Task title...'}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-amber-500 font-sans"
+                />
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={quickTaskPriority}
+                    onChange={(e) => setQuickTaskPriority(e.target.value as TaskPriority)}
+                    className="px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] outline-none font-sans"
+                  >
+                    <option value="high">{isAr ? 'عاجل 🔴' : 'High'}</option>
+                    <option value="medium">{isAr ? 'مهم 🟡' : 'Medium'}</option>
+                    <option value="low">{isAr ? 'عادي 🟢' : 'Low'}</option>
+                  </select>
+                  <input
+                    type="time"
+                    value={quickTaskDueTime}
+                    onChange={(e) => setQuickTaskDueTime(e.target.value)}
+                    className="px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] outline-none font-mono"
+                    title={isAr ? 'وقت التذكير' : 'Due time'}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!quickTaskTitle.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold font-sans text-xs flex items-center gap-1 transition-colors shrink-0 shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'إضافة' : 'Add'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Navigate to full Notes & Zakkirni tab */}
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200 dark:border-slate-800 shrink-0">
+              <span className="text-[10px] text-slate-400 font-sans">
+                {isAr ? 'يتم حفظ كافة المهام تلقائياً وتحديث شريط الأخبار فوراً' : 'Tasks update the live ticker instantly'}
+              </span>
+              {onNavigate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModal(null);
+                    onNavigate('notes');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold font-sans text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{isAr ? 'فتح قسم ذكرني والملاحظات' : 'Open Zakkirni & Notes'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

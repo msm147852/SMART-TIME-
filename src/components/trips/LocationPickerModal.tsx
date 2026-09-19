@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MapPin,
+  MapPinned,
   Search,
   Mic,
   X,
@@ -13,6 +14,7 @@ import {
   CheckCircle2,
   Crosshair,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { TripLocation, LocationPickerMode } from './types';
 import { MapLocationPicker } from './MapLocationPicker';
@@ -26,6 +28,9 @@ interface LocationPickerModalProps {
   mode: LocationPickerMode;
   currentLocation?: TripLocation | null;
   onSelectLocation: (location: TripLocation) => void;
+  onAddStopRequest?: (location: TripLocation) => void;
+  onDeleteStop?: () => void;
+  isEditingStop?: boolean;
   language?: 'ar' | 'en';
 }
 
@@ -37,12 +42,50 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   mode,
   currentLocation,
   onSelectLocation,
+  onAddStopRequest,
+  onDeleteStop,
+  isEditingStop,
   language = 'ar',
 }) => {
   const isRtl = language === 'ar';
   const [activeTab, setActiveTab] = useState<PickerTab>('menu');
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
+
+  const [liveAddress, setLiveAddress] = useState<string>(
+    currentLocation?.address ||
+      (mode === 'pickup'
+        ? isRtl
+          ? 'مدينة نصر، القاهرة'
+          : 'Nasr City, Cairo'
+        : mode === 'dropoff'
+        ? isRtl
+          ? 'التجمع الخامس، القاهرة الجديدة'
+          : '5th Settlement, New Cairo'
+        : isRtl
+        ? 'نقطة توقف إضافية'
+        : 'Intermediate Stop')
+  );
+  const [isGeocoding, setIsGeocoding] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (currentLocation?.address) {
+      setLiveAddress(currentLocation.address);
+    }
+  }, [currentLocation, mode]);
+
+  // Close on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveTab('menu');
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -91,90 +134,97 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
   };
 
-  const modalTitle =
-    mode === 'pickup'
-      ? isRtl
-        ? 'حدد نقطة الانطلاق'
-        : 'Select Pickup Location'
-      : isRtl
-      ? 'حدد نقطة النزول'
-      : 'Select Dropoff Destination';
-
-  const modalSubtitle =
-    mode === 'pickup'
-      ? isRtl
-        ? 'اختر الطريقة الأنسب لك لتحديد مكان تحركك'
-        : 'Choose your preferred method to set pickup spot'
-      : isRtl
-      ? 'اختر الطريقة الأنسب لك لتحديد مكان وصولك'
-      : 'Choose your preferred method to set destination spot';
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/25 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn"
       id="location-picker-modal-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="location-picker-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setActiveTab('menu');
+          onClose();
+        }
+      }}
     >
       <div
-        className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-white"
+        className="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] text-slate-900 dark:text-white"
         id="location-picker-modal-container"
       >
-        {/* Header Bar */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-white border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            {activeTab !== 'menu' && (
-              <button
-                onClick={() => setActiveTab('menu')}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
-                title={isRtl ? 'الرجوع للخيارات' : 'Back'}
-                aria-label={isRtl ? 'رجوع' : 'Back'}
-              >
-                {isRtl ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
-              </button>
-            )}
+        {/* Header Bar: زر الرجوع + تابويت العنوان المباشر في أعلى الخريطة بدون إغلاق وبدون لوجو ضخم */}
+        <div className="flex items-center justify-between gap-2.5 px-3.5 sm:px-5 py-3 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800">
+          {/* زر الرجوع */}
+          <button
+            type="button"
+            onClick={() => {
+              if (activeTab !== 'menu') {
+                setActiveTab('menu');
+              } else {
+                onClose();
+              }
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200/90 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-black text-xs transition-colors shrink-0 shadow-xs active:scale-95"
+            title={isRtl ? 'رجوع' : 'Back'}
+            aria-label={isRtl ? 'رجوع' : 'Back'}
+          >
+            {isRtl ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+            <span>{isRtl ? 'رجوع' : 'Back'}</span>
+          </button>
 
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`p-2 rounded-xl text-white shadow-md ${
-                  mode === 'pickup' ? 'bg-emerald-500 shadow-emerald-500/30' : 'bg-rose-500 shadow-rose-500/30'
-                }`}
-              >
+          {/* تابويت العنوان والموقع أعلى الخريطة */}
+          <div className="flex items-center gap-2 min-w-0 flex-1" dir={isRtl ? 'rtl' : 'ltr'}>
+            <span
+              className={`w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${
+                mode === 'pickup'
+                  ? 'bg-emerald-500 shadow-emerald-500/20'
+                  : mode === 'stop'
+                  ? 'bg-amber-500 shadow-amber-500/20'
+                  : 'bg-rose-500 shadow-rose-500/20'
+              }`}
+            >
+              {mode === 'pickup' ? (
+                <Navigation className="w-4 h-4" />
+              ) : mode === 'stop' ? (
                 <MapPin className="w-4 h-4" />
-              </span>
-              <div>
-                <h2
-                  id="location-picker-modal-title"
-                  className="font-extrabold text-base text-white flex items-center gap-2"
-                >
-                  <span>{modalTitle}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                      mode === 'pickup'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                    }`}
-                  >
-                    {mode === 'pickup' ? (isRtl ? 'نقطة الانطلاق 📍' : 'Pickup') : isRtl ? 'نقطة النزول 🏁' : 'Dropoff'}
+              ) : (
+                <MapPinned className="w-4 h-4" />
+              )}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
+                  {mode === 'pickup'
+                    ? isRtl
+                      ? 'نقطة الانطلاق 📍'
+                      : 'Pickup'
+                    : mode === 'stop'
+                    ? isRtl
+                      ? isEditingStop
+                        ? 'تعديل نقطة التوقف 🛑'
+                        : 'نقطة توقف إضافية 🛑'
+                      : 'Stop Point'
+                    : isRtl
+                    ? 'نقطة النزول 🏁'
+                    : 'Destination'}
+                </span>
+                {isGeocoding && (
+                  <span className="text-[10px] text-cyan-600 dark:text-cyan-400 flex items-center gap-1 font-bold">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    <span>{isRtl ? 'جاري التحديد...' : 'Locating...'}</span>
                   </span>
-                </h2>
-                <p className="text-[11px] text-slate-500 mt-0.5">{modalSubtitle}</p>
+                )}
               </div>
+              <p
+                id="location-picker-modal-title"
+                className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate mt-0.5"
+                title={liveAddress}
+              >
+                {liveAddress || (isRtl ? 'انقر على الخريطة لتحديد الموقع' : 'Select on map')}
+              </p>
             </div>
           </div>
-
-          <button
-            onClick={() => {
-              setActiveTab('menu');
-              onClose();
-            }}
-            className="p-2 rounded-xl bg-white hover:bg-slate-700 text-slate-500 hover:text-white transition-colors"
-            title={isRtl ? 'إغلاق' : 'Close'}
-            aria-label={isRtl ? 'إغلاق النافذة' : 'Close modal'}
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Tab navigation pills (when active in a subview) */}
@@ -338,6 +388,36 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                   {isRtl ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                 </div>
               </button>
+
+              {/* Delete Stop Button when editing */}
+              {isEditingStop && onDeleteStop && (
+                <button
+                  onClick={() => {
+                    onDeleteStop();
+                    setActiveTab('menu');
+                    onClose();
+                  }}
+                  className="w-full p-3.5 sm:p-4 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border-2 border-rose-200 dark:border-rose-800 transition-all flex items-center justify-between group shadow-sm active:scale-98 text-start mt-2"
+                  id="delete-stop-from-modal-btn"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-rose-500 text-white shadow-md">
+                      <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-rose-700 dark:text-rose-300">
+                        {isRtl ? '🗑️ حذف نقطة التوقف هذه' : '🗑️ Delete this Stop'}
+                      </h3>
+                      <p className="text-[11px] text-rose-500 dark:text-rose-400 mt-0.5">
+                        {isRtl ? 'إزالة هذه المحطة من مسار الرحلة نهائياً' : 'Remove this stop from trip route'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black text-rose-700 dark:text-rose-300 px-3 py-1.5 rounded-lg bg-rose-200/60 dark:bg-rose-900/80">
+                    {isRtl ? 'حذف الآن' : 'Delete'}
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
@@ -347,6 +427,22 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               mode={mode}
               initialLocation={currentLocation}
               onConfirm={handleSelectAndClose}
+              onConfirmAndAddStop={(loc) => {
+                if (onAddStopRequest) {
+                  onAddStopRequest(loc);
+                } else {
+                  handleSelectAndClose(loc);
+                }
+              }}
+              isEditingStop={isEditingStop}
+              onDeleteStop={() => {
+                if (onDeleteStop) {
+                  onDeleteStop();
+                  setActiveTab('menu');
+                  onClose();
+                }
+              }}
+              onCancel={() => setActiveTab('menu')}
               language={language}
             />
           )}

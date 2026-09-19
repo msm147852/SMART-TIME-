@@ -42,6 +42,8 @@ import {
   getCardDensityClasses,
 } from '../utils/cardDesignHelper';
 import { CardCustomizerModal } from './CardCustomizerModal';
+import { Organic3DDashboard } from './Organic3DDashboard';
+import { DashboardSkeletonLoader } from './DashboardSkeletonLoader';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -53,6 +55,7 @@ interface DashboardViewProps {
   onNavigate: (tab: AppView, subView?: string) => void;
   onOpenSearch: () => void;
   onOpenVoiceSearch: () => void;
+  isLoading?: boolean;
 }
 
 
@@ -672,21 +675,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   vehicles,
   chatRooms,
   onNavigate,
+  isLoading = false,
 }) => {
   const isAr = user.language === 'ar';
   const { preferences, toggleCardVisibility, setCardSize } = useCardPreferences();
 
+  // Skeleton loading state for repository hydration and layout transitions
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsDataLoading(false);
+    }, 260);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Card customizer modal state
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
 
-  // Layout mode: 'grid' (شبكة 3D) | 'detailed' (بطاقات تفصيلية)
-  const [layoutMode, setLayoutMode] = useState<'grid' | 'detailed'>(() => {
+  // Layout mode: 'organic' (عرض انسيابي ثلاثي الأبعاد) | 'grid' (شبكة 3D) | 'detailed' (بطاقات تفصيلية)
+  const [layoutMode, setLayoutMode] = useState<'organic' | 'grid' | 'detailed'>(() => {
     try {
-      return (localStorage.getItem('smart_time_dashboard_layout') as 'grid' | 'detailed') || 'grid';
+      const saved = localStorage.getItem('smart_time_dashboard_layout');
+      if (saved === 'organic' || saved === 'grid' || saved === 'detailed') {
+        return saved;
+      }
+      return 'organic';
     } catch (e) {
-      return 'grid';
+      return 'organic';
     }
   });
+
+  const handleLayoutModeChange = (mode: 'organic' | 'grid' | 'detailed') => {
+    if (mode === layoutMode) return;
+    setIsDataLoading(true);
+    setLayoutMode(mode);
+    setTimeout(() => {
+      setIsDataLoading(false);
+    }, 160);
+  };
 
   // Reorder mode toggle
   const [isReorderMode, setIsReorderMode] = useState<boolean>(false);
@@ -902,7 +929,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-1 rounded-2xl shadow-xs">
           <button
             type="button"
-            onClick={() => setLayoutMode('grid')}
+            onClick={() => handleLayoutModeChange('organic')}
+            className={`px-2 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 transition-all ${
+              layoutMode === 'organic'
+                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+            title={isAr ? 'العرض الانسيابي ثلاثي الأبعاد بالألوان الخفيفة' : '3D Organic Light View'}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline text-[11px]">{isAr ? 'انسيابي 3D' : '3D'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleLayoutModeChange('grid')}
             className={`p-1.5 rounded-xl transition-all ${
               layoutMode === 'grid'
                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
@@ -914,7 +954,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setLayoutMode('detailed')}
+            onClick={() => handleLayoutModeChange('detailed')}
             className={`p-1.5 rounded-xl transition-all ${
               layoutMode === 'detailed'
                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
@@ -958,8 +998,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* Grid or Detailed 3D Cards Render */}
-      {visibleSections.length === 0 ? (
+      {/* Skeleton Loading State OR Cards Render */}
+      {isDataLoading || isLoading ? (
+        <DashboardSkeletonLoader layoutMode={layoutMode} isAr={isAr} />
+      ) : layoutMode === 'organic' ? (
+        <Organic3DDashboard onNavigate={handleCardClick} isAr={isAr} />
+      ) : visibleSections.length === 0 ? (
         <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-2">
           <Star className="w-10 h-10 mx-auto text-amber-400" />
           <p className="text-sm font-bold text-slate-600 dark:text-slate-300">

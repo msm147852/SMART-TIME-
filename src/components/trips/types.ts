@@ -4,6 +4,7 @@ export interface TripLocation {
   longitude: number;
   placeId?: string;
   name?: string;
+  id?: string;
 }
 
-export type LocationPickerMode = 'pickup' | 'dropoff';
+export type LocationPickerMode = 'pickup' | 'dropoff' | 'stop';

@@ -51,6 +51,8 @@ export const DEFAULT_USER: UserProfile = {
   birthDate: '1995-09-15',
   zodiacSign: 'العذراء',
   tickerPreferences: {
+    showDailyTasks: true,
+    showZakkirni: true,
     showTimeAndDate: true,
     showGold: true,
     showSilver: true,

@@ -34,6 +34,8 @@ export interface TickerPreferences {
   showCurrencies: boolean;
   showWeather: boolean;
   showCustomMessage: boolean;
+  showDailyTasks?: boolean; // تذكيرات ومهام قسم ذكرني في شريط الأخبار
+  showZakkirni?: boolean;
   customMessage?: string;
   favoriteEgyptianTeam?: string;
   favoriteTeam?: string; // Global & Local favorite team (ريال مدريد, برشلونة, مان سيتي, ليفربول, الأهلي, إلخ)
