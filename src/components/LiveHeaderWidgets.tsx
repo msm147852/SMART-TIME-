@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Home,
   Newspaper,
+  ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import { Language, UserProfile } from '../types';
 import { fetchLiveMarket, fetchLiveNews, fetchLiveSports, fetchLiveWeather, LiveMarketData, LiveNewsArticle, LiveSportsMatch, LiveWeatherData } from '../services/liveDataService';
@@ -263,9 +265,9 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
   // دالة تصيير الأرقام والبيانات في شريط الأخبار المباشرة
   const renderTickerItems = (keyPrefix: string) => (
-    <div key={keyPrefix} className="flex items-center gap-2.5 px-3 shrink-0 whitespace-nowrap text-slate-700 dark:text-slate-300 font-semibold text-[11px] font-mono">
-      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${marketIsLive ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'}`} title={marketIsLive ? (isAr ? 'بيانات السوق من الإنترنت' : 'Internet market feed') : (isAr ? 'البيانات الحية غير متاحة حالياً — يتم استخدام آخر قيم احتياطية' : 'Live feed unavailable — fallback values are shown')}>
-        <span className={`w-1.5 h-1.5 rounded-full ${marketIsLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+    <div key={keyPrefix} className="flex items-center gap-3 px-3 shrink-0 whitespace-nowrap text-slate-700 dark:text-slate-200 font-bold text-xs sm:text-[13px] font-mono leading-normal">
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] sm:text-[11px] font-black tracking-wide ${marketIsLive ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-400'}`} title={marketIsLive ? (isAr ? 'بيانات السوق من الإنترنت' : 'Internet market feed') : (isAr ? 'البيانات الحية غير متاحة حالياً — يتم استخدام آخر قيم احتياطية' : 'Live feed unavailable — fallback values are shown')}>
+        <span className={`w-2 h-2 rounded-full ${marketIsLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
         {marketIsLive ? (isAr ? 'مباشر' : 'LIVE') : (isAr ? 'احتياطي' : 'FALLBACK')}
       </span>
       
@@ -274,15 +276,15 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         <>
           <button
             onClick={() => handleItemClick('time')}
-            className="flex items-center gap-1 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0"
+            className="flex items-center gap-1.5 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'التاريخ والتقويم (هجري وميلادي)' : 'Date & Calendar'}
           >
-            <Calendar className="w-3 h-3 text-accent-500 shrink-0" />
-            <span className="text-[10px] text-accent-600 dark:text-accent-400 font-sans font-bold">
+            <Calendar className="w-3.5 h-3.5 text-accent-500 shrink-0" />
+            <span className="text-xs text-accent-600 dark:text-accent-400 font-sans font-bold">
               {hijri}
             </span>
             <span className="text-slate-300 dark:text-slate-700">|</span>
-            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-sans font-medium">
+            <span className="text-xs text-slate-600 dark:text-slate-300 font-sans font-medium">
               {gregorian}
             </span>
           </button>
@@ -295,17 +297,17 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         <>
           <button
             onClick={() => handleItemClick('silver')}
-            className="flex items-center gap-1 hover:text-slate-400 cursor-pointer active:scale-95 transition-colors shrink-0 bg-slate-100/70 dark:bg-slate-800/70 px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700"
+            className="flex items-center gap-1.5 hover:text-slate-400 cursor-pointer active:scale-95 transition-colors shrink-0 bg-slate-100/80 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700"
             title={isAr ? 'أسعار الفضة' : 'Silver Rates'}
           >
-            <span className="text-slate-400 font-bold">🥈</span>
-            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 font-sans">
+            <span className="text-slate-400 font-bold text-sm">🥈</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 font-sans">
               {isAr ? 'الفضة' : 'Silver'} ({selectedSilver.karat}):
             </span>
-            <span className="font-bold font-mono text-slate-900 dark:text-white">
+            <span className="font-bold font-mono text-slate-900 dark:text-white text-xs sm:text-[13px]">
               {prefs.silverUnit === 'ounce' ? `$${selectedSilver.rateUsd}` : `${selectedSilver.rateEgp} ج.م`}
             </span>
-            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono">
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
               +{selectedSilver.change}%
             </span>
           </button>
@@ -320,17 +322,17 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             <React.Fragment key={goldItem.id}>
               <button
                 onClick={() => handleItemClick('gold')}
-                className="flex items-center gap-1 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-accent-50/70 dark:bg-accent-950/40 px-2 py-0.5 rounded-md border border-accent-200 dark:border-accent-900/60"
+                className="flex items-center gap-1.5 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-accent-50/80 dark:bg-accent-950/50 px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-900/60"
                 title={isAr ? `ذهب ${goldItem.nameAr} - انقر لعرض جميع العيارات وحاسبة الجرام` : `Gold ${goldItem.nameEn} - Click for all karats & calculator`}
               >
-                <span className="text-accent-500 font-bold">🥇</span>
-                <span className="text-[10px] font-bold text-accent-700 dark:text-accent-300 font-sans">
+                <span className="text-accent-500 font-bold text-sm">🥇</span>
+                <span className="text-xs font-bold text-accent-700 dark:text-accent-300 font-sans">
                   {isAr ? goldItem.nameAr : goldItem.nameEn}:
                 </span>
-                <span className="font-bold font-mono text-accent-950 dark:text-accent-200">
+                <span className="font-bold font-mono text-accent-950 dark:text-accent-200 text-xs sm:text-[13px]">
                   {liveGoldGramEgp ? `${Math.round(liveGoldGramEgp * (goldItem.id === '24' ? 1 : goldItem.id === '21' ? 21/24 : goldItem.id === '18' ? 18/24 : 1)).toLocaleString()} ج.م` : (goldItem.priceEgp ? `${goldItem.priceEgp.toLocaleString()} ج.م` : `$${goldItem.priceUsd}`)}
                 </span>
-                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono">
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
                   +{goldItem.change24h}
                 </span>
               </button>
@@ -345,18 +347,18 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         <>
           <button
             onClick={() => handleItemClick('league')}
-            className="flex items-center gap-1.5 hover:text-emerald-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-emerald-50/70 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-900/60"
+            className="flex items-center gap-1.5 hover:text-emerald-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-emerald-50/80 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-900/60"
             title={isAr ? `فريقك المفضل (${favTeam}) - انقر لعرض جدول المباريات` : `Favorite Team (${favTeam}) - Click for scores`}
           >
-            <Trophy className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 font-sans">
+            <Trophy className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 font-sans">
               {isAr ? 'فريقك المفضل' : 'Favorite'}:
             </span>
-            <span className="font-bold font-sans text-slate-900 dark:text-white flex items-center gap-1">
+            <span className="font-bold font-sans text-slate-900 dark:text-white flex items-center gap-1.5 text-xs sm:text-[13px]">
               <span className={highlightMatchStyles(highlightedMatch.homeTeam, favTeam)}>
                 {highlightedMatch.homeTeam}
               </span>
-              <span className="font-mono bg-white dark:bg-slate-900 px-1 py-0.2 rounded text-[10px] text-emerald-600 font-bold">
+              <span className="font-mono bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded text-xs text-emerald-600 font-bold shadow-2xs">
                 {highlightedMatch.homeScore} - {highlightedMatch.awayScore}
               </span>
               <span className={highlightMatchStyles(highlightedMatch.awayTeam, favTeam)}>
@@ -364,12 +366,12 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
               </span>
             </span>
             {highlightedMatch.leagueNameAr && (
-              <span className="hidden sm:inline-flex items-center text-[9px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-1 rounded font-sans">
+              <span className="hidden sm:inline-flex items-center text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded font-sans font-bold">
                 {isAr ? highlightedMatch.leagueNameAr : highlightedMatch.leagueNameEn}
               </span>
             )}
             {otherMatches[0] && (
-              <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-slate-500 font-sans ps-1 border-s border-emerald-200 dark:border-emerald-800">
+              <span className="hidden md:inline-flex items-center gap-1 text-xs text-slate-500 font-sans ps-1 border-s border-emerald-200 dark:border-emerald-800">
                 <span>{liveSports[0]?.teams?.home?.name || otherMatches[0].homeTeam} {liveSports[0]?.goals?.home ?? otherMatches[0].homeScore}-{liveSports[0]?.goals?.away ?? otherMatches[0].awayScore} {liveSports[0]?.teams?.away?.name || otherMatches[0].awayTeam}</span>
               </span>
             )}
@@ -383,14 +385,14 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         <>
           <button
             onClick={() => handleItemClick('zodiac')}
-            className="flex items-center gap-1.5 hover:text-purple-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-purple-50/70 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-900/60"
+            className="flex items-center gap-1.5 hover:text-purple-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-purple-50/80 dark:bg-purple-950/50 px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-900/60"
             title={isAr ? 'برج وعمر المستخدم وطاقة اليوم' : 'User Zodiac, Age & Energy'}
           >
-            <Sparkles className="w-3 h-3 text-purple-500 shrink-0" />
-            <span className="font-bold text-[10px] text-purple-700 dark:text-purple-300 font-sans">
+            <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+            <span className="font-bold text-xs text-purple-700 dark:text-purple-300 font-sans">
               {user.zodiacSign || zodiac.nameAr} {zodiac.symbol} • {age.years} {isAr ? 'سنة' : 'yrs'}:
             </span>
-            <span className="text-[10px] text-purple-900 dark:text-purple-200 font-sans font-medium max-w-[140px] truncate">
+            <span className="text-xs text-purple-950 dark:text-purple-200 font-sans font-medium max-w-[160px] truncate">
               {zodiacTip}
             </span>
           </button>
@@ -400,14 +402,14 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
       {/* 5.5 أهم الأخبار المحلية */}
       <div
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0 font-sans"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0 font-sans"
         title={isAr ? 'أهم الأخبار المحلية' : 'Local News Headlines'}
       >
-        <Newspaper className="w-3 h-3 text-blue-500 shrink-0" />
-        <span className="font-bold text-[10px]">
+        <Newspaper className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+        <span className="font-bold text-xs">
           {isAr ? '📰 أخبار مباشرة:' : '📰 Live News:'}
         </span>
-        <span className="text-[10px] text-slate-800 dark:text-slate-200 font-medium max-w-[180px] truncate">
+        <span className="text-xs text-slate-800 dark:text-slate-200 font-medium max-w-[210px] truncate">
           {liveNews[0]?.title || (isAr ? 'جاري تحميل الأخبار من الإنترنت…' : 'Loading live news…')}
         </span>
       </div>
@@ -420,18 +422,18 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             <React.Fragment key={cryptoCoin.id}>
               <button
                 onClick={() => handleItemClick('crypto')}
-                className="flex items-center gap-1 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-accent-500/5 dark:bg-accent-500/10 px-1.5 py-0.5 rounded-md border border-accent-500/20"
+                className="flex items-center gap-1.5 hover:text-accent-500 cursor-pointer active:scale-95 transition-colors shrink-0 bg-accent-500/10 dark:bg-accent-500/15 px-2 py-1 rounded-lg border border-accent-500/20"
                 title={isAr ? `${cryptoCoin.nameAr} (${cryptoCoin.symbol}) - انقر لعرض قائمة العملات المشفرة` : `${cryptoCoin.nameEn} - Click for crypto market`}
               >
-                <span className="text-accent-500 font-black">{cryptoCoin.iconSymbol || '🪙'}</span>
-                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                <span className="text-accent-500 font-black text-xs">{cryptoCoin.iconSymbol || '🪙'}</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono">
                   {cryptoCoin.symbol}:
                 </span>
-                <span className="font-bold font-mono text-slate-900 dark:text-white">
+                <span className="font-bold font-mono text-slate-900 dark:text-white text-xs sm:text-[13px]">
                   ${(() => { const idMap: Record<string,string> = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', BNB: 'binancecoin', XRP: 'ripple' }; const v = liveMarket?.crypto?.[idMap[cryptoCoin.symbol]]?.usd; return (v ?? cryptoCoin.priceUsd).toLocaleString(undefined, { maximumFractionDigits: 8 }); })()}
                 </span>
                 <span
-                  className={`text-[9px] font-mono ${
+                  className={`text-[10px] font-mono font-bold ${
                     cryptoCoin.change24h >= 0
                       ? 'text-emerald-600 dark:text-emerald-400'
                       : 'text-rose-500'
@@ -454,11 +456,11 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             className="flex items-center gap-1 hover:text-emerald-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'سعر صرف الدولار' : 'USD Rate'}
           >
-            <span className="text-emerald-600 font-bold">$</span>
-            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+            <span className="text-emerald-600 font-bold text-xs">$</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">
               USD:
             </span>
-            <span className="font-bold font-mono text-slate-900 dark:text-white">
+            <span className="font-bold font-mono text-slate-900 dark:text-white text-xs sm:text-[13px]">
               {usdRate.rate}
             </span>
           </button>
@@ -470,10 +472,10 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             className="flex items-center gap-1 hover:text-emerald-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'الريال السعودي' : 'SAR Rate'}
           >
-            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">
               SAR:
             </span>
-            <span className="font-bold font-mono text-slate-900 dark:text-white">
+            <span className="font-bold font-mono text-slate-900 dark:text-white text-xs sm:text-[13px]">
               {sarRate.rate}
             </span>
           </button>
@@ -485,10 +487,10 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
             className="flex items-center gap-1 hover:text-emerald-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'الدرهم الإماراتي' : 'AED Rate'}
           >
-            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">
               AED:
             </span>
-            <span className="font-bold font-mono text-slate-900 dark:text-white">
+            <span className="font-bold font-mono text-slate-900 dark:text-white text-xs sm:text-[13px]">
               {aedRate.rate}
             </span>
           </button>
@@ -502,14 +504,14 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
         <>
           <button
             onClick={() => handleItemClick('weather')}
-            className="flex items-center gap-1 hover:text-sky-500 cursor-pointer active:scale-95 transition-colors shrink-0"
+            className="flex items-center gap-1.5 hover:text-sky-500 cursor-pointer active:scale-95 transition-colors shrink-0"
             title={isAr ? 'الطقس' : 'Weather'}
           >
-            <CloudSun className="w-3.5 h-3.5 text-accent-500" />
-            <span className="font-bold font-mono text-sky-600 dark:text-sky-400">
+            <CloudSun className="w-4 h-4 text-accent-500" />
+            <span className="font-bold font-mono text-sky-600 dark:text-sky-400 text-xs sm:text-[13px]">
               {weatherIsLive ? `${Math.round(liveWeather!.temperatureC)}°C` : '—'}
             </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-sans">
+            <span className="text-xs text-slate-600 dark:text-slate-300 font-sans">
               {user.city || (isAr ? 'القاهرة' : 'Cairo')}
             </span>
           </button>
@@ -520,7 +522,7 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
       {/* 9. عبارة المستخدم المخصصة */}
       {prefs.showCustomMessage && prefs.customMessage && (
         <>
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-500/10 text-accent-600 dark:text-accent-400 text-[10px] font-sans font-bold shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-500/15 text-accent-700 dark:text-accent-300 text-xs font-sans font-bold shrink-0">
             <span>📢</span>
             <span>{prefs.customMessage}</span>
           </div>
@@ -532,35 +534,42 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
 
   return (
     <>
-      {/* حاوية شريط الأخبار مع زر الهوم الثابت على اليسار بحيث تخرج الأخبار منه متجهة لليمين */}
+      {/* حاوية شريط الأخبار: زر الشعار الثابت على اليمين مع بقاء حركة الشريط */}
       <div
         className="relative w-full overflow-hidden select-none flex items-center bg-slate-50/90 dark:bg-slate-900/90 border-y border-slate-200/70 dark:border-slate-800/70 rounded-xl"
         id="live-ticker-strip-container"
-        dir="ltr"
+        dir="rtl"
       >
-        {/* زر الهوم الثابت فى أول شريط الأخبار من اليسار (تخرج منه الأخبار لليمين بانسيابية) */}
-        <div className="z-20 shrink-0 flex items-center px-1.5 py-0.5 bg-slate-100/95 dark:bg-slate-900/95 border-r border-slate-200/80 dark:border-slate-800/80 shadow-2xs">
+        {/* أيقونة الشعار الرسمية الفاخرة الثابتة على اليمين */}
+        <div className="z-20 shrink-0 flex items-center px-2 py-0.5 bg-slate-100/95 dark:bg-slate-900/95 border-l border-slate-200/80 dark:border-slate-800/80 shadow-2xs">
           <button
             onClick={onGoHome}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-90 shrink-0 ${
+            className={`flex items-center justify-center p-1 px-2 rounded-xl transition-all shadow-xs active:scale-95 shrink-0 ${
               isHomeActive
-                ? 'bg-accent-500 text-slate-950 font-black shadow-accent-500/30 ring-1 ring-accent-400'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-accent-500 hover:border-accent-400/50 border border-slate-200 dark:border-slate-700'
+                ? 'bg-accent-500/20 ring-1.5 ring-accent-500 shadow-accent-500/25'
+                : 'bg-white/80 dark:bg-slate-800/80 hover:bg-accent-50 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700/80 hover:border-accent-400/60'
             }`}
-            title={isAr ? 'الرئيسية — انقر للرجوع للشاشة الرئيسية' : 'Home — Click to go to Dashboard'}
-            id="ticker-fixed-home-btn"
+            title={isAr ? 'شعار SMART TIME — انقر للرجوع للشاشة الرئيسية' : 'SMART TIME Logo — Click to go to Dashboard'}
+            id="ticker-fixed-logo-btn"
           >
-            <Home className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[11px] font-black">{isAr ? 'الرئيسية' : 'Home'}</span>
+            {/* الشعار بدون smart time gold: أيقونة الشعار عريضة وواضحة جداً بخلفية شفافة */}
+            <img
+              src="/emblem-icon-glow.png"
+              alt="شعار البرنامج"
+              className="h-7 sm:h-8 w-auto min-w-[36px] sm:min-w-[42px] object-contain drop-shadow-sm hover:scale-105 transition-transform"
+            />
           </button>
           
-          {/* مؤشر تدفق وانطلاق الأخبار من زر الهوم باتجاه اليمين */}
-          <span className="ms-1 text-[11px] text-accent-500 font-bold animate-pulse select-none">
-            ▶
-          </span>
+          {/* سهم اتجاه الحركة متجهاً لليمين */}
+          <div
+            className="me-1.5 flex items-center justify-center text-accent-500 font-bold select-none"
+            title={isAr ? 'حركة شريط الأخبار والأسعار لليمين' : 'Live news moving right'}
+          >
+            <ArrowRight className="w-3.5 h-3.5 text-accent-500 animate-pulse shrink-0 stroke-[2.5]" />
+          </div>
         </div>
 
-        {/* مسار الأخبار المتحركة (خارجة من زر الهوم متجهة نحو اليمين) */}
+        {/* مسار الأخبار المتحركة */}
         <div
           className="relative flex-1 overflow-hidden min-w-0 py-0.5"
           dir="ltr"
@@ -589,12 +598,12 @@ export const LiveHeaderWidgets: React.FC<LiveHeaderWidgetsProps> = ({
               : 'Customized Live Ticker — Press to hold, click any item for details'
           }
         >
-          {/* تدرج تلاشي خروج الأخبار بسلاسة من جانب زر الهوم الأيسر */}
+          {/* تدرج تلاشي ناعم بجانب زر الشعار في اليمين */}
           <div
-            className="absolute top-0 bottom-0 left-0 z-10 w-4 pointer-events-none bg-gradient-to-r from-slate-100 dark:from-slate-900 to-transparent"
+            className="absolute top-0 bottom-0 right-0 z-10 w-4 pointer-events-none bg-gradient-to-l from-slate-100 dark:from-slate-900 to-transparent"
           />
 
-          {/* شريط التحريك المستمر باتجاه اليمين */}
+          {/* شريط التحريك المعكوس باتجاه اليمين */}
           <div
             className="flex items-center animate-marquee-right"
             style={{

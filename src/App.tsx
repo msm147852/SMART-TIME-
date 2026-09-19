@@ -491,7 +491,9 @@ export default function App() {
                 onClick={() => handleNavigateSafe(item.view)}
                 className={`flex flex-col items-center justify-center p-1.5 rounded-2xl transition-all active:scale-95 ${
                   item.highlight
-                    ? 'bg-gradient-to-tr from-purple-600 to-indigo-600 text-white px-3.5 py-1.5 shadow-md shadow-purple-500/25 -mt-3 ring-3 ring-white dark:ring-slate-900'
+                    ? isActive
+                      ? 'bg-gradient-to-tr from-accent-500 to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 shadow-lg shadow-accent-500/30 -mt-3 ring-3 ring-white dark:ring-slate-900 scale-105'
+                      : 'bg-gradient-to-tr from-accent-600 to-amber-600 text-slate-950 font-bold px-3.5 py-1.5 shadow-md shadow-accent-500/25 -mt-3 ring-3 ring-white dark:ring-slate-900 opacity-95'
                     : isActive
                     ? 'text-accent-600 dark:text-accent-400 font-bold bg-accent-500/10 dark:bg-accent-500/15 px-3'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'

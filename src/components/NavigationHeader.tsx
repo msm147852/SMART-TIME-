@@ -18,6 +18,7 @@ import { Language, ThemeMode, UserProfile, AppNotification, DailyTask, Note } fr
 import { translations } from '../services/i18n';
 import { LiveHeaderWidgets } from './LiveHeaderWidgets';
 import { DhakirniReminderBar } from './DhakirniReminderBar';
+import { BrandLogo } from './BrandLogo';
 
 interface NavigationHeaderProps {
   user: UserProfile;
@@ -78,9 +79,19 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const timeFormatted = now.toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', {
+  // تنسيق الوقت باللغة الإنجليزية/الأرقام اللاتينية الواضحة
+  const timeFormatted = now.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
+  });
+  const secondsFormatted = now.getSeconds().toString().padStart(2, '0');
+
+  // التاريخ الميلادي بنفس مساحة الساعة (اليوم، الشهر، السنة)
+  const gregorianDateFormatted = now.toLocaleDateString(isAr ? 'ar-EG' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
 
   // Close overflow menu when clicking outside
@@ -108,11 +119,13 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 shadow-xs select-none">
-      {/* 1. Android Top App Bar / Toolbar */}
-      <div className="px-2.5 sm:px-3 h-14 flex items-center justify-between gap-1.5">
-        
-        {/* Side A (Start): User Profile Photo & Name (+ Back button if inside a subscreen) */}
-        <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+      {/* 1. الشريط العلوي (Top Bar) حسب الترتيب المحدد بدقة من الجهة اليسرى (LTR container for consistent left-to-right alignment) */}
+      <div
+        className="w-full px-2 sm:px-3 h-14 flex items-center justify-between gap-1.5"
+        dir="ltr"
+      >
+        {/* الجانب الأيسر: زر الرجوع (عند التواجد في قسم فرعي) + صورة المستخدم بحواف دائرية + الاسم والمهنة */}
+        <div className="flex items-center gap-1.5 min-w-0 shrink">
           {!isHomeActive && (
             <button
               onClick={handleBackClick}
@@ -120,24 +133,28 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               title={isAr ? 'رجوع للخلف' : 'Back'}
               id="android-back-btn"
             >
-              {isAr ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
 
+          {/* صورة المستخدم بمربع بحواف دائرية بجانبها اسم ومهنة المستخدم */}
           <button
             onClick={onOpenSettings}
-            className="flex items-center gap-2 p-1 pe-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-start group active:scale-95 max-w-[145px] sm:max-w-[190px]"
+            className="flex items-center gap-2 p-1 pe-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all text-left group active:scale-95 min-w-0 max-w-[140px] xs:max-w-[170px] sm:max-w-[210px]"
             title={isAr ? 'الملف الشخصي والإعدادات' : 'User Profile & Settings'}
             id="android-profile-btn"
           >
-            <div className="relative shrink-0">
+            {/* مربع بحواف دائرية لصورة المستخدم */}
+            <div className="relative shrink-0 w-9 h-9 rounded-2xl overflow-hidden ring-2 ring-accent-500/80 shadow-xs bg-slate-100 dark:bg-slate-800">
               <img
                 src={user.avatarUrl}
                 alt={user.name}
-                className="w-8 h-8 rounded-xl object-cover ring-2 ring-accent-500/80 shadow-xs"
+                className="w-full h-full object-cover"
               />
-              <span className="absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
             </div>
+
+            {/* بجانب الصورة: اسم ومهنة المستخدم */}
             <div className="flex flex-col min-w-0 leading-tight">
               <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                 {user.name}
@@ -149,68 +166,75 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </button>
         </div>
 
-        {/* Center / Action Buttons (Fixed Clock, Settings Gear, Search, Mic, Notifications, Menu) */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* الساعة الثابتة فى الشريط العلوى (Fixed Live Clock) */}
-          <div
-            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-slate-800 dark:text-slate-100 shadow-2xs shrink-0 select-none"
-            title={isAr ? 'الساعة الثابتة — الوقت الحالي' : 'Live Clock — Current Time'}
-            id="android-fixed-clock"
-          >
-            <Clock className="w-3.5 h-3.5 text-accent-500 animate-pulse shrink-0" />
-            <span className="font-mono font-black text-xs tracking-tight">
-              {timeFormatted}
-            </span>
-          </div>
-
-          {/* ترس السيتنج (Settings Gear) */}
-          <button
-            onClick={onOpenSettings}
-            className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all"
-            title={isAr ? 'الإعدادات والنسخ الاحتياطي (Settings)' : 'Settings & Backup'}
-            id="android-settings-gear-btn"
-          >
-            <Settings className="w-4 h-4 hover:rotate-45 transition-transform" />
-          </button>
-
-          {/* Search Button */}
-          <button
-            onClick={onOpenSearch}
-            className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-colors"
-            title={isAr ? 'بحث سريع' : 'Search'}
-            id="android-search-btn"
-          >
-            <Search className="w-4 h-4" />
-          </button>
-
-          {/* Voice Search Button */}
-          <button
-            onClick={onOpenVoiceSearch}
-            className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-accent-600 dark:text-accent-400 hover:bg-accent-500/10 active:scale-95 transition-colors"
-            title={isAr ? 'البحث الصوتي' : 'Voice Search'}
-            id="android-mic-btn"
-          >
-            <Mic className="w-4 h-4" />
-          </button>
-
-          {/* Notifications Button */}
+        {/* الجانب الأيمن من الشريط العلوي بالترتيب المحدد: 
+            أيقونة الإشعارات -> ساعة رقمية مميزة -> أيقونة الترس (الضبط) -> البحث وقائمة الخيارات */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* بجانبه أيقونة الإشعارات */}
           <button
             onClick={onOpenNotifications}
-            className="relative w-8.5 h-8.5 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-colors"
+            className="relative w-8.5 h-8.5 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all border border-slate-200/60 dark:border-slate-700/60"
             title={t.notifications}
             id="android-notifications-btn"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-4 h-4 text-slate-700 dark:text-slate-200" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+              <span className="absolute top-1 end-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-ping" />
+            )}
+            {unreadCount > 0 && (
+              <span className="absolute top-1 end-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
             )}
           </button>
 
-          {/* Android 3-Dots Overflow Menu (⋮) */}
+          {/* بجانبه ساعة رقمية احترافية بخلفية شفافة وتحتها التاريخ الميلادي بنفس المساحة */}
+          <div
+            className="flex flex-col items-center justify-center px-1.5 py-0.5 rounded-xl bg-transparent hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors shrink-0 select-none cursor-default group"
+            title={isAr ? `الساعة: ${timeFormatted} | التاريخ الميلادي: ${gregorianDateFormatted}` : `Time: ${timeFormatted} | Date: ${gregorianDateFormatted}`}
+            id="android-distinctive-clock"
+          >
+            {/* الصف العلوي: أيقونة الساعة + الوقت + الثواني بخلفية شفافة تماماً */}
+            <div className="flex items-center gap-1 leading-none">
+              <Clock className="w-3.5 h-3.5 text-accent-500 group-hover:scale-110 transition-transform shrink-0" />
+              <span className="font-mono font-black text-xs sm:text-[13px] tracking-tight text-slate-900 dark:text-white">
+                {timeFormatted}
+              </span>
+              <span className="font-mono text-[9px] font-bold text-accent-600 dark:text-accent-400">
+                :{secondsFormatted}
+              </span>
+            </div>
+
+            {/* الصف السفلي: التاريخ الميلادي بنفس مساحة وعرض الساعة */}
+            <div className="w-full flex items-center justify-center gap-1 mt-0.5 pt-0.5 border-t border-slate-200/50 dark:border-slate-800/50 leading-none">
+              <span className="text-[9.5px] sm:text-[10px] font-bold font-sans text-slate-500 dark:text-slate-400 tracking-tight whitespace-nowrap">
+                📅 {gregorianDateFormatted}
+              </span>
+            </div>
+          </div>
+
+          {/* بجانبه أيقونة الترس (الضبط) */}
+          <button
+            onClick={onOpenSettings}
+            className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all border border-slate-200/60 dark:border-slate-700/60 group"
+            title={isAr ? 'الإعدادات والضبط (Settings)' : 'Settings & Preferences'}
+            id="android-settings-gear-btn"
+          >
+            <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300 text-slate-700 dark:text-slate-200" />
+          </button>
+
+          {/* زر البحث السريع */}
+          <button
+            onClick={onOpenSearch}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-colors hidden xs:flex"
+            title={isAr ? 'بحث سريع' : 'Search'}
+            id="android-search-btn"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
+
+          {/* قائمة الخيارات الإضافية (Android 3-Dots Menu) */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-colors active:scale-95 ${
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors active:scale-95 ${
                 isMenuOpen
                   ? 'bg-accent-500 text-slate-950'
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -221,11 +245,12 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               <MoreVertical className="w-4 h-4" />
             </button>
 
-            {/* Android Dropdown Menu Sheet */}
+            {/* Dropdown Menu */}
             {isMenuOpen && (
               <div
-                className="absolute end-0 mt-2 w-52 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-1.5 z-50 animate-fadeIn"
+                className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-1.5 z-50 animate-fadeIn"
                 id="android-overflow-dropdown"
+                dir={isAr ? 'rtl' : 'ltr'}
               >
                 {/* Theme toggle */}
                 <button
@@ -246,6 +271,18 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                   <span className="text-[10px] text-accent-600 font-bold uppercase">
                     {theme === 'dark' ? (isAr ? 'داكن' : 'Dark') : (isAr ? 'فاتح' : 'Light')}
                   </span>
+                </button>
+
+                {/* Voice Search */}
+                <button
+                  onClick={() => {
+                    onOpenVoiceSearch();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Mic className="w-4 h-4 text-accent-500" />
+                  <span>{isAr ? 'البحث الصوتي' : 'Voice Search'}</span>
                 </button>
 
                 {/* Language options */}
@@ -291,27 +328,13 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             )}
           </div>
         </div>
-
-        {/* Side B (End): Official App Logo (بالجهة المقابلة لصورة المستخدم) */}
-        <button
-          onClick={() => onNavigate('dashboard')}
-          className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-accent-500/10 transition-all active:scale-95 group shrink-0"
-          title={isAr ? 'SMART TIME — وقتك في مكان واحد' : 'SMART TIME — Your time, organized'}
-          id="android-official-brand-logo-btn"
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-accent-400 via-accent-500 to-accent-700 border border-accent-300/60 p-1 shadow-md shadow-accent-500/20 group-hover:scale-105 transition-transform flex items-center justify-center text-white">
-            <div className="w-full h-full rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-        </button>
-
       </div>
 
-      {/* 2. شريط الأخبار والأسعار الرقمية المباشرة (يثبت في جميع الأقسام ويختفي فقط عند فتح السيتنج) */}
+      {/* 2. شريط الأخبار المتحرك (أسفل الشريط العلوي مباشرة):
+             يبدأ بأيقونة الشعار الرسمية الفاخرة الثابتة تخرج منها الأخبار والأسعار متحركة نحو اليمين */}
       {!isSettingsOpen && activeTab !== 'settings' && (
         <>
-          <div className="w-full bg-slate-100/90 dark:bg-slate-950/80 border-t border-slate-200/60 dark:border-slate-800/60 px-1 py-1 flex items-center">
+          <div className="w-full bg-slate-100/90 dark:bg-slate-950/80 px-1 py-1 flex items-center">
             <LiveHeaderWidgets
               user={user}
               language={language}
@@ -320,7 +343,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             />
           </div>
 
-          {/* 3. مربع التذكير "ذكرني" بعرض الشاشة تحت شريط الأخبار وبارتفاع ضعف شريط الأخبار تقريباً */}
+          {/* 3. أسفله شريط ذكرني بعرض الشاشة */}
           <DhakirniReminderBar
             language={language}
             tasks={dailyTasks}
