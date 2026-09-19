@@ -30,6 +30,26 @@ function getGemini(): any {
 const app = express();
 app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT || 3000);
+
+// CORS for the Vercel-hosted frontend talking to the Railway API.
+// Keep credentials disabled; SMART TIME auth uses bearer tokens explicitly.
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || "");
+  const allowed =
+    !origin ||
+    /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin) ||
+    /^https?:\/\/localhost(?::\\d+)?$/i.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(?::\\d+)?$/i.test(origin);
+
+  if (allowed && origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 seedServiceStatuses();
 seedDefaultChatRooms();
 app.use(express.json({ limit: "50mb" }));
