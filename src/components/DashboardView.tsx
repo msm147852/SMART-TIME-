@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, Expense, Note, Recipe, Vehicle, ChatRoom, AppView } from '../types';
+import { UserProfile, Expense, Note, Vehicle, ChatRoom, AppView } from '../types';
 import {
   MessageSquare,
   DollarSign,
@@ -50,7 +50,6 @@ interface DashboardViewProps {
   user: UserProfile;
   expenses: Expense[];
   notes: Note[];
-  recipes: Recipe[];
   vehicles: Vehicle[];
   chatRooms: ChatRoom[];
   onNavigate: (tab: AppView, subView?: string) => void;
@@ -123,18 +122,7 @@ const ALL_SECTIONS: SectionCard[] = [
     gradient: 'from-sky-500/20 via-blue-500/10 to-transparent',
     darkGradient: 'from-sky-950/40 via-blue-950/20 to-slate-900',
   },
-  {
-    id: 'food',
-    titleAr: 'الطعام والمشتريات',
-    titleEn: 'Food & Pantry',
-    subtitleAr: 'الوصفات الشهية، قائمة التسوق والمؤونة',
-    subtitleEn: 'Recipes, shopping list & inventory',
-    icon: Utensils,
-    emoji: '🍽️',
-    tone: 'food',
-    gradient: 'from-pink-500/20 via-rose-500/10 to-transparent',
-    darkGradient: 'from-pink-950/40 via-rose-950/20 to-slate-900',
-  },
+
   {
     id: 'ai',
     titleAr: 'الذكاء الاصطناعي',
@@ -673,7 +661,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   user,
   expenses,
   notes,
-  recipes,
   vehicles,
   chatRooms,
   onNavigate,
@@ -847,8 +834,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return expenses.length > 0 ? `${expenses.length} سجل` : undefined;
       case 'notes':
         return notes.length > 0 ? `${notes.length} ملاحظة` : undefined;
-      case 'food':
-        return recipes.length > 0 ? `${recipes.length} وصفة` : undefined;
       case 'vehicles':
         return vehicles.length > 0 ? `${vehicles.length} مركبة` : undefined;
       case 'chat':
