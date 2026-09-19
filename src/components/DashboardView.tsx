@@ -40,6 +40,7 @@ import { useCardPreferences } from '../context/CardSettingsContext';
 import {
   resolveCardContainerClasses,
   getCardDensityClasses,
+  getCardIconSizeClass,
 } from '../utils/cardDesignHelper';
 import { CardCustomizerModal } from './CardCustomizerModal';
 import { Organic3DDashboard } from './Organic3DDashboard';
@@ -312,6 +313,7 @@ const Interactive3DCard: React.FC<{
   const IconComponent = section.icon;
   const densityClasses = getCardDensityClasses(preferences.density);
   const cardContainerClass = resolveCardContainerClasses(preferences, section.tone, isReorderMode);
+  const iconSizeClass = preferences.iconSize ? getCardIconSizeClass(preferences.iconSize) : densityClasses.iconSize;
 
   // Detailed / Wide Card Layout
   if (layoutMode === 'detailed' || isWide) {
@@ -374,7 +376,7 @@ const Interactive3DCard: React.FC<{
                   ? 'translateZ(20px)'
                   : 'translateZ(0px)',
             }}
-            className={`dashboard-section-icon ${densityClasses.iconSize} rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-200 shadow-sm`}
+            className={`dashboard-section-icon ${iconSizeClass} rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-200 shadow-sm`}
           >
             <IconComponent className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
@@ -968,7 +970,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Gear Cog Icon for Card Customizer Studio */}
           <button
             type="button"
-            onClick={() => setIsCustomizerOpen(true)}
+            onClick={(e) => { e.stopPropagation(); setIsCustomizerOpen(true); }}
             className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90"
             title={isAr ? 'ضبط وتخصيص نمط وتصميم البطاقات' : 'Card Design & Settings'}
           >
@@ -1095,6 +1097,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isOpen={isCustomizerOpen}
         onClose={() => setIsCustomizerOpen(false)}
         language={user.language || 'ar'}
+        sections={sections.map((section) => ({
+          id: section.id,
+          titleAr: section.titleAr,
+          titleEn: section.titleEn,
+          emoji: section.emoji,
+        }))}
       />
     </div>
   );
