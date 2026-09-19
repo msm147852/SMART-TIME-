@@ -2,7 +2,7 @@ import express from "express";
 import http from "node:http";
 import path from "path";
 import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
+const require = createRequire(path.resolve(process.cwd(), "server.ts"));
 const { GoogleGenAI } = require("@google/genai") as { GoogleGenAI: new (options: { apiKey: string }) => any };
 import dotenv from "dotenv";
 import crypto from "node:crypto";
