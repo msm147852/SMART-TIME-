@@ -510,3 +510,75 @@ html[class*="theme-"] nav button[class*="text-accent-600"] {
   animation: shimmer 1.8s infinite;
 }
 
+
+/* =========================================================
+   SMART TIME — Organic card shapes (reference-inspired)
+   Smooth 3D blob silhouettes without changing card behavior.
+   ========================================================= */
+.smart-organic-card{
+  position:relative;
+  min-height:190px;
+  isolation:isolate;
+  border-radius:46% 54% 52% 48% / 42% 48% 52% 58%;
+  border-width:1px;
+  box-shadow:
+    0 16px 34px -12px rgba(15,23,42,.22),
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(15,23,42,.06);
+  transform:translateZ(0);
+}
+.smart-organic-card::before{
+  content:"";
+  position:absolute;
+  inset:7px;
+  z-index:-1;
+  border-radius:inherit;
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255,255,255,.55), transparent 28%),
+    radial-gradient(circle at 78% 82%, rgba(255,255,255,.22), transparent 32%);
+  opacity:.9;
+  pointer-events:none;
+}
+.smart-organic-card::after{
+  content:"";
+  position:absolute;
+  width:58%;
+  height:34%;
+  top:-8%;
+  inset-inline-start:12%;
+  z-index:-1;
+  border-radius:50%;
+  background:rgba(255,255,255,.34);
+  filter:blur(13px);
+  transform:rotate(-10deg);
+  pointer-events:none;
+}
+.smart-organic-card--expenses{border-radius:42% 58% 51% 49% / 47% 40% 60% 53%}
+.smart-organic-card--chat{border-radius:56% 44% 48% 52% / 42% 55% 45% 58%}
+.smart-organic-card--food{border-radius:49% 51% 44% 56% / 55% 43% 57% 45%}
+.smart-organic-card--trips{border-radius:45% 55% 58% 42% / 53% 45% 55% 47%}
+.smart-organic-card--notes{border-radius:54% 46% 43% 57% / 45% 56% 44% 55%}
+.smart-organic-card--sports{border-radius:52% 48% 57% 43% / 47% 54% 46% 53%}
+.smart-organic-card:hover{
+  box-shadow:
+    0 22px 42px -13px rgba(15,23,42,.28),
+    inset 0 1px 0 rgba(255,255,255,.68),
+    inset 0 -1px 0 rgba(15,23,42,.08);
+}
+.dark .smart-organic-card{
+  box-shadow:
+    0 20px 42px -14px rgba(0,0,0,.62),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 -1px 0 rgba(0,0,0,.24);
+}
+.dark .smart-organic-card::before{
+  background:
+    radial-gradient(circle at 22% 16%, rgba(255,255,255,.14), transparent 27%),
+    radial-gradient(circle at 80% 82%, rgba(255,255,255,.07), transparent 34%);
+}
+@media(max-width:640px){
+  .smart-organic-card{
+    min-height:172px;
+    padding:10px!important;
+  }
+}
