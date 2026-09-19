@@ -18,8 +18,6 @@ import {
   Student,
   LessonItem,
   EducationExpense,
-  Recipe,
-  ShoppingItem,
   AthkarItem,
   SecureRecord,
   MediaFolder,
@@ -36,7 +34,6 @@ import {
   ExpensesRepository,
   VehiclesRepository,
   EducationRepository,
-  FoodRepository,
   ReligiousRepository,
   VaultRepository,
   TripsRepository,
@@ -57,7 +54,6 @@ import WalletView from './components/WalletView';
 import AdminWalletPanel from './components/AdminWalletPanel';
 import { VehiclesView } from './components/VehiclesView';
 import { EducationView } from './components/EducationView';
-import FoodSection from './components/FoodSection';
 import { ReligiousView } from './components/ReligiousView';
 import { SecureVaultView } from './components/SecureVaultView';
 import { AiCenterView } from './components/AiCenterView';
@@ -131,8 +127,6 @@ export default function App() {
   const [educationExpenses, setEducationExpenses] = useState<EducationExpense[]>(() =>
     EducationRepository.getEducationExpenses()
   );
-  const [recipes, setRecipes] = useState<Recipe[]>(() => FoodRepository.getRecipes());
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => FoodRepository.getShoppingList());
   const [athkarItems, setAthkarItems] = useState<AthkarItem[]>(() => ReligiousRepository.getAthkarItems());
   const [secureRecords, setSecureRecords] = useState<SecureRecord[]>(() => VaultRepository.getRecords());
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>(() => ChatRepository.getChatRooms());
@@ -418,10 +412,6 @@ export default function App() {
                 EducationRepository.saveEducationExpenses(updated);
               }}
             />
-          )}
-
-          {currentView === 'food' && (
-            <FoodSection onBack={() => handleNavigateSafe('dashboard' as AppView)} />
           )}
 
           {currentView === 'religious' && (
