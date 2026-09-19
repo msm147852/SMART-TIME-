@@ -6,6 +6,8 @@ import {
   CardBlur,
   CardAnimation,
   CardDensity,
+  CardIconSize,
+  CardBackgroundTheme,
   CardPresetId,
 } from '../types';
 
@@ -163,6 +165,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: true,
       showGlow: true,
       tilt3D: true,
+      iconSize: 'medium',
+      backgroundTheme: 'default',
       activePreset: 'dashboard',
     },
   },
@@ -184,6 +188,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: true,
       showGlow: true,
       tilt3D: true,
+      iconSize: 'medium',
+      backgroundTheme: 'default',
       activePreset: 'glass',
     },
   },
@@ -205,6 +211,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: true,
       showGlow: false,
       tilt3D: false,
+      iconSize: 'large',
+      backgroundTheme: 'default',
       activePreset: 'elegant',
     },
   },
@@ -226,6 +234,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: true,
       showGlow: true,
       tilt3D: true,
+      iconSize: 'medium',
+      backgroundTheme: 'default',
       activePreset: 'darkPremium',
     },
   },
@@ -247,6 +257,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: true,
       showGlow: true,
       tilt3D: true,
+      iconSize: 'medium',
+      backgroundTheme: 'default',
       activePreset: 'colorful',
     },
   },
@@ -268,6 +280,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: true,
       showGlow: true,
       tilt3D: true,
+      iconSize: 'medium',
+      backgroundTheme: 'default',
       activePreset: 'neon',
     },
   },
@@ -289,6 +303,8 @@ export const CARD_PRESETS: CardPresetMeta[] = [
       showBadges: false,
       showGlow: false,
       tilt3D: false,
+      iconSize: 'small',
+      backgroundTheme: 'default',
       activePreset: 'minimal',
     },
   },
@@ -305,6 +321,8 @@ export const DEFAULT_CARD_PREFERENCES: CardPreferences = {
   showBadges: true,
   showGlow: true,
   tilt3D: true,
+  iconSize: 'medium',
+  backgroundTheme: 'default',
   activePreset: 'dashboard',
   hiddenCardIds: [],
   cardSizes: {},
@@ -399,6 +417,37 @@ export function getCardDensityClasses(density: CardDensity): {
   }
 }
 
+
+export function getCardIconSizeClass(size?: CardIconSize): string {
+  switch (size) {
+    case 'small':
+      return 'w-8 h-8 sm:w-9 sm:h-9';
+    case 'large':
+      return 'w-12 h-12 sm:w-14 sm:h-14';
+    case 'medium':
+    default:
+      return 'w-10 h-10 sm:w-12 sm:h-12';
+  }
+}
+
+export function getCardBackgroundClass(theme?: CardBackgroundTheme): string {
+  switch (theme) {
+    case 'sky':
+      return 'card-bg-sky';
+    case 'mint':
+      return 'card-bg-mint';
+    case 'lavender':
+      return 'card-bg-lavender';
+    case 'peach':
+      return 'card-bg-peach';
+    case 'candy':
+      return 'card-bg-candy';
+    case 'default':
+    default:
+      return '';
+  }
+}
+
 // Main Card Styling Resolver
 export function resolveCardContainerClasses(
   preferences: CardPreferences,
@@ -408,6 +457,7 @@ export function resolveCardContainerClasses(
   const radius = getCardRadiusClass(preferences.radius);
   const shadow = getCardShadowClass(preferences.shadow);
   const blur = getCardBlurClass(preferences.blur);
+  const backgroundClass = getCardBackgroundClass(preferences.backgroundTheme);
 
   let styleClasses = '';
 
@@ -449,5 +499,5 @@ export function resolveCardContainerClasses(
     ? 'ring-2 ring-amber-400 dark:ring-amber-500 scale-[0.98] shadow-lg'
     : '';
 
-  return `${radius} ${shadow} ${styleClasses} ${reorderRing} transition-all duration-200 relative overflow-hidden select-none`;
+  return `${radius} ${shadow} ${styleClasses} ${backgroundClass} ${reorderRing} transition-all duration-200 relative overflow-hidden select-none`;
 }
