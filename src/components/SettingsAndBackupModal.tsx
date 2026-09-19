@@ -432,7 +432,6 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
       vehiclePreferences: vehiclePrefs,
       budgetPreferences: budgetPrefs,
       religiousDetails: relDetails,
-      foodPreferences: foodPrefs,
       educationPreferences: eduPrefs,
     };
     onUpdateProfile(updated);
