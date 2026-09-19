@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { CardSettingsProvider } from './context/CardSettingsContext.tsx';
 import './index.css';
+import './v9-adaptive.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

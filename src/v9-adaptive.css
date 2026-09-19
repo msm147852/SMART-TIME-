@@ -1,0 +1,117 @@
+/*
+ * SMART TIME V9 — adaptive application shell.
+ * The layout follows the actual application window instead of assuming a 430px phone.
+ */
+@media (min-width: 600px) {
+  #root > div:first-child {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+  }
+
+  #root > div:first-child > div:first-child {
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+    border-width: 0;
+    box-shadow: none;
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  #android-system-status-bar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  #root > div:first-child > div:first-child > header {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  /* Existing mobile navigation becomes the large-screen navigation rail. */
+  #root > div:first-child > div:first-child > nav {
+    grid-column: 1;
+    grid-row: 2 / 4;
+    width: 104px;
+    height: auto;
+    min-height: 0;
+    padding: 12px 8px;
+    border-top-width: 0;
+    border-inline-end-width: 1px;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  #root > div:first-child > div:first-child > nav > button {
+    width: 88px;
+    min-height: 64px;
+    flex: 0 0 auto;
+    padding: 8px;
+    border-radius: 18px;
+  }
+
+  #root > div:first-child > div:first-child > nav > button[class*="-mt-3"] {
+    margin-top: 0;
+  }
+
+  #root > div:first-child > div:first-child > main {
+    grid-column: 2;
+    grid-row: 3;
+    min-width: 0;
+    min-height: 0;
+    padding-bottom: 20px;
+  }
+
+  #root > div:first-child > div:first-child > nav + div {
+    display: none;
+  }
+
+  /* Dashboard grid: 2 columns on compact windows, then progressively wider. */
+  #android-dashboard-grid-view > .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 840px) {
+  #root > div:first-child > div:first-child {
+    grid-template-columns: 116px minmax(0, 1fr);
+  }
+  #root > div:first-child > div:first-child > nav { width: 116px; }
+  #root > div:first-child > div:first-child > nav > button { width: 96px; }
+  #root > div:first-child > div:first-child > main { padding-inline: 20px; }
+
+  #android-dashboard-grid-view > .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  #root > div:first-child > div:first-child {
+    grid-template-columns: 132px minmax(0, 1fr);
+  }
+  #root > div:first-child > div:first-child > nav { width: 132px; }
+  #root > div:first-child > div:first-child > nav > button { width: 108px; }
+  #root > div:first-child > div:first-child > main { padding-inline: 28px; }
+
+  #android-dashboard-grid-view > .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root *, #root *::before, #root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
