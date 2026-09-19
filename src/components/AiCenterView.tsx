@@ -14,6 +14,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { AiMessage, AiModelType, Language } from '../types';
+import { askSmartAi, buildSmartAiContext, SmartAiAction } from '../services/aiService';
 import { translations } from '../services/i18n';
 import { ChatRepository } from '../services';
 import { apiUrl } from '../services/apiConfig';
@@ -23,13 +24,13 @@ interface AiCenterViewProps {
   onOpenVoiceSearch: () => void;
 }
 
-export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoiceSearch }) => {
+export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoiceSearch, appContext, onApplyAction }) => {
   const t = translations[language];
-  const [selectedModel, setSelectedModel] = useState<AiModelType>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<AiModelType>('gemini-3.8-flash');
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);\n  const [pendingAction, setPendingAction] = useState<SmartAiAction>(null);\n  const [actionStatus, setActionStatus] = useState<string>('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // Load chat history
@@ -83,39 +84,32 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
     setIsLoading(true);
 
     try {
-      // Server-side Gemini API call via /api/ai/chat
-      const res = await fetch(apiUrl('/api/ai/chat'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: textToSend,
-          prompt: textToSend,
-          modelProvider: selectedModel,
-          conversationHistory: newMessages.slice(-6).map((m) => ({
-            sender: m.sender === 'user' ? 'user' : 'model',
-            text: m.text,
-          })),
-        }),
+      const data = await askSmartAi({
+        message: textToSend,
+        language,
+        model: selectedModel,
+        conversationHistory: newMessages.slice(-8).map((m) => ({
+          sender: m.sender === 'user' ? 'user' : 'model',
+          text: m.text,
+        })),
+        appContext: buildSmartAiContext(appContext),
       });
-
-      const data = await res.json();
-      const aiReply =
-        data.reply ||
-        (language === 'ar'
-          ? `بناءً على تحليلي لطلبك بخصوص "${textToSend}"، تم فحص البيانات بنجاح وتقديم التوصيات الذكية اللازمة لمساعدتك في توفير الوقت والمال.`
-          : `Based on your request regarding "${textToSend}", the SMART TIME AI engine has processed your data to save time and optimize your daily workflow.`);
 
       const aiMsg: AiMessage = {
         id: 'msg_ai_' + Date.now(),
         sender: 'ai',
-        text: aiReply,
+        text: data.reply || (language === 'ar' ? 'لم أتمكن من توليد رد واضح.' : 'I could not generate a clear response.'),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: selectedModel,
+        model: (data.model as AiModelType) || selectedModel,
+        provider: (data.provider as any) || 'gemini',
       };
 
       const finalMessages = [...newMessages, aiMsg];
       setMessages(finalMessages);
       ChatRepository.saveAiChatHistory(finalMessages);
+
+      setPendingAction(data.action || null);
+      setActionStatus(data.actionSummary || '');
     } catch (e) {
       console.error('AI chat failed:', e);
       const fallbackMsg: AiMessage = {
@@ -169,16 +163,19 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
         {/* Model Switcher Buttons */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto">
           <button
-            onClick={() => setSelectedModel('gemini-2.5-flash')}
+            onClick={() => setSelectedModel('gemini-3.8-flash')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
               selectedModel === 'gemini-2.5-flash'
                 ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
-            ✨ Gemini 2.5 Flash
+            ✨ Gemini 3.8 Flash
           </button>
           <button
+            type="button"
+            disabled
+            title="سيتم ربط مزودين إضافيين لاحقًا"
             onClick={() => setSelectedModel('chatgpt-4o')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
               selectedModel === 'chatgpt-4o'
@@ -189,6 +186,9 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
             🟢 ChatGPT 4o
           </button>
           <button
+            type="button"
+            disabled
+            title="سيتم ربط مزودين إضافيين لاحقًا"
             onClick={() => setSelectedModel('claude-3-5-sonnet')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
               selectedModel === 'claude-3-5-sonnet'
@@ -199,6 +199,9 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
             🟠 Claude 3.5
           </button>
           <button
+            type="button"
+            disabled
+            title="سيتم ربط مزودين إضافيين لاحقًا"
             onClick={() => setSelectedModel('manus-agent')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
               selectedModel === 'manus-agent'
