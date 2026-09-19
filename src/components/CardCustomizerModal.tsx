@@ -15,12 +15,13 @@ import {
   SunMedium,
   CheckCircle2,
 } from 'lucide-react';
-import { Language, CardPreferences, CardStyleType, CardRadius, CardShadow, CardBlur, CardAnimation, CardDensity, CardPresetId } from '../types';
+import { Language, CardPreferences, CardStyleType, CardRadius, CardShadow, CardBlur, CardAnimation, CardDensity, CardPresetId, CardIconSize, CardBackgroundTheme } from '../types';
 import {
   CARD_STYLES_LIST,
   CARD_PRESETS,
   resolveCardContainerClasses,
   getCardDensityClasses,
+  getCardIconSizeClass,
 } from '../utils/cardDesignHelper';
 import { useCardPreferences } from '../context/CardSettingsContext';
 
@@ -28,12 +29,14 @@ interface CardCustomizerModalProps {
   isOpen: boolean;
   onClose: () => void;
   language: Language;
+  sections: Array<{ id: string; titleAr: string; titleEn: string; emoji?: string }>;
 }
 
 export const CardCustomizerModal: React.FC<CardCustomizerModalProps> = ({
   isOpen,
   onClose,
   language,
+  sections,
 }) => {
   const isAr = language === 'ar';
   const { preferences, updatePreferences, applyPreset, resetToDefaults } = useCardPreferences();
@@ -57,6 +60,8 @@ export const CardCustomizerModal: React.FC<CardCustomizerModalProps> = ({
         ...found.preferences,
         hiddenCardIds: localPrefs.hiddenCardIds,
         cardSizes: localPrefs.cardSizes,
+        iconSize: localPrefs.iconSize,
+        backgroundTheme: localPrefs.backgroundTheme,
       };
       setLocalPrefs(updated);
     }
@@ -75,6 +80,9 @@ export const CardCustomizerModal: React.FC<CardCustomizerModalProps> = ({
   };
 
   const densityClasses = getCardDensityClasses(localPrefs.density);
+  const iconSizeClass = localPrefs.iconSize
+    ? getCardIconSizeClass(localPrefs.iconSize)
+    : densityClasses.iconSize;
   const cardContainerClass = resolveCardContainerClasses(localPrefs, 'expenses', false);
 
   return (
@@ -129,7 +137,7 @@ export const CardCustomizerModal: React.FC<CardCustomizerModalProps> = ({
               className={`w-full max-w-sm ${cardContainerClass} ${densityClasses.padding} flex items-center justify-between gap-3`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`${densityClasses.iconSize} rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 shadow-sm`}>
+                <div className={`${iconSizeClass} rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 shadow-sm`}>
                   <Box className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
@@ -417,6 +425,98 @@ export const CardCustomizerModal: React.FC<CardCustomizerModalProps> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Icon Size */}
+              <div className="bg-slate-50 dark:bg-slate-850 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>{isAr ? 'حجم أيقونات البطاقات' : 'Card Icon Size'}</span>
+                  <span className="text-amber-500 font-mono text-[11px] uppercase">{localPrefs.iconSize || 'medium'}</span>
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['small', 'medium', 'large'] as CardIconSize[]).map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setLocalPrefs((p) => ({ ...p, iconSize: size, activePreset: undefined }))}
+                      className={`py-2 px-2 rounded-xl text-xs font-black transition-all ${
+                        localPrefs.iconSize === size
+                          ? 'bg-amber-500 text-slate-950 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {size === 'small' ? (isAr ? 'صغير' : 'Small') : size === 'medium' ? (isAr ? 'متوسط' : 'Medium') : (isAr ? 'كبير' : 'Large')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card Background */}
+              <div className="bg-slate-50 dark:bg-slate-850 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>{isAr ? 'لون خلفية البطاقات' : 'Card Background'}</span>
+                  <span className="text-amber-500 font-mono text-[11px] uppercase">{localPrefs.backgroundTheme || 'default'}</span>
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    { id: 'default', ar: 'افتراضي', en: 'Default', swatch: 'bg-white dark:bg-slate-900' },
+                    { id: 'sky', ar: 'سماوي', en: 'Sky', swatch: 'bg-sky-50' },
+                    { id: 'mint', ar: 'نعناعي', en: 'Mint', swatch: 'bg-emerald-50' },
+                    { id: 'lavender', ar: 'لافندر', en: 'Lavender', swatch: 'bg-violet-50' },
+                    { id: 'peach', ar: 'خوخي', en: 'Peach', swatch: 'bg-orange-50' },
+                    { id: 'candy', ar: 'وردي', en: 'Candy', swatch: 'bg-pink-50' },
+                  ] as Array<{id: CardBackgroundTheme; ar: string; en: string; swatch: string}>).map((bg) => (
+                    <button
+                      key={bg.id}
+                      type="button"
+                      onClick={() => setLocalPrefs((p) => ({ ...p, backgroundTheme: bg.id, activePreset: undefined }))}
+                      className={`py-2 px-2 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${
+                        localPrefs.backgroundTheme === bg.id || (!localPrefs.backgroundTheme && bg.id === 'default')
+                          ? 'bg-amber-500 text-slate-950 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      <span className={`w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 ${bg.swatch}`} />
+                      {isAr ? bg.ar : bg.en}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Visibility */}
+              <div className="bg-slate-50 dark:bg-slate-850 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>{isAr ? 'إظهار وإخفاء البطاقات' : 'Show / Hide Cards'}</span>
+                  <span className="text-amber-500 font-mono text-[11px]">{(localPrefs.hiddenCardIds || []).length}</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {sections.map((section) => {
+                    const hidden = (localPrefs.hiddenCardIds || []).includes(section.id);
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => setLocalPrefs((p) => {
+                          const current = p.hiddenCardIds || [];
+                          return {
+                            ...p,
+                            hiddenCardIds: hidden ? current.filter((id) => id !== section.id) : [...current, section.id],
+                          };
+                        })}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl text-start border transition-all ${
+                          hidden
+                            ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {hidden ? <EyeOff className="w-4 h-4 shrink-0" /> : <Eye className="w-4 h-4 shrink-0 text-emerald-500" />}
+                        <span className="truncate font-bold text-[11px]">{isAr ? section.titleAr : section.titleEn}</span>
+                        {section.emoji && <span className="ms-auto">{section.emoji}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-400">{isAr ? 'الإخفاء لا يحذف بيانات البطاقة، ويمكن إظهارها لاحقًا.' : 'Hiding a card does not delete its data.'}</p>
               </div>
 
               {/* Feature Toggles (3D Tilt, Badges, Glow) */}
