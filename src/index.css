@@ -564,3 +564,50 @@ html[class*="theme-"] nav button[class*="text-accent-600"] {
     border-radius:22px;
   }
 }
+
+
+/* Card background themes controlled from Card Settings */
+.card-bg-sky{
+  background:linear-gradient(145deg,#ffffff 0%,#eef9ff 52%,#e8f7ff 100%) !important;
+}
+.card-bg-mint{
+  background:linear-gradient(145deg,#ffffff 0%,#effcf7 52%,#e8fbf5 100%) !important;
+}
+.card-bg-lavender{
+  background:linear-gradient(145deg,#ffffff 0%,#f7f2ff 52%,#f0ebff 100%) !important;
+}
+.card-bg-peach{
+  background:linear-gradient(145deg,#ffffff 0%,#fff7ed 52%,#fff1e8 100%) !important;
+}
+.card-bg-candy{
+  background:linear-gradient(145deg,#ffffff 0%,#fff7fc 52%,#f6f2ff 100%) !important;
+}
+.dark .card-bg-sky{
+  background:linear-gradient(145deg,#10243a 0%,#123445 100%) !important;
+}
+.dark .card-bg-mint{
+  background:linear-gradient(145deg,#102b27 0%,#123b35 100%) !important;
+}
+.dark .card-bg-lavender{
+  background:linear-gradient(145deg,#211b38 0%,#2a2142 100%) !important;
+}
+.dark .card-bg-peach{
+  background:linear-gradient(145deg,#302118 0%,#3b261d 100%) !important;
+}
+.dark .card-bg-candy{
+  background:linear-gradient(145deg,#301b2a 0%,#20233d 100%) !important;
+}
+.card-bg-sky .dashboard-section-icon,
+.card-bg-mint .dashboard-section-icon,
+.card-bg-lavender .dashboard-section-icon,
+.card-bg-peach .dashboard-section-icon,
+.card-bg-candy .dashboard-section-icon{
+  background:rgba(255,255,255,.58);
+}
+.dark .card-bg-sky .dashboard-section-icon,
+.dark .card-bg-mint .dashboard-section-icon,
+.dark .card-bg-lavender .dashboard-section-icon,
+.dark .card-bg-peach .dashboard-section-icon,
+.dark .card-bg-candy .dashboard-section-icon{
+  background:rgba(15,23,42,.52);
+}
