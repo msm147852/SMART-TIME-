@@ -293,7 +293,6 @@ export default function App() {
               user={userProfile}
               expenses={expenses}
               notes={notes}
-              recipes={recipes}
               vehicles={vehicles}
               chatRooms={chatRooms}
               onNavigate={(tab) => handleNavigateSafe(tab as AppView)}
@@ -510,7 +509,6 @@ export default function App() {
           expenses={expenses}
           vehicles={vehicles}
           lessons={lessons}
-          recipes={recipes}
           onNavigate={(view) => handleNavigateSafe(view)}
         />
 
