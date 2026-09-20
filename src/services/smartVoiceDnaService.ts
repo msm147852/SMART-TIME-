@@ -136,7 +136,7 @@ export async function saveVoiceDnaSample(
       profileId,
       mimeType: blob.type || "audio/webm",
       durationMs,
-      iv: iv.buffer.slice(0),
+      iv: iv.slice().buffer as ArrayBuffer,
       ciphertext,
       createdAt: new Date().toISOString(),
     };
