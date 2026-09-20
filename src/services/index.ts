@@ -10,3 +10,5 @@ export * from './authService';
 export * from './notificationSoundService';
 export * from './permissionService';
 export * from './ridePriceEstimator';
+
+export * from './smartVoiceDnaService';

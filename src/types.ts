@@ -573,6 +573,8 @@ export interface PrayerTimesData {
 }
 
 export type SmartAiVoiceId = 'male' | 'female' | 'youth' | 'child';
+export type SmartVoiceDnaRelationship = 'self' | 'father' | 'mother' | 'spouse' | 'son' | 'daughter' | 'family';
+export type SmartVoiceDnaConsentMode = 'self' | 'guardian';
 
 // ---------------------------
 // 9. AI CENTER

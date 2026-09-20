@@ -73,3 +73,10 @@ Keep API keys in server `.env` variables only. Do not put secrets in `VITE_*` va
 - Secure Vault secrets and authentication tokens are excluded from the AI context.
 - Voice playback supports male, female, youth, and child profiles through browser TTS in V1; a dedicated first-party TTS engine is planned separately.
 
+
+## SMART VOICE DNA
+- Added a privacy-first Voice DNA foundation for personalized speech profiles.
+- Voice profiles require explicit owner consent; child profiles also require guardian consent.
+- Recorded samples stay on-device in encrypted IndexedDB in V1 and are not sent to SMART AI or external APIs.
+- The current browser voice presets are not voice clones. Voice DNA remains pending until a dedicated local TTS engine is connected.
+- Architecture and safety rules: docs/SMART_VOICE_DNA.md

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Bot, Check, Copy, Mic, RotateCcw, Send, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
+import { SmartVoiceDnaPanel } from './SmartVoiceDnaPanel';
 import { AiMessage, AiModelType, Language } from '../types';
 import { ChatRepository } from '../services';
 import { askSmartAi, buildSmartAiContext, SmartAiAction } from '../services/aiService';
@@ -29,6 +30,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const [actionStatus, setActionStatus] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<SmartAiVoiceId>(() => loadSmartAiVoiceId());
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
+  const [isVoiceDnaOpen, setIsVoiceDnaOpen] = useState(false);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -213,6 +215,14 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
             <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
               ✨ SMART TIME AI
             </span>
+            <button
+              type="button"
+              onClick={() => setIsVoiceDnaOpen((open) => !open)}
+              className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-xs font-bold border border-purple-200 dark:border-purple-800/60"
+              title="Voice DNA"
+            >
+              Voice DNA
+            </button>
           </div>
           <button
             type="button"
@@ -224,6 +234,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
           </button>
         </div>
       </div>
+
+      {isVoiceDnaOpen && (
+        <SmartVoiceDnaPanel language={language} onClose={() => setIsVoiceDnaOpen(false)} />
+      )}
 
       <div className="flex-1 bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-6 overflow-y-auto space-y-4">
         {messages.map((msg, index) => {

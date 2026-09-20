@@ -1,5 +1,28 @@
 export type SmartAiVoiceId = "male" | "female" | "youth" | "child";
 
+export type SmartAiVoiceProvider = "browser-tts" | "voice-dna-local";
+
+export interface SmartAiVoiceRuntimeStatus {
+  provider: SmartAiVoiceProvider;
+  ready: boolean;
+  note: string;
+}
+
+export function getSmartAiVoiceRuntimeStatus(provider: SmartAiVoiceProvider = "browser-tts"): SmartAiVoiceRuntimeStatus {
+  if (provider === "voice-dna-local") {
+    return {
+      provider,
+      ready: false,
+      note: "Voice DNA local TTS adapter is not connected yet; recorded profiles remain private and local.",
+    };
+  }
+  return {
+    provider,
+    ready: typeof window !== "undefined" && "speechSynthesis" in window,
+    note: "Browser Web Speech API adapter.",
+  };
+}
+
 export interface SmartAiVoiceProfile {
   id: SmartAiVoiceId;
   labelAr: string;
