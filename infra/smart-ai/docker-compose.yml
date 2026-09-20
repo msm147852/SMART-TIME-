@@ -1,0 +1,35 @@
+services:
+  smart-ai-inference:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    ipc: host
+    command:
+      - --model
+      - ${SMART_AI_MODEL}
+      - --served-model-name
+      - ${SMART_AI_LOCAL_MODEL:-smart-time-local}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --max-model-len
+      - ${SMART_AI_MAX_MODEL_LEN:-4096}
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - ${SMART_AI_TOOL_CALL_PARSER:-hermes}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  huggingface-cache:
