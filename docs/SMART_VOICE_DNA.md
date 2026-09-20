@@ -55,3 +55,16 @@ The reference audio is intentionally not uploaded or copied by this sharing laye
 
 
 Server-side profile registration now re-checks explicit owner consent and guardian consent for child profiles. This is separate from the local recording step and prevents a client-only checkbox from being the sole authorization gate.
+
+
+## Multi-device recovery
+
+Voice DNA now supports an optional recovery envelope for the device sync key.
+
+When recovery is configured, the browser generates a fresh RSA-OAEP sync key, exports the private JWK only in memory, encrypts that private JWK with AES-GCM using a PBKDF2-derived key from a user-selected recovery passphrase, and uploads only the encrypted envelope plus the matching public JWK.
+
+The recovery passphrase is never sent to SMART TIME. The server cannot decrypt the private key. Restoring on another device decrypts the envelope locally, imports the private key as non-exportable, and re-registers the public key.
+
+Configuring recovery rotates the sync key. Packages encrypted to the previous key are not re-keyed by the server; the voice owner must re-sync shared voices after recovery.
+
+The recovery passphrase is separate from the SMART TIME account password and should be kept in a secure password manager. It must never be committed to the repository or logged.
