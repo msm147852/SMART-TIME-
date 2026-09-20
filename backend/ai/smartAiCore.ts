@@ -18,7 +18,12 @@ export async function askSmartAiCore(request: SmartAiRequest): Promise<SmartAiRe
   // for open-ended conversation when one is explicitly configured.
   if (isLocalSmartAiConfigured() && ruleResponse.needsClarification) {
     try {
-      const localResponse = await askLocalSmartAi({ language, message, data });
+      const localResponse = await askLocalSmartAi({
+        language,
+        message,
+        data,
+        conversationHistory: Array.isArray(request.conversationHistory) ? request.conversationHistory.slice(-6) : []
+      });
       if (localResponse?.reply) return localResponse;
     } catch (error) {
       console.warn("Local SMART AI unavailable; keeping deterministic fallback:", (error as Error)?.message);
