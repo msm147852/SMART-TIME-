@@ -797,6 +797,82 @@ app.delete("/api/voice-dna/recovery/envelope", async (req, res) => {
     return res.status(500).json({ error: "تعذر حذف نسخة استرداد Voice DNA." });
   }
 });
+ 
+app.post("/api/voice-dna/recovery/samples", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+    const profileId = String(req.body?.profileId || "").trim();
+    const salt = String(req.body?.salt || "").trim();
+    const iv = String(req.body?.iv || "").trim();
+    const ciphertext = String(req.body?.ciphertext || "").trim();
+    const mimeType = String(req.body?.mimeType || "audio/webm").trim().slice(0, 100);
+    const durationMs = Number(req.body?.durationMs || 0);
+
+    if (!profileId || !salt || !iv || !ciphertext) {
+      return res.status(400).json({ error: "بيانات النسخة الاحتياطية للصوت غير مكتملة." });
+    }
+    if (iv.length > 64 || salt.length > 128 || ciphertext.length > 12000000) {
+      return res.status(413).json({ error: "نسخة Voice DNA كبيرة جدًا." });
+    }
+    if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 120000) {
+      return res.status(400).json({ error: "مدة عينة Voice DNA غير صالحة." });
+    }
+
+    const owner = db.prepare("SELECT id FROM voice_dna_profiles WHERE id=? AND owner_user_id=? AND revoked_at IS NULL").get(profileId, user.id) as any;
+    if (!owner) return res.status(404).json({ error: "ملف Voice DNA غير موجود." });
+
+    const recovery = db.prepare("SELECT salt FROM voice_dna_recovery_envelopes WHERE user_id=?").get(user.id) as any;
+    if (!recovery || String(recovery.salt) !== salt) {
+      return res.status(409).json({ error: "نسخة الاسترداد غير متزامنة. أعد إعداد/تحديث الاسترداد." });
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO voice_dna_recovery_samples
+      (id, user_id, profile_id, salt, iv, ciphertext, mime_type, duration_ms, created_at, rotated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,NULL)
+      ON CONFLICT(user_id, profile_id) DO UPDATE SET
+        salt=excluded.salt,
+        iv=excluded.iv,
+        ciphertext=excluded.ciphertext,
+        mime_type=excluded.mime_type,
+        duration_ms=excluded.duration_ms,
+        created_at=excluded.created_at,
+        rotated_at=excluded.created_at`)
+      .run("vrec_" + crypto.randomUUID(), user.id, profileId, salt, iv, ciphertext, mimeType, Math.round(durationMs), now);
+
+    return res.json({ ok: true, profileId, updatedAt: now });
+  } catch (error: any) {
+    console.error("Voice DNA recovery sample upload error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر تحديث النسخة الاحتياطية للصوت." });
+  }
+});
+
+app.get("/api/voice-dna/recovery/samples", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const rows = db.prepare(`SELECT profile_id as profileId, salt, iv, ciphertext, mime_type as mimeType,
+      duration_ms as durationMs, created_at as createdAt, rotated_at as rotatedAt
+      FROM voice_dna_recovery_samples WHERE user_id=? ORDER BY created_at DESC`).all(user.id);
+    return res.json({ samples: rows });
+  } catch {
+    return res.status(500).json({ error: "تعذر قراءة النسخ الاحتياطية للصوت." });
+  }
+});
+
+app.delete("/api/voice-dna/recovery/samples", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    db.prepare("DELETE FROM voice_dna_recovery_samples WHERE user_id=?").run(user.id);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "تعذر حذف النسخ الاحتياطية للصوت." });
+  }
+});
+
 
 
 app.post("/api/voice-dna/sync/upload", async (req, res) => {
