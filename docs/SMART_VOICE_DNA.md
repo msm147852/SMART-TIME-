@@ -65,7 +65,7 @@ When recovery is configured, the browser generates a fresh RSA-OAEP sync key, ex
 
 The recovery passphrase is never sent to SMART TIME. The server cannot decrypt the private key. Restoring on another device decrypts the envelope locally, imports the private key as non-exportable, and re-registers the public key.
 
-Configuring recovery rotates the sync key. Packages encrypted to the previous key are not re-keyed by the server; the voice owner must re-sync shared voices after recovery.
+Configuring recovery rotates the sync key and starts a new encrypted sample-backup generation. Previous recovery sample backups are discarded when the envelope rotates, so the owner should refresh the backup after rotation. Packages encrypted to the previous sync key are not re-keyed by the server; the voice owner must re-sync shared voices after recovery.
 
 The recovery passphrase is separate from the SMART TIME account password and should be kept in a secure password manager. It must never be committed to the repository or logged.
 
