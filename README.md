@@ -6,8 +6,6 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/e6e3433e-6362-4d70-9b85-2377fce00f85
-
 ## Run Locally
 
 **Prerequisites:**  Node.js
@@ -15,7 +13,7 @@ View your app in AI Studio: https://ai.studio/apps/e6e3433e-6362-4d70-9b85-2377f
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key. You can also set `GEMINI_MODEL=gemini-3.8-flash`.
+2. Copy `.env.example` to your local environment and configure only the services you actually use.
 3. Run the app:
    `npm run dev`
 
@@ -67,8 +65,11 @@ Keep API keys in server `.env` variables only. Do not put secrets in `VITE_*` va
 - Set `RAPIDAPI_KEY` in `.env` (see `.env.example`) before running the server.
 
 ## SMART AI
-- The AI Center is now a server-backed SMART AI assistant using Gemini.
-- The server reads `GEMINI_API_KEY` from the environment; the key never reaches the browser.
-- Default model: `gemini-3.8-flash`; override it with `GEMINI_MODEL` when needed.
-- SMART AI can analyze the app context and prepare actions for expenses, education expenses, fuel records, and reminders. Write actions require user confirmation before changing local app data.
+- SMART AI is a first-party, keyless application intelligence layer. Its deterministic V1 core handles common SMART TIME data questions without a cloud LLM.
+- The default runtime uses the SMART TIME rules/data engine for calculations, summaries, period filters, and safety boundaries.
+- An optional local OpenAI-compatible inference adapter can be enabled with `SMART_AI_LOCAL_URL`, `SMART_AI_LOCAL_MODEL`, and `SMART_AI_LOCAL_TOKEN`.
+- GPU-side inference deployment files live under `infra/smart-ai/`; the model itself is intentionally selected at deployment time.
+- Customer records are runtime context, not training data. Training examples should teach SMART TIME behavior, terminology, and safe tool usage.
 - Secure Vault secrets and authentication tokens are excluded from the AI context.
+- Voice playback supports male, female, youth, and child profiles through browser TTS in V1; a dedicated first-party TTS engine is planned separately.
+
