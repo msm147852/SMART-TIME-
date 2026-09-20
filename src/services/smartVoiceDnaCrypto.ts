@@ -333,6 +333,7 @@ async function getValidatedRecoveryKey(envelope: any, passphrase: string): Promi
 
 export async function backupVoiceDnaSamplesForRecovery(passphrase: string): Promise<number> {
   const envelope = await getRecoveryEnvelope();
+  const salt = fromBase64(String(envelope.salt || ""));
   const recoveryKey = await getValidatedRecoveryKey(envelope, passphrase);
   const profiles = await listVoiceDnaProfiles();
   let count = 0;
