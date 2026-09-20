@@ -2,6 +2,7 @@ import type { SmartAiResponse } from "./types.js";
 
 const LOCAL_URL = String(process.env.SMART_AI_LOCAL_URL || "").trim().replace(/\/$/, "");
 const LOCAL_MODEL = String(process.env.SMART_AI_LOCAL_MODEL || "smart-time-local").trim();
+const LOCAL_TOKEN = String(process.env.SMART_AI_LOCAL_TOKEN || "").trim();
 
 export function isLocalSmartAiConfigured(): boolean {
   return Boolean(LOCAL_URL);
@@ -23,6 +24,7 @@ export async function askLocalSmartAi(input: {
   language: "ar" | "en";
   message: string;
   data: Record<string, unknown>;
+  conversationHistory?: Array<{ sender: "user" | "model"; text: string }>;
 }): Promise<SmartAiResponse | null> {
   if (!LOCAL_URL) return null;
 
@@ -50,8 +52,14 @@ export async function askLocalSmartAi(input: {
   const body = {
     model: LOCAL_MODEL,
     stream: false,
+    temperature: 0.2,
+    max_tokens: 700,
     messages: [
       { role: "system", content: system },
+      ...(input.conversationHistory || []).slice(-6).map((item) => ({
+        role: item.sender === "user" ? "user" : "assistant",
+        content: String(item.text || "").slice(0, 2000)
+      })),
       {
         role: "user",
         content: JSON.stringify({
@@ -65,7 +73,10 @@ export async function askLocalSmartAi(input: {
   try {
     const response = await fetch(`${LOCAL_URL}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(LOCAL_TOKEN ? { Authorization: `Bearer ${LOCAL_TOKEN}` } : {})
+      },
       body: JSON.stringify(body),
       signal: controller.signal
     });
