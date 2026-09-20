@@ -237,7 +237,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
             <div>{ar ? CONSENT_PHRASE_AR : CONSENT_PHRASE_EN}</div>
           </div>
 
-          <button type="button" disabled={recordState === "recording" || recordState === "saving"} onClick={recordState === "recording" ? stopRecording : () => void startRecording()} className="mt-3 w-full rounded-xl px-3 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 flex items-center justify-center gap-2 text-xs font-extrabold">
+          <button type="button" disabled={recordState === "saving"} onClick={recordState === "recording" ? stopRecording : () => void startRecording()} className="mt-3 w-full rounded-xl px-3 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 flex items-center justify-center gap-2 text-xs font-extrabold">
             {recordState === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
             {recordState === "recording"
               ? (ar ? "إيقاف التسجيل" : "Stop recording") + " · " + (elapsedMs / 1000).toFixed(1) + "s"
