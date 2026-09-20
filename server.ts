@@ -10,6 +10,7 @@ import { getServiceStatuses, seedServiceStatuses, setServiceStatus } from "./bac
 import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
+import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 
 dotenv.config();
 
@@ -359,12 +360,12 @@ app.get("/api/database/health", (_req, res) => {
 // SMART AI is app-owned. The V1 core answers app-data questions from
 // sanitized SMART TIME context and does not require an AI API key.
 const handleAiChat = async (req: express.Request, res: express.Response) => {
+  const language = String(req.body?.language || "ar") === "en" ? "en" : "ar";
   try {
     const user = authUser(req);
     if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول لاستخدام SMART AI." });
 
     const message = String(req.body?.message || req.body?.prompt || "").trim();
-    const language = String(req.body?.language || "ar") === "en" ? "en" : "ar";
     const conversationHistory = Array.isArray(req.body?.conversationHistory)
       ? req.body.conversationHistory.slice(-8)
       : [];
@@ -395,6 +396,20 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
 
 app.post("/api/ai/chat", handleAiChat);
 app.post("/api/gemini/chat", handleAiChat);
+
+app.get("/api/ai/status", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  res.json({
+    provider: "smart-ai",
+    core: "smart-time-core",
+    deterministic: true,
+    localInferenceConfigured: isLocalSmartAiConfigured(),
+    localModel: isLocalSmartAiConfigured() ? String(process.env.SMART_AI_LOCAL_MODEL || "smart-time-local").trim() : null,
+    apiKeyRequired: false,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // ----------------------------------------------------
 // 3. Smart Search Intent Parser
