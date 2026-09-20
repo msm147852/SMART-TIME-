@@ -20,12 +20,15 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   onApplyAction,
 }) => {
   const selectedModel: AiModelType = 'smart-time-core';
+  const smartLanguage: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [pendingAction, setPendingAction] = useState<SmartAiAction>(null);
   const [actionStatus, setActionStatus] = useState('');
+  const [selectedVoice, setSelectedVoice] = useState<SmartAiVoiceId>(() => loadSmartAiVoiceId());
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +56,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, pendingAction]);
+
+  useEffect(() => () => {
+    stopSmartAiVoice();
+  }, []);
 
   const quickPrompts = [
     { ar: '📊 قارن مصاريف هذا الشهر بالشهر الماضي', en: 'Compare this month expenses to last month' },
@@ -84,7 +91,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
     try {
       const data = await askSmartAi({
         message: textToSend,
-        language,
+        language: smartLanguage,
 
         conversationHistory: nextMessages.slice(-8).map((m) => ({
           sender: m.sender === 'user' ? 'user' : 'model',
@@ -94,7 +101,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       });
 
       if (isVoiceEnabled && data.reply) {
-        speakSmartAi(data.reply, language, selectedVoice);
+        speakSmartAi(data.reply, smartLanguage, selectedVoice);
       }
 
       const aiMessage: AiMessage = {
@@ -103,7 +110,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         text: data.reply || (language === 'ar' ? 'تعذر الحصول على رد واضح.' : 'No clear response was returned.'),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         model: (data.model as AiModelType) || selectedModel,
-        provider: (data.provider as any) || 'gemini',
+        provider: (data.provider as any) || 'smart-ai',
       };
 
       const finalMessages = [...nextMessages, aiMessage];
@@ -193,8 +200,12 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
                 stopSmartAiVoice();
                 setIsVoiceEnabled(false);
               } else {
-                setIsVoiceEnabled(true);
-                speakSmartAi(language === 'ar' ? 'أهلًا بك في SMART TIME.' : 'Welcome to SMART TIME.', language, selectedVoice);
+                const started = speakSmartAi(
+                  smartLanguage === 'ar' ? 'أهلًا بك في SMART TIME.' : 'Welcome to SMART TIME.',
+                  smartLanguage,
+                  selectedVoice,
+                );
+                setIsVoiceEnabled(started);
               }
             }} className="p-2 text-slate-500 hover:text-purple-600 rounded-xl" title={language === 'ar' ? 'صوت SMART AI' : 'SMART AI voice'}>
               {isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -244,7 +255,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
                   <span>{msg.timestamp}</span>
                   {isAi && (
                     <>
-                      <button type="button" onClick={() => speakSmartAi(msg.text, language, selectedVoice)} className="flex items-center gap-1 hover:opacity-100" title={language === 'ar' ? 'استماع' : 'Listen'}>
+                      <button type="button" onClick={() => speakSmartAi(msg.text, smartLanguage, selectedVoice)} className="flex items-center gap-1 hover:opacity-100" title={language === 'ar' ? 'استماع' : 'Listen'}>
                         <Volume2 className="w-3 h-3" />
                         <span>{language === 'ar' ? 'استماع' : 'Listen'}</span>
                       </button>
