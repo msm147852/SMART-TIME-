@@ -111,3 +111,168 @@ export async function decryptIncomingVoiceDnaPackage(pkg: { wrappedKey: string; 
   const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(pkg.iv) }, contentKey, fromBase64(pkg.ciphertext));
   return new Blob([plaintext], { type: pkg.mimeType || "audio/webm" });
 }
+
+const RECOVERY_ITERATIONS = 300000;
+
+async function deriveRecoveryKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  if (passphrase.trim().length < 12) throw new Error("مفتاح الاسترداد يجب أن يكون 12 حرفًا على الأقل.");
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(passphrase),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: RECOVERY_ITERATIONS, hash: "SHA-256" },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function persistIdentityKeyPair(keyPair: CryptoKeyPair): Promise<void> {
+  const db = await openDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE, "readwrite");
+      tx.objectStore(KEY_STORE).put({ id: IDENTITY_KEY_ID, keyPair });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error("Could not save Voice DNA identity."));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function createVoiceDnaRecoveryEnvelope(passphrase: string): Promise<void> {
+  if (passphrase.trim().length < 12) throw new Error("مفتاح الاسترداد يجب أن يكون 12 حرفًا على الأقل.");
+
+  const generated = await crypto.subtle.generateKey(
+    { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["wrapKey", "unwrapKey"]
+  ) as CryptoKeyPair;
+
+  const publicJwk = await crypto.subtle.exportKey("jwk", generated.publicKey);
+  const privateJwk = await crypto.subtle.exportKey("jwk", generated.privateKey);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const recoveryKey = await deriveRecoveryKey(passphrase, salt);
+  const privatePayload = new TextEncoder().encode(JSON.stringify(privateJwk));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, recoveryKey, privatePayload);
+
+  const response = await fetch(apiUrl("/api/voice-dna/recovery/envelope"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      algorithm: "RSA-OAEP-256",
+      kdf: "PBKDF2-SHA-256",
+      iterations: RECOVERY_ITERATIONS,
+      salt: toBase64(salt),
+      iv: toBase64(iv),
+      ciphertext: toBase64(new Uint8Array(ciphertext)),
+      publicJwk,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || "تعذر حفظ نسخة الاسترداد.");
+
+  const publicKey = await crypto.subtle.importKey(
+    "jwk",
+    publicJwk,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    true,
+    ["wrapKey"]
+  );
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    privateJwk,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["unwrapKey"]
+  );
+  await persistIdentityKeyPair({ publicKey, privateKey });
+}
+
+export async function hasVoiceDnaRecoveryEnvelope(): Promise<boolean> {
+  const response = await fetch(apiUrl("/api/voice-dna/recovery/envelope"), {
+    headers: { ...authHeaders() },
+  });
+  return response.ok;
+}
+
+export async function restoreVoiceDnaFromRecovery(passphrase: string): Promise<void> {
+  if (passphrase.trim().length < 12) throw new Error("مفتاح الاسترداد يجب أن يكون 12 حرفًا على الأقل.");
+
+  const response = await fetch(apiUrl("/api/voice-dna/recovery/envelope"), {
+    headers: { ...authHeaders() },
+  });
+  const envelope = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(envelope?.error || "لا توجد نسخة استرداد Voice DNA.");
+
+  const salt = fromBase64(String(envelope.salt || ""));
+  const iv = fromBase64(String(envelope.iv || ""));
+  const iterations = Number(envelope.iterations);
+  if (!salt.length || iv.length !== 12 || !Number.isInteger(iterations) || iterations < 100000 || iterations > 2000000) {
+    throw new Error("نسخة الاسترداد غير صالحة.");
+  }
+
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(passphrase),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  const recoveryKey = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  let privateJwk: JsonWebKey;
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      recoveryKey,
+      fromBase64(String(envelope.ciphertext || ""))
+    );
+    privateJwk = JSON.parse(new TextDecoder().decode(decrypted));
+  } catch {
+    throw new Error("مفتاح الاسترداد غير صحيح.");
+  }
+
+  const publicJwk = envelope.publicJwk as JsonWebKey;
+  const publicKey = await crypto.subtle.importKey(
+    "jwk",
+    publicJwk,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    true,
+    ["wrapKey"]
+  );
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    privateJwk,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["unwrapKey"]
+  );
+
+  await persistIdentityKeyPair({ publicKey, privateKey });
+  await ensureVoiceDnaPublicKeyRegistered();
+}
+
+export async function deleteVoiceDnaRecoveryEnvelope(): Promise<void> {
+  const response = await fetch(apiUrl("/api/voice-dna/recovery/envelope"), {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || "تعذر حذف نسخة الاسترداد.");
+  }
+}
