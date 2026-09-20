@@ -7,6 +7,7 @@ import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
   listVoiceDnaProfiles,
+  readVoiceDnaSample,
   saveVoiceDnaProfile,
   saveVoiceDnaSample,
   setDefaultVoiceDnaProfile,
