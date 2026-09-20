@@ -1,4 +1,5 @@
 import base64
+from threading import Lock
 import os
 import tempfile
 from pathlib import Path
@@ -21,6 +22,7 @@ MAX_REFERENCE_BYTES = int(os.getenv("SMART_VOICE_DNA_MAX_REFERENCE_BYTES", str(8
 MAX_TEXT_CHARS = int(os.getenv("SMART_VOICE_DNA_MAX_TEXT_CHARS", "4000"))
 
 _tts = None
+synthesis_lock = Lock()
 
 
 class SynthesizeRequest(BaseModel):
@@ -104,7 +106,8 @@ def synthesize(payload: SynthesizeRequest, authorization: str | None = Header(de
             if payload.referenceText.strip():
                 kwargs["ref_text"] = payload.referenceText.strip()
 
-            tts.synthesize(payload.text, **kwargs)
+            with synthesis_lock:
+                tts.synthesize(payload.text, **kwargs)
             if not out_path.exists() or out_path.stat().st_size == 0:
                 raise RuntimeError("VoiceTuT produced no audio.")
 
