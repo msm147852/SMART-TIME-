@@ -791,6 +791,7 @@ app.delete("/api/voice-dna/recovery/envelope", async (req, res) => {
   try {
     const user = authUser(req);
     if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    db.prepare("DELETE FROM voice_dna_recovery_samples WHERE user_id=?").run(user.id);
     db.prepare("DELETE FROM voice_dna_recovery_envelopes WHERE user_id=?").run(user.id);
     return res.json({ ok: true });
   } catch {
