@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2 } from "lucide-react";
 import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
 import { acceptVoiceDnaShare, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaShare, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
+import { ensureVoiceDnaPublicKeyRegistered, uploadEncryptedVoiceDnaPackage, listIncomingVoiceDnaPackages, decryptIncomingVoiceDnaPackage } from "../services/smartVoiceDnaCrypto";
 import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
@@ -45,6 +46,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [incomingShares, setIncomingShares] = useState<VoiceDnaShareRecord[]>([]);
   const [outgoingShares, setOutgoingShares] = useState<VoiceDnaShareRecord[]>([]);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [message, setMessage] = useState("");
@@ -59,6 +61,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   useEffect(() => {
     void refreshProfiles();
     void refreshShares();
+    void ensureVoiceDnaPublicKeyRegistered().catch(() => undefined);
     return () => stopActiveRecorder();
   }, []);
 
@@ -213,6 +216,67 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
     if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
   };
 
+  const syncProfileToRecipient = async (profileId: string, share: VoiceDnaShareRecord) => {
+    if (!share.recipientUserId) {
+      setMessage(ar ? "بيانات المستلم ناقصة." : "Recipient data is incomplete.");
+      return;
+    }
+    setSyncingId(share.id);
+    try {
+      const sample = await readVoiceDnaSample(profileId);
+      if (!sample) throw new Error(ar ? "العينة الصوتية غير موجودة." : "Local voice sample not found.");
+      await ensureVoiceDnaPublicKeyRegistered();
+      await uploadEncryptedVoiceDnaPackage({ profileId, shareId: share.id, recipientUserId: share.recipientUserId, audio: sample });
+      setMessage(ar ? "تمت مزامنة نسخة مشفّرة من الصوت." : "Encrypted voice copy synced.");
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر مزامنة الصوت." : "Voice sync failed."));
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const syncIncomingPackages = async () => {
+    setSyncingId("incoming");
+    try {
+      await ensureVoiceDnaPublicKeyRegistered();
+      const packages = await listIncomingVoiceDnaPackages();
+      for (const pkg of packages) {
+        const profileId = "shared_" + String(pkg.profileId);
+        const blob = await decryptIncomingVoiceDnaPackage(pkg);
+        const profile: SmartVoiceDnaProfile = {
+          id: profileId,
+          displayName: String(pkg.displayName || "Shared Voice"),
+          relationship: (pkg.relationship || "family") as SmartVoiceDnaRelationship,
+          language: pkg.language === "en" ? "en" : "ar",
+          locale: pkg.locale === "en-US" ? "en-US" : "ar-EG",
+          dialect: pkg.dialect === "en-US" ? "en-US" : "ar-EG",
+          speakingStyle: (pkg.speakingStyle || "natural") as SmartVoiceDnaSpeakingStyle,
+          isDefault: false,
+          consentMode: "self",
+          ownerConfirmed: true,
+          guardianConfirmed: false,
+          consentRecordedAt: new Date().toISOString(),
+          createdAt: String(pkg.createdAt || new Date().toISOString()),
+          sampleDurationMs: 0,
+          engineStatus: "pending_local_engine",
+          origin: "shared",
+          ownerUserId: pkg.ownerUserId,
+          shareId: pkg.shareId,
+        };
+        await saveVoiceDnaProfile(profile);
+        await saveVoiceDnaSample(profileId, blob, 0);
+      }
+      await refreshProfiles();
+      setMessage(packages.length
+        ? (ar ? "تم استلام وفك تشفير الأصوات المشتركة على الجهاز." : "Shared voices were received and decrypted locally.")
+        : (ar ? "مفيش أصوات جديدة للمزامنة." : "No new voice packages."));
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر مزامنة الأصوات الواردة." : "Incoming voice sync failed."));
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       await deleteVoiceDnaProfile(id);
@@ -361,7 +425,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                     </button>
                   </div>
                   <div className="text-[9px] text-slate-500 mt-1">
-                    {ar ? "المشاركة هنا هي صلاحية خاصة فقط؛ نقل العينة الصوتية سيأتي مع مزامنة آمنة لاحقًا." : "This grants private access metadata only; secure sample sync comes later."}
+                    {ar ? "المشاركة تمنح صلاحية، والمزامنة تنقل نسخة مشفّرة لا يملك SMART TIME مفتاح فكها." : "This grants private access metadata only; secure sample sync comes later."}
                   </div>
                 </div>
                 <div className="text-[10px] text-amber-200/90 mt-1">
@@ -375,7 +439,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
 <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-          <div className="flex items-center gap-2 text-xs font-extrabold"><UserPlus className="w-4 h-4 text-purple-300" />{ar ? "دعوات واردة" : "Incoming invitations"}</div>
+          <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-xs font-extrabold"><UserPlus className="w-4 h-4 text-purple-300" />{ar ? "دعوات واردة" : "Incoming invitations"}</div><button type="button" onClick={() => void syncIncomingPackages()} disabled={syncingId === "incoming"} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[9px] font-bold disabled:opacity-50">{syncingId === "incoming" ? "…" : (ar ? "مزامنة" : "Sync")}</button></div>
           <div className="space-y-2 mt-3">
             {incomingShares.length === 0 && <div className="text-[10px] text-slate-500">{ar ? "مفيش دعوات مشاركة حاليًا." : "No incoming voice invitations."}</div>}
             {incomingShares.map((share) => (
@@ -387,6 +451,14 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                   </div>
                   <span className="text-[9px] text-amber-200">{share.status}</span>
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                <span className="text-[9px] text-slate-500">{share.ownerUsername || ""}</span>
+              </div>
+              {share.status === "active" && (
+                <button type="button" onClick={() => void syncIncomingPackages()} disabled={syncingId === "incoming"} className="mt-2 w-full rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-bold disabled:opacity-50">
+                  {syncingId === "incoming" ? "…" : (ar ? "استلام الصوت المشفّر" : "Receive encrypted voice")}
+                </button>
+              )}
                 {share.status === "pending" && (
                   <button type="button" onClick={async () => {
                     try {
@@ -427,6 +499,11 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                   </div>
                   <span className="text-[9px] text-amber-200">{share.status}</span>
                 </div>
+                {share.status === "active" && (
+                  <button type="button" disabled={syncingId === share.id} onClick={() => void syncProfileToRecipient(share.profileId, share)} className="mt-2 w-full rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-bold disabled:opacity-50">
+                    {syncingId === share.id ? "…" : (ar ? "مزامنة الصوت المشفّر" : "Sync encrypted voice")}
+                  </button>
+                )}
                 {share.status !== "revoked" && (
                   <button type="button" onClick={async () => {
                     try {

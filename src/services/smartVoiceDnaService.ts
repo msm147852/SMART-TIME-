@@ -16,6 +16,9 @@ export interface SmartVoiceDnaProfile {
   createdAt: string;
   sampleDurationMs: number;
   engineStatus: "pending_local_engine" | "ready";
+  origin?: "local" | "shared";
+  ownerUserId?: string;
+  shareId?: string;
 }
 
 interface StoredVoiceSample {

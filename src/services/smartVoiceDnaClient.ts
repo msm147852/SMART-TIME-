@@ -20,7 +20,9 @@ export interface VoiceDnaShareRecord {
   displayName: string;
   status: "pending" | "active" | "revoked";
   recipientUsername?: string;
+  recipientUserId?: string;
   ownerUsername?: string;
+  ownerUserId?: string;
   createdAt: string;
   acceptedAt?: string | null;
   revokedAt?: string | null;
