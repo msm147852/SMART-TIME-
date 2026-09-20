@@ -158,6 +158,9 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
             dialect: profile.dialect,
             speakingStyle: profile.speakingStyle,
             engineStatus: profile.engineStatus,
+            ownerConfirmed: profile.ownerConfirmed,
+            guardianConfirmed: profile.guardianConfirmed,
+            consentRecordedAt: profile.consentRecordedAt,
           });
           if (isDefault) await setDefaultVoiceDnaProfile(profileId);
           await refreshProfiles();

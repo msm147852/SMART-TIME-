@@ -9,6 +9,9 @@ export interface RegisterVoiceDnaProfileRequest {
   dialect: string;
   speakingStyle: string;
   engineStatus: string;
+  ownerConfirmed: boolean;
+  guardianConfirmed: boolean;
+  consentRecordedAt: string;
 }
 
 export interface VoiceDnaShareRecord {

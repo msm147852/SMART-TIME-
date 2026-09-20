@@ -429,12 +429,18 @@ app.post("/api/voice-dna/profiles", async (req, res) => {
     const dialect = String(req.body?.dialect || locale).trim().slice(0, 20);
     const speakingStyle = String(req.body?.speakingStyle || "natural").trim().slice(0, 30);
     const engineStatus = String(req.body?.engineStatus || "pending_local_engine").trim().slice(0, 40);
+    const ownerConfirmed = req.body?.ownerConfirmed === true;
+    const guardianConfirmed = req.body?.guardianConfirmed === true;
+    const consentRecordedAt = String(req.body?.consentRecordedAt || "").trim().slice(0, 60);
+    const requiresGuardian = relationship === "son" || relationship === "daughter";
 
     if (!id || !displayName) return res.status(400).json({ error: "Voice profile id and name are required." });
+    if (!ownerConfirmed) return res.status(400).json({ error: "صاحب الصوت لازم يوافق بنفسه." });
+    if (requiresGuardian && !guardianConfirmed) return res.status(400).json({ error: "موافقة ولي الأمر مطلوبة لصوت الطفل." });
 
     db.prepare(`INSERT INTO voice_dna_profiles
-      (id, owner_user_id, display_name, relationship, language, locale, dialect, speaking_style, engine_status, created_at, revoked_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,NULL)
+      (id, owner_user_id, display_name, relationship, language, locale, dialect, speaking_style, engine_status, owner_confirmed, guardian_confirmed, consent_recorded_at, created_at, revoked_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, ?,NULL)
       ON CONFLICT(id) DO UPDATE SET
         display_name=excluded.display_name,
         relationship=excluded.relationship,
@@ -443,8 +449,11 @@ app.post("/api/voice-dna/profiles", async (req, res) => {
         dialect=excluded.dialect,
         speaking_style=excluded.speaking_style,
         engine_status=excluded.engine_status,
+        owner_confirmed=excluded.owner_confirmed,
+        guardian_confirmed=excluded.guardian_confirmed,
+        consent_recorded_at=excluded.consent_recorded_at,
         revoked_at=NULL`)
-      .run(id, user.id, displayName, relationship, language, locale, dialect, speakingStyle, engineStatus, new Date().toISOString());
+      .run(id, user.id, displayName, relationship, language, locale, dialect, speakingStyle, engineStatus, ownerConfirmed ? 1 : 0, guardianConfirmed ? 1 : 0, consentRecordedAt || new Date().toISOString(), new Date().toISOString());
 
     return res.json({ ok: true, id });
   } catch (error: any) {
@@ -459,7 +468,9 @@ app.get("/api/voice-dna/profiles", async (req, res) => {
     if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
     const rows = db.prepare(`SELECT id, owner_user_id as ownerUserId, display_name as displayName,
       relationship, language, locale, dialect, speaking_style as speakingStyle,
-      engine_status as engineStatus, created_at as createdAt, revoked_at as revokedAt
+      engine_status as engineStatus, owner_confirmed as ownerConfirmed,
+      guardian_confirmed as guardianConfirmed, consent_recorded_at as consentRecordedAt,
+      created_at as createdAt, revoked_at as revokedAt
       FROM voice_dna_profiles
       WHERE owner_user_id=? AND revoked_at IS NULL
       ORDER BY created_at ASC`).all(user.id);

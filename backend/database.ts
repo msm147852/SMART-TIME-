@@ -137,6 +137,9 @@ CREATE TABLE IF NOT EXISTS voice_dna_profiles (
   dialect TEXT NOT NULL,
   speaking_style TEXT NOT NULL,
   engine_status TEXT NOT NULL DEFAULT 'pending_local_engine',
+  owner_confirmed INTEGER NOT NULL DEFAULT 0,
+  guardian_confirmed INTEGER NOT NULL DEFAULT 0,
+  consent_recorded_at TEXT,
   created_at TEXT NOT NULL,
   revoked_at TEXT
 );
@@ -373,3 +376,7 @@ export function seedDefaultChatRooms() {
 try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN revoked_at TEXT'); } catch {}
 try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN accepted_at TEXT'); } catch {}
 try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN revoked_at TEXT'); } catch {}
+
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN owner_confirmed INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN guardian_confirmed INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN consent_recorded_at TEXT'); } catch {}
