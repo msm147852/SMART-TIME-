@@ -1,0 +1,126 @@
+import type { SmartAiAction, SmartAiResponse } from "./types.js";
+import type { SmartTimeData } from "./appContext.js";
+
+function money(value: number, currency: string): string {
+  return new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 2 }).format(value) + (currency ? " " + currency : "");
+}
+
+function periodLabel(key: string | undefined, language: "ar" | "en"): string {
+  if (language === "en") {
+    if (key === "last_month") return "last month";
+    if (key === "last_week") return "last week";
+    if (key === "this_week") return "this week";
+    if (key === "this_month") return "this month";
+    if (key === "today") return "today";
+    return "the available period";
+  }
+  if (key === "last_month") return "الشهر اللي فات";
+  if (key === "last_week") return "الأسبوع اللي فات";
+  if (key === "this_week") return "الأسبوع ده";
+  if (key === "this_month") return "الشهر ده";
+  if (key === "today") return "النهاردة";
+  return "الفترة المتاحة";
+}
+
+function actionFromMessage(_message: string): SmartAiAction {
+  // V1 deliberately does not mutate data from free-form text.
+  // Existing UI confirmation flow remains available for a future tool/action parser.
+  return null;
+}
+
+function isExpenseQuestion(q: string): boolean {
+  return /(مصاريف|صرف|مصروف|دفعت|expense|expenses|spending|spent)/i.test(q);
+}
+
+function isFuelQuestion(q: string): boolean {
+  return /(بنزين|وقود|تموين|fuel|gas)/i.test(q);
+}
+
+function isEducationQuestion(q: string): boolean {
+  return /(تعليم|طالب|مدرسة|درس|education|student|lesson)/i.test(q);
+}
+
+function isHelpQuestion(q: string): boolean {
+  return /(اشرح|شرح|ازاي|كيف|ماذا تستطيع|تقدر تعمل ايه|what can you do|help)/i.test(q);
+}
+
+export function answerWithRules(message: string, language: "ar" | "en", data: SmartTimeData): SmartAiResponse {
+  const q = message.toLowerCase();
+  const currency = String(data.profile.currency || "EGP");
+  const action = actionFromMessage(message);
+
+  if (isHelpQuestion(q)) {
+    return {
+      reply: language === "ar"
+        ? "أنا SMART AI داخل SMART TIME. أقدر أشرح بيانات التطبيق، ألخّص المصاريف والفترة الزمنية، أراجع الوقود والتعليم، وأساعدك في فهم بياناتك. التنفيذ على البيانات لا يتم إلا بتأكيدك."
+        : "I am SMART AI inside SMART TIME. I can explain app data, summarize expenses and periods, review fuel and education data, and help you understand your records. Data changes require your confirmation.",
+      action,
+      needsClarification: false,
+      requiresConfirmation: false,
+      provider: "smart-ai",
+      model: "smart-time-core",
+      engine: "rules"
+    };
+  }
+
+  if (isFuelQuestion(q)) {
+    const total = Number(data.fuel?.totalCost || 0);
+    const liters = Number(data.fuel?.liters || 0);
+    const count = Number(data.fuel?.count || 0);
+    const p = periodLabel(data.period?.key, language);
+    return {
+      reply: language === "ar"
+        ? "في " + p + " سجلت " + count + " عمليات تموين، بإجمالي " + money(total, currency) + " و" + liters.toFixed(2) + " لتر."
+        : "For " + p + ", there were " + count + " fuel records totaling " + money(total, currency) + " and " + liters.toFixed(2) + " liters.",
+      action,
+      provider: "smart-ai",
+      model: "smart-time-core",
+      engine: "rules"
+    };
+  }
+
+  if (isEducationQuestion(q)) {
+    const total = Number(data.education?.total || 0);
+    const count = Number(data.education?.count || 0);
+    const p = periodLabel(data.period?.key, language);
+    return {
+      reply: language === "ar"
+        ? "في " + p + " عندك " + count + " مصروف تعليمي بإجمالي " + money(total, currency) + "."
+        : "For " + p + ", there were " + count + " education expenses totaling " + money(total, currency) + ".",
+      action,
+      provider: "smart-ai",
+      model: "smart-time-core",
+      engine: "rules"
+    };
+  }
+
+  if (isExpenseQuestion(q) || data.period) {
+    const total = Number(data.expenses?.total || 0);
+    const count = Number(data.expenses?.count || 0);
+    const categories = Array.isArray(data.expenses?.categories) ? data.expenses.categories : [];
+    let reply = language === "ar"
+      ? "إجمالي المصاريف في " + periodLabel(data.period?.key, "ar") + " هو " + money(total, currency) + " من " + count + " عملية."
+      : "Total expenses for " + periodLabel(data.period?.key, "en") + ": " + money(total, currency) + " across " + count + " records.";
+    if (language === "ar" && categories.length) {
+      const top = categories.slice(0, 3).map((x: any) => String(x.category) + ": " + money(Number(x.amount || 0), currency)).join("، ");
+      reply += " أكبر البنود: " + top + ".";
+    }
+    return {
+      reply,
+      action,
+      provider: "smart-ai",
+      model: "smart-time-core",
+      engine: "rules"
+    };
+  }
+
+  return {
+    reply: language === "ar"
+      ? "أنا جاهز أتكلم معاك عن بيانات SMART TIME. جرّب مثلًا: «احكيلي عن مصاريف الأسبوع اللي فات» أو «كام صرفت الشهر اللي فات؟»."
+      : "I am ready to talk about SMART TIME data. Try: “Summarize last week's expenses” or “How much did I spend last month?”.",
+    action,
+    provider: "smart-ai",
+    model: "smart-time-core",
+    engine: "rules"
+  };
+}
