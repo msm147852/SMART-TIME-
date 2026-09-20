@@ -61,6 +61,17 @@ export async function revokeVoiceDnaShare(shareId: string): Promise<void> {
   await apiRequest("/api/voice-dna/shares/" + encodeURIComponent(shareId) + "/revoke", { method: "POST" });
 }
 
+export async function revokeVoiceDnaProfile(profileId: string): Promise<void> {
+  await apiRequest("/api/voice-dna/profiles/" + encodeURIComponent(profileId) + "/revoke", { method: "POST" });
+}
+
+export async function acknowledgeVoiceDnaSyncPackage(packageId: string): Promise<void> {
+  await apiRequest("/api/voice-dna/sync/ack", {
+    method: "POST",
+    body: JSON.stringify({ packageId }),
+  });
+}
+
 
 export async function synthesizeVoiceDna(input: {
   profileId: string;
