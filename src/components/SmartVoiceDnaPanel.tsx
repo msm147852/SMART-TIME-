@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2, Volume2 } from "lucide-react";
 import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
 import { acceptVoiceDnaShare, acknowledgeVoiceDnaSyncPackage, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaProfile, revokeVoiceDnaShare, synthesizeVoiceDna, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
-import { createVoiceDnaRecoveryEnvelope, deleteVoiceDnaRecoveryEnvelope, ensureVoiceDnaPublicKeyRegistered, hasVoiceDnaRecoveryEnvelope, uploadEncryptedVoiceDnaPackage, listIncomingVoiceDnaPackages, decryptIncomingVoiceDnaPackage, restoreVoiceDnaFromRecovery } from "../services/smartVoiceDnaCrypto";
+import { backupVoiceDnaSamplesForRecovery, createVoiceDnaRecoveryEnvelope, deleteVoiceDnaRecoveryEnvelope, ensureVoiceDnaPublicKeyRegistered, hasVoiceDnaRecoveryEnvelope, uploadEncryptedVoiceDnaPackage, listIncomingVoiceDnaPackages, decryptIncomingVoiceDnaPackage, restoreVoiceDnaFromRecovery, restoreVoiceDnaSamplesFromRecovery } from "../services/smartVoiceDnaCrypto";
 import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
@@ -125,9 +125,12 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
     setRecoveryBusy(true);
     try {
       await createVoiceDnaRecoveryEnvelope(recoveryPassphrase);
+      const backedUp = await backupVoiceDnaSamplesForRecovery(recoveryPassphrase);
       setRecoveryPassphrase("");
       setRecoveryReady(true);
-      setMessage(ar ? "تم إعداد استرداد Voice DNA. تم تدوير مفتاح المزامنة؛ أعد مزامنة الأصوات المشتركة عند الحاجة." : "Voice DNA recovery is ready. The sync key was rotated; re-sync shared voices when needed.");
+      setMessage(ar
+        ? `تم إعداد الاسترداد وتحديث نسخة آمنة لـ ${backedUp} ملف صوتي.`
+        : `Recovery is ready and ${backedUp} voice profile(s) were backed up securely.`);
     } catch (error: any) {
       setMessage(error?.message || (ar ? "تعذر إعداد الاسترداد." : "Could not configure recovery."));
     } finally { setRecoveryBusy(false); }
@@ -141,11 +144,31 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
     setRecoveryBusy(true);
     try {
       await restoreVoiceDnaFromRecovery(recoveryPassphrase);
+      const restored = await restoreVoiceDnaSamplesFromRecovery(recoveryPassphrase);
+      await refreshProfiles();
       setRecoveryPassphrase("");
       setRecoveryReady(true);
-      setMessage(ar ? "تم استرداد مفتاح Voice DNA على هذا الجهاز. يمكن استقبال مزامنة جديدة." : "Voice DNA key restored on this device. New sync packages can now be received.");
+      setMessage(ar
+        ? `تم استرداد المفتاح والملفات الصوتية: ${restored} ملف.`
+        : `Recovery restored the key and ${restored} voice profile(s).`);
     } catch (error: any) {
       setMessage(error?.message || (ar ? "تعذر استرداد المفتاح." : "Could not restore the key."));
+    } finally { setRecoveryBusy(false); }
+  };
+
+  const updateRecoveryBackup = async () => {
+    if (recoveryPassphrase.trim().length < 12) {
+      setMessage(ar ? "اكتب مفتاح الاسترداد لتحديث النسخة." : "Enter the recovery passphrase to refresh the backup.");
+      return;
+    }
+    setRecoveryBusy(true);
+    try {
+      const backedUp = await backupVoiceDnaSamplesForRecovery(recoveryPassphrase);
+      setRecoveryPassphrase("");
+      setRecoveryReady(true);
+      setMessage(ar ? `تم تحديث النسخة المشفّرة لـ ${backedUp} ملف صوتي.` : `Encrypted recovery backup updated for ${backedUp} voice profile(s).`);
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر تحديث النسخة." : "Could not refresh the backup."));
     } finally { setRecoveryBusy(false); }
   };
 
@@ -658,9 +681,12 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
           placeholder={ar ? "كلمة مرور استرداد طويلة (12+ حرف)" : "Long recovery passphrase (12+ chars)"}
           autoComplete="new-password"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
           <button type="button" onClick={() => void configureRecovery()} disabled={recoveryBusy} className="rounded-lg bg-cyan-600 px-2 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
             {ar ? "إعداد/تدوير" : "Set / rotate"}
+          </button>
+          <button type="button" onClick={() => void updateRecoveryBackup()} disabled={recoveryBusy || !recoveryReady} className="rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {ar ? "تحديث النسخة" : "Refresh backup"}
           </button>
           <button type="button" onClick={() => void restoreRecovery()} disabled={recoveryBusy || !recoveryReady} className="rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
             {ar ? "استرداد الجهاز" : "Restore device"}
