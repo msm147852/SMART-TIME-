@@ -693,6 +693,92 @@ app.get("/api/voice-dna/keys/public/:userId", async (req, res) => {
     return res.status(500).json({ error: "تعذر قراءة مفتاح Voice DNA العام." });
   }
 });
+ 
+app.post("/api/voice-dna/recovery/envelope", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+    const algorithm = String(req.body?.algorithm || "").trim().slice(0, 80);
+    const kdf = String(req.body?.kdf || "").trim().slice(0, 80);
+    const iterations = Number(req.body?.iterations || 0);
+    const salt = String(req.body?.salt || "").trim();
+    const iv = String(req.body?.iv || "").trim();
+    const ciphertext = String(req.body?.ciphertext || "").trim();
+    const publicJwk = req.body?.publicJwk;
+
+    if (algorithm !== "RSA-OAEP-256" || kdf !== "PBKDF2-SHA-256") {
+      return res.status(400).json({ error: "صيغة مفتاح الاسترداد غير مدعومة." });
+    }
+    if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 2000000) {
+      return res.status(400).json({ error: "عدد دورات الاسترداد غير صالح." });
+    }
+    if (!salt || !iv || !ciphertext || !publicJwk || typeof publicJwk !== "object") {
+      return res.status(400).json({ error: "بيانات استرداد Voice DNA غير مكتملة." });
+    }
+    if (salt.length > 128 || iv.length > 64 || ciphertext.length > 20000) {
+      return res.status(413).json({ error: "حزمة استرداد Voice DNA كبيرة جدًا." });
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO voice_dna_recovery_envelopes
+      (user_id, algorithm, kdf, iterations, salt, iv, ciphertext, public_jwk_json, created_at, rotated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,NULL)
+      ON CONFLICT(user_id) DO UPDATE SET
+        algorithm=excluded.algorithm,
+        kdf=excluded.kdf,
+        iterations=excluded.iterations,
+        salt=excluded.salt,
+        iv=excluded.iv,
+        ciphertext=excluded.ciphertext,
+        public_jwk_json=excluded.public_jwk_json,
+        rotated_at=excluded.created_at`)
+      .run(user.id, algorithm, kdf, iterations, salt, iv, ciphertext, JSON.stringify(publicJwk), now);
+
+    return res.json({ ok: true, rotatedAt: now });
+  } catch (error: any) {
+    console.error("Voice DNA recovery envelope error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر حفظ نسخة استرداد Voice DNA." });
+  }
+});
+
+app.get("/api/voice-dna/recovery/envelope", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+    const row = db.prepare(`SELECT algorithm, kdf, iterations, salt, iv, ciphertext, public_jwk_json as publicJwkJson,
+      created_at as createdAt, rotated_at as rotatedAt
+      FROM voice_dna_recovery_envelopes WHERE user_id=?`).get(user.id) as any;
+    if (!row) return res.status(404).json({ error: "لا توجد نسخة استرداد Voice DNA لهذا الحساب." });
+
+    return res.json({
+      algorithm: row.algorithm,
+      kdf: row.kdf,
+      iterations: Number(row.iterations),
+      salt: row.salt,
+      iv: row.iv,
+      ciphertext: row.ciphertext,
+      publicJwk: JSON.parse(String(row.publicJwkJson)),
+      createdAt: row.createdAt,
+      rotatedAt: row.rotatedAt,
+    });
+  } catch {
+    return res.status(500).json({ error: "تعذر قراءة نسخة استرداد Voice DNA." });
+  }
+});
+
+app.delete("/api/voice-dna/recovery/envelope", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    db.prepare("DELETE FROM voice_dna_recovery_envelopes WHERE user_id=?").run(user.id);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "تعذر حذف نسخة استرداد Voice DNA." });
+  }
+});
+
 
 app.post("/api/voice-dna/sync/upload", async (req, res) => {
   try {
