@@ -12,6 +12,7 @@ import { getCache, setCache } from "./backend/cache.js";
 import { getServiceStatuses, seedServiceStatuses, setServiceStatus } from "./backend/serviceStatus.js";
 import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
+import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 
 dotenv.config();
 
@@ -368,143 +369,42 @@ app.get("/api/database/health", (_req, res) => {
 });
 
 // ----------------------------------------------------
-// 2. AI Center - SMART AI (Gemini)
+// 2. AI Center - SMART AI (Keyless App Intelligence)
 // ----------------------------------------------------
-const SMART_AI_DEFAULT_MODEL = String(process.env.GEMINI_MODEL || "gemini-3.8-flash").trim();
-
-function smartAiSystemPrompt(language: string) {
-  return language === "en"
-    ? `You are SMART AI, the unified assistant inside the SMART TIME app.
-Analyze only the APP_CONTEXT_JSON supplied by the client. Never invent missing user data.
-You may propose ONE write action when the user's request is explicit and all required values are present.
-Allowed actions: add_expense, add_education_expense, add_fuel_record, add_daily_task.
-Never access, request, expose, or summarize passwords, PINs, authentication tokens, API keys, secure-vault secrets, or raw private files.
-The Food section has been removed from SMART TIME. Do not suggest or create food-module records. Expense category "food" remains valid as an ordinary expense classification.
-For education expenses, match the exact studentId from the provided students list whenever possible.
-For fuel records, match the exact vehicleId from the provided vehicles list whenever possible.
-If a write request is ambiguous or missing a required value/identifier, set action to null and needsClarification=true and state what is missing.
-For analytical questions, calculate from the provided context and return action=null.
-Return strict JSON only with keys: reply, action, actionSummary, requiresConfirmation, needsClarification, model, provider.
-`
-    : `أنت SMART AI، المساعد الموحد داخل تطبيق SMART TIME.
-حلل فقط بيانات التطبيق الموجودة في APP_CONTEXT_JSON المرسل مع الطلب، ولا تخترع بيانات غير موجودة.
-يمكنك اقتراح إجراء كتابة واحد فقط عندما يكون طلب المستخدم واضحًا وكل القيم الأساسية موجودة.
-الإجراءات المسموحة: add_expense, add_education_expense, add_fuel_record, add_daily_task.
-ممنوع طلب أو كشف كلمات المرور أو PIN أو رموز التوثيق أو مفاتيح API أو أسرار الخزنة الآمنة أو الملفات الخاصة الخام.
-قسم الطعام تم حذفه من SMART TIME؛ لا تقترح أو تنشئ سجلات لوحدة الطعام. تصنيف المصروف "food" يظل مسموحًا كمجرد تصنيف للمصروف العادي.
-في مصروف التعليم استخدم studentId المطابق من قائمة الطلاب قدر الإمكان.
-في التموين استخدم vehicleId المطابق من قائمة السيارات قدر الإمكان.
-إذا كان طلب الكتابة غير واضح أو ينقصه مبلغ/قيمة/معرّف أساسي، اجعل action=null وneedsClarification=true واشرح المطلوب تحديدًا.
-في الأسئلة التحليلية احسب من البيانات المرسلة وأعد action=null.
-أعد JSON صارمًا فقط بالمفاتيح: reply, action, actionSummary, requiresConfirmation, needsClarification, model, provider.
-`;
-}
-
-function parseSmartAiJson(text: string): any {
-  const cleaned = String(text || "")
-    .trim()
-    .replace(/^\`\`\`json\s*/i, "")
-    .replace(/^\`\`\`\s*/i, "")
-    .replace(/\s*\`\`\`$/, "");
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    return null;
-  }
-}
-
+// SMART AI is app-owned. The V1 core answers app-data questions from
+// sanitized SMART TIME context and does not require an AI API key.
 const handleAiChat = async (req: express.Request, res: express.Response) => {
   try {
     const user = authUser(req);
     if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول لاستخدام SMART AI." });
 
-    const userPrompt = String(req.body?.message || req.body?.prompt || "").trim();
+    const message = String(req.body?.message || req.body?.prompt || "").trim();
     const language = String(req.body?.language || "ar") === "en" ? "en" : "ar";
-    const requestedModel = String(req.body?.model || req.body?.modelProvider || SMART_AI_DEFAULT_MODEL).trim();
-    const model = requestedModel.startsWith("gemini-") ? requestedModel : SMART_AI_DEFAULT_MODEL;
     const conversationHistory = Array.isArray(req.body?.conversationHistory)
       ? req.body.conversationHistory.slice(-8)
       : [];
     const appContext = req.body?.appContext;
 
-    if (!userPrompt) return res.status(400).json({ error: "Message is required" });
+    if (!message) return res.status(400).json({ error: "Message is required" });
     if (!appContext || typeof appContext !== "object") {
       return res.status(400).json({ error: "بيانات سياق SMART TIME مطلوبة." });
     }
 
-    const prompt = [
-      smartAiSystemPrompt(language),
-      "",
-      "APP_CONTEXT_JSON:",
-      JSON.stringify(appContext),
-      "",
-      "CONVERSATION_HISTORY_JSON:",
-      JSON.stringify(conversationHistory),
-      "",
-      "USER_REQUEST:",
-      userPrompt,
-      "",
-      "OUTPUT_REQUIREMENTS:",
-      "- action must be null or exactly one allowed action object.",
-      "- requiresConfirmation must be true only when action is present.",
-      "- Do not claim that a write action has already been executed.",
-      "- Never fabricate a studentId or vehicleId when a matching record is not present in the context.",
-    ].join("\n");
+    const response = await askSmartAiCore({
+      message,
+      language,
+      conversationHistory,
+      appContext: appContext as Record<string, unknown>,
+    });
 
-    try {
-      const ai = getGemini();
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        } as any,
-      });
-
-      const rawText = String(response?.text || "").trim();
-      const parsed = parseSmartAiJson(rawText);
-
-      if (!parsed) {
-        return res.json({
-          reply: rawText || (language === "ar" ? "تعذر الحصول على رد واضح من Gemini." : "Gemini returned no usable response."),
-          action: null,
-          requiresConfirmation: false,
-          needsClarification: false,
-          model,
-          provider: "gemini",
-        });
-      }
-
-      const allowedActions = new Set([
-        "add_expense",
-        "add_education_expense",
-        "add_fuel_record",
-        "add_daily_task",
-      ]);
-      const action = parsed.action && allowedActions.has(parsed.action.type) ? parsed.action : null;
-
-      return res.json({
-        reply: String(parsed.reply || ""),
-        action,
-        actionSummary: action ? String(parsed.actionSummary || "") : "",
-        requiresConfirmation: !!(action && parsed.requiresConfirmation),
-        needsClarification: !!parsed.needsClarification,
-        model,
-        provider: "gemini",
-      });
-    } catch (aiErr: any) {
-      console.warn("Gemini SMART AI error:", aiErr?.message || aiErr);
-      return res.status(503).json({
-        error:
-          process.env.NODE_ENV === "production"
-            ? "خدمة SMART AI غير متاحة الآن. تأكد من إعداد GEMINI_API_KEY."
-            : "تعذر تشغيل Gemini محليًا. تأكد من إعداد GEMINI_API_KEY.",
-      });
-    }
+    return res.json(response);
   } catch (error: any) {
-    console.error("AI Chat error:", error);
-    return res.status(500).json({ error: error?.message || "Internal server error" });
+    console.error("SMART AI Core error:", error?.message || error);
+    return res.status(500).json({
+      error: language === "en"
+        ? "SMART AI could not process this request."
+        : "تعذر تشغيل SMART AI لهذه الرسالة.",
+    });
   }
 };
 
