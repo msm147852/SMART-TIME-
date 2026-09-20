@@ -741,6 +741,11 @@ app.post("/api/voice-dna/recovery/envelope", async (req, res) => {
     }
 
     const now = new Date().toISOString();
+
+    // Rotating the recovery envelope rotates the encryption key for sample backups too.
+    // Remove samples encrypted with the previous recovery key before replacing the envelope.
+    db.prepare("DELETE FROM voice_dna_recovery_samples WHERE user_id=?").run(user.id);
+
     db.prepare(`INSERT INTO voice_dna_recovery_envelopes
       (user_id, algorithm, kdf, iterations, salt, iv, ciphertext, public_jwk_json, created_at, rotated_at)
       VALUES (?,?,?,?,?,?,?,?,?,NULL)
