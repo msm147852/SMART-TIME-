@@ -1,5 +1,6 @@
 import { apiUrl } from "./apiConfig";
 import { authHeaders } from "./authService";
+import { listVoiceDnaProfiles, readVoiceDnaSample, saveVoiceDnaProfile, saveVoiceDnaSample, type SmartVoiceDnaProfile } from "./smartVoiceDnaService";
 
 const DB_NAME = "smart-time-voice-dna";
 const DB_VERSION = 3;
@@ -114,7 +115,7 @@ export async function decryptIncomingVoiceDnaPackage(pkg: { wrappedKey: string; 
 
 const RECOVERY_ITERATIONS = 300000;
 
-async function deriveRecoveryKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveRecoveryKey(passphrase: string, salt: Uint8Array, iterations = RECOVERY_ITERATIONS): Promise<CryptoKey> {
   if (passphrase.trim().length < 12) throw new Error("مفتاح الاسترداد يجب أن يكون 12 حرفًا على الأقل.");
   const baseKey = await crypto.subtle.importKey(
     "raw",
@@ -124,7 +125,7 @@ async function deriveRecoveryKey(passphrase: string, salt: Uint8Array): Promise<
     ["deriveKey"]
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: RECOVERY_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
     baseKey,
     { name: "AES-GCM", length: 256 },
     false,
@@ -276,4 +277,121 @@ export async function deleteVoiceDnaRecoveryEnvelope(): Promise<void> {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload?.error || "تعذر حذف نسخة الاسترداد.");
   }
+}
+
+
+async function getRecoveryEnvelope(): Promise<any> {
+  const response = await fetch(apiUrl("/api/voice-dna/recovery/envelope"), {
+    headers: { ...authHeaders() },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || "لا توجد نسخة استرداد Voice DNA.");
+  return payload;
+}
+
+export async function backupVoiceDnaSamplesForRecovery(passphrase: string): Promise<number> {
+  const envelope = await getRecoveryEnvelope();
+  const salt = fromBase64(String(envelope.salt || ""));
+  const iterations = Number(envelope.iterations);
+  if (salt.length !== 16 || !Number.isInteger(iterations) || iterations < 100000 || iterations > 2000000) {
+    throw new Error("نسخة الاسترداد غير صالحة.");
+  }
+
+  const recoveryKey = await deriveRecoveryKey(passphrase, salt, iterations);
+  const profiles = await listVoiceDnaProfiles();
+  let count = 0;
+
+  for (const profile of profiles) {
+    if (profile.origin === "shared") continue;
+    const sample = await readVoiceDnaSample(profile.id);
+    if (!sample) continue;
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = new Uint8Array(await sample.arrayBuffer());
+    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, recoveryKey, plaintext);
+
+    const response = await fetch(apiUrl("/api/voice-dna/recovery/samples"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({
+        profileId: profile.id,
+        salt: toBase64(salt),
+        iv: toBase64(iv),
+        ciphertext: toBase64(new Uint8Array(ciphertext)),
+        mimeType: sample.type || "audio/webm",
+        durationMs: profile.sampleDurationMs,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || "تعذر تحديث النسخة الاحتياطية للصوت.");
+    count += 1;
+  }
+
+  return count;
+}
+
+export async function restoreVoiceDnaSamplesFromRecovery(passphrase: string): Promise<number> {
+  const envelope = await getRecoveryEnvelope();
+  const salt = fromBase64(String(envelope.salt || ""));
+  const iterations = Number(envelope.iterations);
+  if (salt.length !== 16 || !Number.isInteger(iterations) || iterations < 100000 || iterations > 2000000) {
+    throw new Error("نسخة الاسترداد غير صالحة.");
+  }
+
+  const profilesResponse = await fetch(apiUrl("/api/voice-dna/profiles"), {
+    headers: { ...authHeaders() },
+  });
+  const profilePayload = await profilesResponse.json().catch(() => ({}));
+  if (!profilesResponse.ok) throw new Error(profilePayload?.error || "تعذر قراءة ملفات Voice DNA.");
+  const remoteProfiles = Array.isArray(profilePayload?.profiles) ? profilePayload.profiles : [];
+
+  const recoveryKey = await deriveRecoveryKey(passphrase, salt, iterations);
+  const samplesResponse = await fetch(apiUrl("/api/voice-dna/recovery/samples"), {
+    headers: { ...authHeaders() },
+  });
+  const samplesPayload = await samplesResponse.json().catch(() => ({}));
+  if (!samplesResponse.ok) throw new Error(samplesPayload?.error || "تعذر قراءة النسخة الاحتياطية للصوت.");
+
+  let count = 0;
+  for (const item of Array.isArray(samplesPayload?.samples) ? samplesPayload.samples : []) {
+    const remote = remoteProfiles.find((profile: any) => String(profile.id) === String(item.profileId));
+    if (!remote) continue;
+
+    let plaintext: ArrayBuffer;
+    try {
+      plaintext = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: fromBase64(String(item.iv || "")) },
+        recoveryKey,
+        fromBase64(String(item.ciphertext || ""))
+      );
+    } catch {
+      throw new Error("تعذر فك إحدى عينات Voice DNA. تأكد من مفتاح الاسترداد.");
+    }
+
+    const localProfile: SmartVoiceDnaProfile = {
+      id: String(remote.id),
+      displayName: String(remote.displayName || "Voice DNA"),
+      relationship: (remote.relationship || "family") as SmartVoiceDnaProfile["relationship"],
+      language: remote.language === "en" ? "en" : "ar",
+      locale: remote.locale === "en-US" ? "en-US" : "ar-EG",
+      dialect: remote.dialect === "en-US" ? "en-US" : "ar-EG",
+      speakingStyle: (remote.speakingStyle || "natural") as SmartVoiceDnaProfile["speakingStyle"],
+      isDefault: Boolean(remote.isDefault),
+      consentMode: (remote.relationship === "son" || remote.relationship === "daughter") ? "guardian" : "self",
+      ownerConfirmed: Boolean(remote.ownerConfirmed),
+      guardianConfirmed: Boolean(remote.guardianConfirmed),
+      consentRecordedAt: String(remote.consentRecordedAt || new Date().toISOString()),
+      createdAt: String(remote.createdAt || new Date().toISOString()),
+      sampleDurationMs: Number(item.durationMs || 0),
+      engineStatus: "pending_local_engine",
+      origin: "local",
+      ownerUserId: String(remote.ownerUserId || ""),
+    };
+
+    await saveVoiceDnaProfile(localProfile);
+    await saveVoiceDnaSample(localProfile.id, new Blob([plaintext], { type: String(item.mimeType || "audio/webm") }), localProfile.sampleDurationMs);
+    count += 1;
+  }
+
+  return count;
 }
