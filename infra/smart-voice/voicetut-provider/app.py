@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 try:
@@ -108,10 +108,10 @@ def synthesize(payload: SynthesizeRequest, authorization: str | None = Header(de
             if not out_path.exists() or out_path.stat().st_size == 0:
                 raise RuntimeError("VoiceTuT produced no audio.")
 
-            return FileResponse(
-                out_path,
+            audio_bytes = out_path.read_bytes()
+            return Response(
+                content=audio_bytes,
                 media_type="audio/wav",
-                filename="smart-time-voice.wav",
                 headers={
                     "X-SMART-VOICE-PROVIDER": "voicetut-tts",
                     "Cache-Control": "no-store",
