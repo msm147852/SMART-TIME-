@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bot, Check, Copy, Mic, RotateCcw, Send, Sparkles, Zap } from 'lucide-react';
+import { Bot, Check, Copy, Mic, RotateCcw, Send, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
 import { AiMessage, AiModelType, Language } from '../types';
 import { ChatRepository } from '../services';
 import { askSmartAi, buildSmartAiContext, SmartAiAction } from '../services/aiService';
+import { loadSmartAiVoiceId, saveSmartAiVoiceId, speakSmartAi, stopSmartAiVoice, SMART_AI_VOICE_PROFILES } from '../services/smartAiVoiceService';
+import type { SmartAiVoiceId } from '../types';
 
 interface AiCenterViewProps {
   language: Language;
@@ -91,6 +93,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         appContext: buildSmartAiContext(appContext),
       });
 
+      if (isVoiceEnabled && data.reply) {
+        speakSmartAi(data.reply, language, selectedVoice);
+      }
+
       const aiMessage: AiMessage = {
         id: 'msg_ai_' + Date.now(),
         sender: 'ai',
@@ -172,9 +178,31 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
-            ✨ SMART TIME AI
-          </span>
+          <div className="flex items-center gap-2">
+            <select value={selectedVoice} onChange={(event) => {
+              const id = event.target.value as SmartAiVoiceId;
+              setSelectedVoice(id);
+              saveSmartAiVoiceId(id);
+            }} className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 border-0 outline-none">
+              {SMART_AI_VOICE_PROFILES.map((voice) => (
+                <option key={voice.id} value={voice.id}>{language === 'ar' ? voice.labelAr : voice.labelEn}</option>
+              ))}
+            </select>
+            <button type="button" onClick={() => {
+              if (isVoiceEnabled) {
+                stopSmartAiVoice();
+                setIsVoiceEnabled(false);
+              } else {
+                setIsVoiceEnabled(true);
+                speakSmartAi(language === 'ar' ? 'أهلًا بك في SMART TIME.' : 'Welcome to SMART TIME.', language, selectedVoice);
+              }
+            }} className="p-2 text-slate-500 hover:text-purple-600 rounded-xl" title={language === 'ar' ? 'صوت SMART AI' : 'SMART AI voice'}>
+              {isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+              ✨ SMART TIME AI
+            </span>
+          </div>
           <button
             type="button"
             onClick={handleClearChat}
@@ -215,6 +243,11 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
                 <div className="flex items-center justify-between gap-4 pt-2 text-[10px] opacity-70">
                   <span>{msg.timestamp}</span>
                   {isAi && (
+                    <>
+                      <button type="button" onClick={() => speakSmartAi(msg.text, language, selectedVoice)} className="flex items-center gap-1 hover:opacity-100" title={language === 'ar' ? 'استماع' : 'Listen'}>
+                        <Volume2 className="w-3 h-3" />
+                        <span>{language === 'ar' ? 'استماع' : 'Listen'}</span>
+                      </button>
                     <button
                       type="button"
                       onClick={() => handleCopy(index, msg.text)}
@@ -223,6 +256,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
                       {copiedIndex === index ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                       <span>{copiedIndex === index ? 'تم النسخ' : 'نسخ'}</span>
                     </button>
+                      </>
                   )}
                 </div>
               </div>
