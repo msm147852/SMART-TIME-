@@ -60,3 +60,38 @@ export async function acceptVoiceDnaShare(shareId: string): Promise<void> {
 export async function revokeVoiceDnaShare(shareId: string): Promise<void> {
   await apiRequest("/api/voice-dna/shares/" + encodeURIComponent(shareId) + "/revoke", { method: "POST" });
 }
+
+
+export async function synthesizeVoiceDna(input: {
+  profileId: string;
+  text: string;
+  speakingStyle?: string;
+  consentConfirmed: boolean;
+  referenceAudio: Blob;
+}): Promise<Blob> {
+  const bytes = new Uint8Array(await input.referenceAudio.arrayBuffer());
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+
+  const response = await fetch(apiUrl("/api/voice-dna/synthesize"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      profileId: input.profileId,
+      text: input.text,
+      speakingStyle: input.speakingStyle || "natural",
+      consentConfirmed: input.consentConfirmed,
+      referenceAudioBase64: btoa(binary),
+      referenceMimeType: input.referenceAudio.type || "audio/webm",
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || "تعذر تشغيل صوت Voice DNA.");
+  }
+  return await response.blob();
+}
