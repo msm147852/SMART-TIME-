@@ -123,16 +123,25 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
       return;
     }
     setRecoveryBusy(true);
+    let envelopeCreated = false;
     try {
       await createVoiceDnaRecoveryEnvelope(recoveryPassphrase);
+      envelopeCreated = true;
+      setRecoveryReady(true);
       const backedUp = await backupVoiceDnaSamplesForRecovery(recoveryPassphrase);
       setRecoveryPassphrase("");
-      setRecoveryReady(true);
       setMessage(ar
         ? `تم إعداد الاسترداد وتحديث نسخة آمنة لـ ${backedUp} ملف صوتي.`
         : `Recovery is ready and ${backedUp} voice profile(s) were backed up securely.`);
     } catch (error: any) {
-      setMessage(error?.message || (ar ? "تعذر إعداد الاسترداد." : "Could not configure recovery."));
+      if (envelopeCreated) {
+        setRecoveryReady(true);
+        setMessage(ar
+          ? `تم إنشاء مفتاح الاسترداد، لكن النسخة الاحتياطية لم تكتمل: ${error?.message || "حاول تحديث النسخة مرة أخرى."}`
+          : `The recovery key was created, but the backup did not finish: ${error?.message || "Refresh the backup and try again."}`);
+      } else {
+        setMessage(error?.message || (ar ? "تعذر إعداد الاسترداد." : "Could not configure recovery."));
+      }
     } finally { setRecoveryBusy(false); }
   };
 
@@ -555,11 +564,11 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                     </button>
                   </div>
                   <div className="text-[9px] text-slate-500 mt-1">
-                    {ar ? "المشاركة تمنح صلاحية، والمزامنة تنقل نسخة مشفّرة لا يملك SMART TIME مفتاح فكها." : "This grants private access metadata only; secure sample sync comes later."}
+                    {ar ? "المشاركة تمنح صلاحية فقط؛ وعند المزامنة تنتقل نسخة مشفّرة لا يملك SMART TIME مفتاح فكها." : "Sharing grants access metadata only; secure sample sync transfers an encrypted copy that SMART TIME cannot decrypt."}
                   </div>
                 </div>
                 <div className="text-[10px] text-amber-200/90 mt-1">
-                  {ar ? "المحرك الصوتي المحلي: غير موصول بعد" : "Local voice engine: not connected yet"}
+                  {ar ? "محرك الصوت المحلي: يعمل فقط عند توصيل مزوّد VoiceTuT عبر الخادم." : "Local voice engine: available when a VoiceTuT provider is connected through the server."}
                 </div>
                 <button type="button" onClick={() => void playVoiceDnaSample(profile)} disabled={playingId === profile.id} className="mt-2 w-full rounded-lg border border-purple-400/30 px-2 py-1.5 text-[10px] font-bold text-purple-200 disabled:opacity-50 flex items-center justify-center gap-1.5">
                   <Volume2 className="w-3.5 h-3.5" />{playingId === profile.id ? "…" : (ar ? "تجربة الصوت" : "Test voice")}
