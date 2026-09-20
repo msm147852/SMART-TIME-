@@ -493,6 +493,7 @@ app.post("/api/voice-dna/profiles/:id/revoke", async (req, res) => {
     db.prepare("UPDATE voice_dna_profiles SET revoked_at=? WHERE id=? AND owner_user_id=?").run(now, profileId, user.id);
     db.prepare("UPDATE voice_dna_shares SET status='revoked', revoked_at=? WHERE profile_id=?").run(now, profileId);
     db.prepare("UPDATE voice_dna_sync_packages SET revoked_at=? WHERE profile_id=? AND revoked_at IS NULL").run(now, profileId);
+    db.prepare("DELETE FROM voice_dna_recovery_samples WHERE user_id=? AND profile_id=?").run(user.id, profileId);
     return res.json({ ok: true, status: "revoked" });
   } catch (error: any) {
     console.error("Voice DNA profile revoke error:", error?.message || error);
