@@ -40,6 +40,14 @@ function isEducationQuestion(q: string): boolean {
   return /(تعليم|طالب|مدرسة|درس|education|student|lesson)/i.test(q);
 }
 
+function isComparisonQuestion(q: string): boolean {
+  return /(قارن|مقارنة|مقارنه|الفرق|مقابل|مقابلين|compare|comparison|difference|versus|vs\.?)/i.test(q);
+}
+
+function isNetIncomeQuestion(q: string): boolean {
+  return /(صافي الدخل|صافي دخلي|الدخل الصافي|صافى الدخل|net income|take.?home)/i.test(q);
+}
+
 function isHelpQuestion(q: string): boolean {
   return /(اشرح|شرح|ازاي|كيف|ماذا تستطيع|تقدر تعمل ايه|what can you do|help)/i.test(q);
 }
@@ -48,6 +56,43 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
   const q = message.toLowerCase();
   const currency = String(data.profile.currency || "EGP");
   const action = actionFromMessage(message);
+
+  if (isComparisonQuestion(q)) {
+    const current = data.comparisons?.thisMonth;
+    const previous = data.comparisons?.lastMonth;
+    const currentTotal = Number(current?.total || 0);
+    const previousTotal = Number(previous?.total || 0);
+    const delta = Math.round((currentTotal - previousTotal) * 100) / 100;
+    const percent = previousTotal === 0 ? null : Math.round((delta / previousTotal) * 1000) / 10;
+    const direction = delta > 0 ? (language === "ar" ? "أعلى" : "higher") : delta < 0 ? (language === "ar" ? "أقل" : "lower") : (language === "ar" ? "مساوي" : "the same");
+    const changeText = percent === null
+      ? (language === "ar" ? "لا يمكن حساب نسبة التغير لأن الشهر الماضي كان 0." : "A percentage change cannot be calculated because last month was 0.")
+      : (language === "ar" ? "التغير حوالي " + Math.abs(percent) + "%." : "The change was about " + Math.abs(percent) + "%.");
+    return {
+      reply: language === "ar"
+        ? "مصاريف الشهر ده " + money(currentTotal, currency) + " مقابل " + money(previousTotal, currency) + " الشهر اللي فات؛ يعني " + direction + " بمقدار " + money(Math.abs(delta), currency) + ". " + changeText
+        : "This month's expenses are " + money(currentTotal, currency) + " versus " + money(previousTotal, currency) + " last month; that is " + direction + " by " + money(Math.abs(delta), currency) + ". " + changeText,
+      action,
+      provider: "smart-ai",
+      model: "smart-time-core",
+      engine: "rules"
+    };
+  }
+
+  if (isNetIncomeQuestion(q)) {
+    const income = Number(data.comparisons?.thisMonthIncome || 0);
+    const expenses = Number(data.comparisons?.thisMonth?.total || 0);
+    const net = Math.round((income - expenses) * 100) / 100;
+    return {
+      reply: language === "ar"
+        ? "الدخل المسجل في الشهر ده " + money(income, currency) + "، والمصاريف " + money(expenses, currency) + "، وصافي الدخل المحسوب هو " + money(net, currency) + "."
+        : "Recorded income this month is " + money(income, currency) + ", expenses are " + money(expenses, currency) + ", and calculated net income is " + money(net, currency) + ".",
+      action,
+      provider: "smart-ai",
+      model: "smart-time-core",
+      engine: "rules"
+    };
+  }
 
   if (isHelpQuestion(q)) {
     return {
@@ -116,8 +161,8 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
 
   return {
     reply: language === "ar"
-      ? "أنا جاهز أتكلم معاك عن بيانات SMART TIME. جرّب مثلًا: «احكيلي عن مصاريف الأسبوع اللي فات» أو «كام صرفت الشهر اللي فات؟»."
-      : "I am ready to talk about SMART TIME data. Try: “Summarize last week's expenses” or “How much did I spend last month?”.",
+      ? "أنا جاهز أتكلم معاك عن بيانات SMART TIME. جرّب مثلًا: «قارن مصاريف الشهر ده بالشهر اللي فات» أو «احسب صافي دخلي الشهر ده» أو «كام صرفت الأسبوع اللي فات؟»."
+      : "I am ready to talk about SMART TIME data. Try: “Compare this month with last month”, “What is my net income this month?”, or “How much did I spend last week?”.",
     action,
     provider: "smart-ai",
     model: "smart-time-core",
