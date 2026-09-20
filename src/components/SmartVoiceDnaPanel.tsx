@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Mic, ShieldCheck, Trash2, X } from "lucide-react";
-import type { Language, SmartVoiceDnaRelationship } from "../types";
+import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
 import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
   listVoiceDnaProfiles,
   saveVoiceDnaProfile,
   saveVoiceDnaSample,
+  setDefaultVoiceDnaProfile,
+  clearDefaultVoiceDnaProfile,
   type SmartVoiceDnaProfile,
 } from "../services/smartVoiceDnaService";
 
@@ -36,6 +38,8 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const [relationship, setRelationship] = useState<SmartVoiceDnaRelationship>("self");
   const [ownerConfirmed, setOwnerConfirmed] = useState(false);
   const [guardianConfirmed, setGuardianConfirmed] = useState(false);
+  const [speakingStyle, setSpeakingStyle] = useState<SmartVoiceDnaSpeakingStyle>("natural");
+  const [isDefault, setIsDefault] = useState(false);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [message, setMessage] = useState("");
@@ -129,6 +133,9 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
             relationship,
             language: ar ? "ar" : "en",
             locale: ar ? "ar-EG" : "en-US",
+            dialect: ar ? "ar-EG" : "en-US",
+            speakingStyle,
+            isDefault,
             consentMode: requiresGuardian ? "guardian" : "self",
             ownerConfirmed,
             guardianConfirmed: requiresGuardian ? guardianConfirmed : false,
@@ -140,6 +147,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
           await saveVoiceDnaProfile(profile);
           await saveVoiceDnaSample(profileId, new Blob(chunksRef.current, { type: mimeType }), durationMs);
+          if (isDefault) await setDefaultVoiceDnaProfile(profileId);
           await refreshProfiles();
           setRecordState("idle");
           setMessage(ar
@@ -148,6 +156,8 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
           setDisplayName("");
           setOwnerConfirmed(false);
           setGuardianConfirmed(false);
+          setSpeakingStyle("natural");
+          setIsDefault(false);
         } catch (error) {
           console.error("Voice DNA save failed:", error);
           setRecordState("idle");
@@ -232,6 +242,19 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
             </label>
           )}
 
+          <label className="block text-[11px] font-bold text-slate-300 mt-3 mb-1">{ar ? "أسلوب الكلام" : "Speaking style"}</label>
+          <select value={speakingStyle} onChange={(event) => setSpeakingStyle(event.target.value as SmartVoiceDnaSpeakingStyle)} className="w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs outline-none">
+            <option value="natural">{ar ? "طبيعي" : "Natural"}</option>
+            <option value="calm">{ar ? "هادئ" : "Calm"}</option>
+            <option value="warm">{ar ? "دافئ" : "Warm"}</option>
+            <option value="formal">{ar ? "رسمي" : "Formal"}</option>
+            <option value="alert">{ar ? "تنبيه" : "Alert"}</option>
+          </select>
+          <label className="flex items-center gap-2 mt-3 text-[11px] text-slate-300">
+            <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
+            <span>{ar ? "استخدم هذا الصوت تلقائيًا مع SMART AI" : "Use this voice by default with SMART AI"}</span>
+          </label>
+
           <div className="mt-3 rounded-xl bg-purple-500/10 border border-purple-400/20 p-2.5 text-[10px] leading-relaxed text-purple-100">
             <div className="font-bold mb-1">{ar ? "جملة الموافقة للتسجيل" : "Consent phrase"}</div>
             <div>{ar ? CONSENT_PHRASE_AR : CONSENT_PHRASE_EN}</div>
@@ -275,6 +298,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                   <Check className="w-3.5 h-3.5" />
                   <span>{ar ? "محلي ومشفّر" : "Local and encrypted"}</span>
                 </div>
+                <div className="text-[10px] text-purple-200/90 mt-1">{profile.speakingStyle ? (ar ? `الأسلوب: ${profile.speakingStyle}` : `Style: ${profile.speakingStyle}`) : ""}</div>
                 <div className="text-[10px] text-amber-200/90 mt-1">
                   {ar ? "المحرك الصوتي المحلي: غير موصول بعد" : "Local voice engine: not connected yet"}
                 </div>

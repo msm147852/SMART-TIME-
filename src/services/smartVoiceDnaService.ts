@@ -1,11 +1,14 @@
-import type { SmartVoiceDnaConsentMode, SmartVoiceDnaRelationship } from "../types";
+import type { SmartVoiceDnaConsentMode, SmartVoiceDnaRelationship, SmartVoiceDnaDialect, SmartVoiceDnaSpeakingStyle } from "../types";
 
 export interface SmartVoiceDnaProfile {
   id: string;
   displayName: string;
   relationship: SmartVoiceDnaRelationship;
   language: "ar" | "en";
-  locale: string;
+  locale: SmartVoiceDnaDialect;
+  dialect: SmartVoiceDnaDialect;
+  speakingStyle: SmartVoiceDnaSpeakingStyle;
+  isDefault: boolean;
   consentMode: SmartVoiceDnaConsentMode;
   ownerConfirmed: boolean;
   guardianConfirmed: boolean;
@@ -211,4 +214,44 @@ export function createVoiceDnaId(): string {
     return "voice_" + crypto.randomUUID();
   }
   return "voice_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2);
+}
+
+const DEFAULT_PROFILE_KEY = "smart-time-voice-dna-default";
+
+export function getDefaultVoiceDnaProfileId(): string | null {
+  try {
+    return localStorage.getItem(DEFAULT_PROFILE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function setDefaultVoiceDnaProfile(profileId: string): Promise<void> {
+  const profiles = await listVoiceDnaProfiles();
+  const exists = profiles.some((profile) => profile.id === profileId);
+  if (!exists) throw new Error("Voice DNA profile not found.");
+
+  for (const profile of profiles) {
+    if (profile.isDefault !== (profile.id === profileId)) {
+      await saveVoiceDnaProfile({ ...profile, isDefault: profile.id === profileId });
+    }
+  }
+
+  try {
+    localStorage.setItem(DEFAULT_PROFILE_KEY, profileId);
+  } catch {
+    // Local preference storage may be unavailable.
+  }
+}
+
+export async function clearDefaultVoiceDnaProfile(): Promise<void> {
+  const profiles = await listVoiceDnaProfiles();
+  for (const profile of profiles) {
+    if (profile.isDefault) await saveVoiceDnaProfile({ ...profile, isDefault: false });
+  }
+  try {
+    localStorage.removeItem(DEFAULT_PROFILE_KEY);
+  } catch {
+    // no-op
+  }
 }
