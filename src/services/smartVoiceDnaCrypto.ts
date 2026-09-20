@@ -1,0 +1,89 @@
+import { apiUrl } from "./apiConfig";
+import { authHeaders } from "./authService";
+
+const DB_NAME = "smart-time-voice-dna";
+const DB_VERSION = 3;
+const KEY_STORE = "keys";
+const IDENTITY_KEY_ID = "voice-dna-identity-rsa-oaep";
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  return btoa(binary);
+}
+function fromBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(KEY_STORE)) db.createObjectStore(KEY_STORE, { keyPath: "id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Could not open Voice DNA keys."));
+  });
+}
+async function getIdentityKeyPair(): Promise<CryptoKeyPair> {
+  const db = await openDb();
+  try {
+    const existing = await new Promise<CryptoKeyPair | null>((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE, "readonly");
+      const request = tx.objectStore(KEY_STORE).get(IDENTITY_KEY_ID);
+      request.onsuccess = () => resolve(request.result?.keyPair || null);
+      request.onerror = () => reject(request.error);
+    });
+    if (existing?.privateKey && existing?.publicKey) return existing;
+    const keyPair = await crypto.subtle.generateKey({ name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: "SHA-256" }, false, ["wrapKey","unwrapKey"]) as CryptoKeyPair;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE, "readwrite");
+      tx.objectStore(KEY_STORE).put({ id: IDENTITY_KEY_ID, keyPair });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error("Could not save Voice DNA identity."));
+    });
+    return keyPair;
+  } finally { db.close(); }
+}
+export async function ensureVoiceDnaPublicKeyRegistered(): Promise<void> {
+  const keyPair = await getIdentityKeyPair();
+  const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  const response = await fetch(apiUrl("/api/voice-dna/keys/public"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ algorithm: "RSA-OAEP-256", publicJwk }) });
+  if (!response.ok) throw new Error("تعذر تسجيل مفتاح Voice DNA العام.");
+}
+async function importRecipientPublicKey(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey("jwk", jwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["wrapKey"]);
+}
+export async function createEncryptedVoiceDnaPackage(input: { audio: Blob; recipientUserId: string }): Promise<{ wrappedKey: string; iv: string; ciphertext: string; mimeType: string }> {
+  const keyResponse = await fetch(apiUrl("/api/voice-dna/keys/public/" + encodeURIComponent(input.recipientUserId)), { headers: { ...authHeaders() } });
+  const keyPayload = await keyResponse.json().catch(() => ({}));
+  if (!keyResponse.ok || !keyPayload?.publicJwk) throw new Error(keyPayload?.error || "Recipient has no Voice DNA encryption key yet.");
+  const recipientKey = await importRecipientPublicKey(keyPayload.publicJwk);
+  const contentKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt","decrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, contentKey, new Uint8Array(await input.audio.arrayBuffer()));
+  const wrappedKey = await crypto.subtle.wrapKey("raw", contentKey, recipientKey, { name: "RSA-OAEP" });
+  return { wrappedKey: toBase64(new Uint8Array(wrappedKey)), iv: toBase64(iv), ciphertext: toBase64(new Uint8Array(ciphertext)), mimeType: input.audio.type || "audio/webm" };
+}
+export async function uploadEncryptedVoiceDnaPackage(input: { profileId: string; shareId: string; recipientUserId: string; audio: Blob }): Promise<void> {
+  const encrypted = await createEncryptedVoiceDnaPackage({ audio: input.audio, recipientUserId: input.recipientUserId });
+  const response = await fetch(apiUrl("/api/voice-dna/sync/upload"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ profileId: input.profileId, shareId: input.shareId, recipientUserId: input.recipientUserId, ...encrypted }) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || "تعذر مزامنة Voice DNA المشفّر.");
+}
+export async function listIncomingVoiceDnaPackages(): Promise<any[]> {
+  const response = await fetch(apiUrl("/api/voice-dna/sync/incoming"), { headers: { ...authHeaders() } });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || "تعذر قراءة حزم Voice DNA.");
+  return Array.isArray(payload?.packages) ? payload.packages : [];
+}
+export async function decryptIncomingVoiceDnaPackage(pkg: { wrappedKey: string; iv: string; ciphertext: string; mimeType: string }): Promise<Blob> {
+  const keyPair = await getIdentityKeyPair();
+  const contentKey = await crypto.subtle.unwrapKey("raw", fromBase64(pkg.wrappedKey), keyPair.privateKey, { name: "RSA-OAEP", hash: "SHA-256" }, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(pkg.iv) }, contentKey, fromBase64(pkg.ciphertext));
+  return new Blob([plaintext], { type: pkg.mimeType || "audio/webm" });
+}

@@ -574,6 +574,101 @@ app.post("/api/voice-dna/shares/:id/revoke", async (req, res) => {
 });
 
 // ----------------------------------------------------
+// SMART VOICE DNA - encrypted sync
+// ----------------------------------------------------
+app.post("/api/voice-dna/keys/public", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const algorithm = String(req.body?.algorithm || "").trim().slice(0, 120);
+    const publicJwk = req.body?.publicJwk;
+    if (!algorithm || !publicJwk || typeof publicJwk !== "object") return res.status(400).json({ error: "Public Voice DNA key is required." });
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO voice_dna_public_keys (user_id, algorithm, public_jwk_json, created_at, rotated_at)
+      VALUES (?,?,?,?,NULL)
+      ON CONFLICT(user_id) DO UPDATE SET algorithm=excluded.algorithm, public_jwk_json=excluded.public_jwk_json, rotated_at=excluded.created_at`)
+      .run(user.id, algorithm, JSON.stringify(publicJwk), now);
+    return res.json({ ok: true });
+  } catch (error: any) {
+    console.error("Voice DNA public key registration error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر تسجيل مفتاح Voice DNA العام." });
+  }
+});
+
+app.get("/api/voice-dna/keys/public/:userId", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const userId = String(req.params.userId || "").trim();
+    const row = db.prepare("SELECT algorithm, public_jwk_json as publicJwkJson FROM voice_dna_public_keys WHERE user_id=?").get(userId) as any;
+    if (!row) return res.status(404).json({ error: "المستخدم لم يسجل مفتاح Voice DNA بعد." });
+    return res.json({ algorithm: row.algorithm, publicJwk: JSON.parse(String(row.publicJwkJson)) });
+  } catch {
+    return res.status(500).json({ error: "تعذر قراءة مفتاح Voice DNA العام." });
+  }
+});
+
+app.post("/api/voice-dna/sync/upload", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const profileId = String(req.body?.profileId || "").trim();
+    const shareId = String(req.body?.shareId || "").trim();
+    const recipientUserId = String(req.body?.recipientUserId || "").trim();
+    const wrappedKey = String(req.body?.wrappedKey || "").trim();
+    const iv = String(req.body?.iv || "").trim();
+    const ciphertext = String(req.body?.ciphertext || "").trim();
+    const mimeType = String(req.body?.mimeType || "audio/webm").trim().slice(0, 100);
+    if (!profileId || !shareId || !recipientUserId || !wrappedKey || !iv || !ciphertext) return res.status(400).json({ error: "Encrypted Voice DNA package is incomplete." });
+    const share = db.prepare("SELECT id FROM voice_dna_shares WHERE id=? AND profile_id=? AND owner_user_id=? AND recipient_user_id=? AND status='active'").get(shareId, profileId, user.id, recipientUserId) as any;
+    if (!share) return res.status(403).json({ error: "Voice DNA share is not active." });
+    const maxChars = Math.max(1024 * 1024, Number(process.env.SMART_VOICE_DNA_MAX_PACKAGE_CHARS || 12 * 1024 * 1024));
+    if (wrappedKey.length > 16000 || iv.length > 256 || ciphertext.length > maxChars) return res.status(413).json({ error: "Encrypted Voice DNA package is too large." });
+    const packageId = "vpkg_" + crypto.randomUUID();
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO voice_dna_sync_packages
+      (id, profile_id, owner_user_id, recipient_user_id, share_id, wrapped_key, iv, ciphertext, mime_type, created_at, revoked_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,NULL)`).run(packageId, profileId, user.id, recipientUserId, shareId, wrappedKey, iv, ciphertext, mimeType, now);
+    return res.json({ ok: true, packageId });
+  } catch (error: any) {
+    console.error("Voice DNA encrypted upload error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر مزامنة Voice DNA المشفّر." });
+  }
+});
+
+app.get("/api/voice-dna/sync/incoming", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const rows = db.prepare(`SELECT p.id, p.profile_id as profileId, p.share_id as shareId,
+      p.wrapped_key as wrappedKey, p.iv, p.ciphertext, p.mime_type as mimeType, p.created_at as createdAt,
+      v.owner_user_id as ownerUserId, v.display_name as displayName, v.relationship,
+      v.language, v.locale, v.dialect, v.speaking_style as speakingStyle
+      FROM voice_dna_sync_packages p
+      JOIN voice_dna_profiles v ON v.id=p.profile_id
+      JOIN voice_dna_shares s ON s.id=p.share_id
+      WHERE p.recipient_user_id=? AND p.revoked_at IS NULL AND s.status='active' AND v.revoked_at IS NULL
+      ORDER BY p.created_at DESC`).all(user.id);
+    return res.json({ packages: rows });
+  } catch {
+    return res.status(500).json({ error: "تعذر قراءة حزم Voice DNA." });
+  }
+});
+
+app.post("/api/voice-dna/sync/revoke", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const shareId = String(req.body?.shareId || "").trim();
+    const row = db.prepare("SELECT id FROM voice_dna_shares WHERE id=? AND (owner_user_id=? OR recipient_user_id=?)").get(shareId, user.id, user.id) as any;
+    if (!row) return res.status(404).json({ error: "مشاركة الصوت غير موجودة." });
+    db.prepare("UPDATE voice_dna_sync_packages SET revoked_at=? WHERE share_id=?").run(new Date().toISOString(), shareId);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "تعذر إلغاء حزمة Voice DNA." });
+  }
+});
+// ----------------------------------------------------
 // 3. Smart Search Intent Parser
 // ----------------------------------------------------
 app.post("/api/ai/search-intent", async (req, res) => {

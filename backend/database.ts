@@ -143,6 +143,26 @@ CREATE TABLE IF NOT EXISTS voice_dna_profiles (
   created_at TEXT NOT NULL,
   revoked_at TEXT
 );
+CREATE TABLE IF NOT EXISTS voice_dna_public_keys (
+  user_id TEXT PRIMARY KEY,
+  algorithm TEXT NOT NULL,
+  public_jwk_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS voice_dna_sync_packages (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  owner_user_id TEXT NOT NULL,
+  recipient_user_id TEXT NOT NULL,
+  share_id TEXT NOT NULL,
+  wrapped_key TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
 CREATE TABLE IF NOT EXISTS voice_dna_shares (
   id TEXT PRIMARY KEY,
   profile_id TEXT NOT NULL,
@@ -380,3 +400,5 @@ try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN revoked_at TEXT'); } catc
 try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN owner_confirmed INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN guardian_confirmed INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN consent_recorded_at TEXT'); } catch {}
+
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_voice_dna_sync_recipient ON voice_dna_sync_packages(recipient_user_id, created_at)'); } catch {}
