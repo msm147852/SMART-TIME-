@@ -164,6 +164,7 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
       ? "أنا جاهز أتكلم معاك عن بيانات SMART TIME. جرّب مثلًا: «قارن مصاريف الشهر ده بالشهر اللي فات» أو «احسب صافي دخلي الشهر ده» أو «كام صرفت الأسبوع اللي فات؟»."
       : "I am ready to talk about SMART TIME data. Try: “Compare this month with last month”, “What is my net income this month?”, or “How much did I spend last week?”.",
     action,
+    needsClarification: true,
     provider: "smart-ai",
     model: "smart-time-core",
     engine: "rules"
