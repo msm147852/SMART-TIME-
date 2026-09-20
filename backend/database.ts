@@ -163,6 +163,18 @@ CREATE TABLE IF NOT EXISTS voice_dna_sync_packages (
   created_at TEXT NOT NULL,
   revoked_at TEXT
 );
+CREATE TABLE IF NOT EXISTS voice_dna_recovery_envelopes (
+  user_id TEXT PRIMARY KEY,
+  algorithm TEXT NOT NULL,
+  kdf TEXT NOT NULL,
+  iterations INTEGER NOT NULL,
+  salt TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  public_jwk_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT
+);
 CREATE TABLE IF NOT EXISTS voice_dna_shares (
   id TEXT PRIMARY KEY,
   profile_id TEXT NOT NULL,
