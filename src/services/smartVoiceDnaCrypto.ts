@@ -38,16 +38,40 @@ async function getIdentityKeyPair(): Promise<CryptoKeyPair> {
       request.onsuccess = () => resolve(request.result?.keyPair || null);
       request.onerror = () => reject(request.error);
     });
-    if (existing?.privateKey && existing?.publicKey) return existing;
-    const keyPair = await crypto.subtle.generateKey({ name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: "SHA-256" }, false, ["wrapKey","unwrapKey"]) as CryptoKeyPair;
+
+    if (existing?.privateKey && existing?.publicKey) {
+      try {
+        await crypto.subtle.exportKey("jwk", existing.publicKey);
+        return existing;
+      } catch {
+        // Older versions may have stored a non-extractable public key.
+      }
+    }
+
+    const generated = await crypto.subtle.generateKey(
+      { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+      true,
+      ["wrapKey", "unwrapKey"]
+    ) as CryptoKeyPair;
+
+    const publicJwk = await crypto.subtle.exportKey("jwk", generated.publicKey);
+    const privateJwk = await crypto.subtle.exportKey("jwk", generated.privateKey);
+
+    const publicKey = await crypto.subtle.importKey("jwk", publicJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["wrapKey"]);
+    const privateKey = await crypto.subtle.importKey("jwk", privateJwk, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["unwrapKey"]);
+    const keyPair = { publicKey, privateKey };
+
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(KEY_STORE, "readwrite");
       tx.objectStore(KEY_STORE).put({ id: IDENTITY_KEY_ID, keyPair });
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error || new Error("Could not save Voice DNA identity."));
     });
+
     return keyPair;
-  } finally { db.close(); }
+  } finally {
+    db.close();
+  }
 }
 export async function ensureVoiceDnaPublicKeyRegistered(): Promise<void> {
   const keyPair = await getIdentityKeyPair();
