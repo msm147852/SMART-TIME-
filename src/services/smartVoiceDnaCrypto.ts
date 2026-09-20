@@ -194,6 +194,7 @@ export async function createVoiceDnaRecoveryEnvelope(passphrase: string): Promis
     ["unwrapKey"]
   );
   await persistIdentityKeyPair({ publicKey, privateKey });
+  await ensureVoiceDnaPublicKeyRegistered();
 }
 
 export async function hasVoiceDnaRecoveryEnvelope(): Promise<boolean> {
