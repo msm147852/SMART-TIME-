@@ -23,6 +23,19 @@ const SMART_VOICE_DNA_PROVIDER_TOKEN = String(process.env.SMART_VOICE_DNA_PROVID
 const smartVoiceDnaProvider = SMART_VOICE_DNA_PROVIDER_URL
   ? createHttpVoiceDnaProvider({ id: "voicetut-local", url: SMART_VOICE_DNA_PROVIDER_URL, token: SMART_VOICE_DNA_PROVIDER_TOKEN || undefined, timeoutMs: Number(process.env.SMART_VOICE_DNA_PROVIDER_TIMEOUT_MS || 120000) })
   : new DisabledVoiceDnaProvider();
+const SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE || 8));
+const voiceDnaRequestWindow = new Map<string, { startedAt: number; count: number }>();
+function consumeVoiceDnaQuota(userId: string): boolean {
+  const now = Date.now();
+  const current = voiceDnaRequestWindow.get(userId);
+  if (!current || now - current.startedAt >= 60_000) {
+    voiceDnaRequestWindow.set(userId, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE) return false;
+  current.count += 1;
+  return true;
+}
 
 // CORS for the Vercel-hosted frontend talking to the Railway API.
 // Keep credentials disabled; SMART TIME auth uses bearer tokens explicitly.
@@ -596,6 +609,9 @@ app.post("/api/voice-dna/synthesize", async (req, res) => {
     const user = authUser(req);
     if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
     if (!smartVoiceDnaProvider.isAvailable()) return res.status(503).json({ error: "محرك Voice DNA المحلي غير موصل حاليًا." });
+    if (!consumeVoiceDnaQuota(String(user.id))) {
+      return res.status(429).json({ error: "تم الوصول للحد المؤقت لتوليد Voice DNA. حاول بعد قليل." });
+    }
     if (req.body?.consentConfirmed !== true) return res.status(400).json({ error: "لازم تأكيد موافقة استخدام الصوت قبل التوليد." });
 
     const profileId = String(req.body?.profileId || "").trim();
