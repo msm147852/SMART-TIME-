@@ -37,3 +37,5 @@ docker run --rm --gpus all -p 8000:8000 \
   -e SMART_VOICE_DNA_PROVIDER_TOKEN="replace-with-a-long-random-secret" \
   smart-time-voicetut
 ```
+
+Optional: `SMART_VOICE_DNA_CONCURRENCY` (default `1`) serializes GPU synthesis requests on a provider instance.
