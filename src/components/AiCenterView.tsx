@@ -5,6 +5,8 @@ import { AiMessage, AiModelType, Language } from '../types';
 import { ChatRepository } from '../services';
 import { askSmartAi, buildSmartAiContext, SmartAiAction } from '../services/aiService';
 import { loadSmartAiVoiceId, saveSmartAiVoiceId, speakSmartAi, stopSmartAiVoice, SMART_AI_VOICE_PROFILES } from '../services/smartAiVoiceService';
+import { listVoiceDnaProfiles, readVoiceDnaSample, type SmartVoiceDnaProfile } from '../services/smartVoiceDnaService';
+import { synthesizeVoiceDna } from '../services/smartVoiceDnaClient';
 import type { SmartAiVoiceId } from '../types';
 
 interface AiCenterViewProps {
@@ -30,9 +32,16 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const [actionStatus, setActionStatus] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<SmartAiVoiceId>(() => loadSmartAiVoiceId());
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
+  const [voiceDnaProfiles, setVoiceDnaProfiles] = useState<SmartVoiceDnaProfile[]>([]);
+  const [selectedVoiceDnaId, setSelectedVoiceDnaId] = useState<string | null>(null);
   const [isVoiceDnaOpen, setIsVoiceDnaOpen] = useState(false);
+  const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void refreshVoiceDnaProfiles();
+  }, []);
 
   useEffect(() => {
     const saved = ChatRepository.getAiChatHistory();
@@ -55,6 +64,18 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
     ChatRepository.saveAiChatHistory([welcome]);
   }, [language, selectedModel]);
 
+  const refreshVoiceDnaProfiles = async () => {
+    try {
+      const profiles = await listVoiceDnaProfiles();
+      setVoiceDnaProfiles(profiles);
+      const preferred = profiles.find((profile) => profile.isDefault)?.id || profiles[0]?.id || null;
+      setSelectedVoiceDnaId((current) => current && profiles.some((profile) => profile.id === current) ? current : preferred);
+    } catch {
+      setVoiceDnaProfiles([]);
+      setSelectedVoiceDnaId(null);
+    }
+  };
+
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, pendingAction]);
@@ -62,6 +83,67 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   useEffect(() => () => {
     stopSmartAiVoice();
   }, []);
+
+  const selectedVoiceDnaProfile = voiceDnaProfiles.find((profile) => profile.id === selectedVoiceDnaId) || null;
+
+  const speakWithSelectedVoice = async (text: string): Promise<boolean> => {
+    if (!text.trim()) return false;
+
+    if (!selectedVoiceDnaProfile) {
+      return speakSmartAi(text, smartLanguage, selectedVoice);
+    }
+
+    setVoicePlaybackBusy(true);
+    try {
+      const sample = await readVoiceDnaSample(selectedVoiceDnaProfile.id);
+      if (!sample) throw new Error(language === 'ar' ? 'العينة الصوتية المحلية غير موجودة.' : 'Local Voice DNA sample not found.');
+
+      const serverProfileId = selectedVoiceDnaProfile.id.startsWith('shared_')
+        ? selectedVoiceDnaProfile.id.slice('shared_'.length)
+        : selectedVoiceDnaProfile.id;
+
+      const canUseVoice = selectedVoiceDnaProfile.ownerConfirmed &&
+        (selectedVoiceDnaProfile.relationship !== 'son' && selectedVoiceDnaProfile.relationship !== 'daughter'
+          ? true
+          : selectedVoiceDnaProfile.guardianConfirmed);
+
+      if (!canUseVoice) throw new Error(language === 'ar' ? 'موافقة استخدام الصوت غير مكتملة.' : 'Voice consent is incomplete.');
+
+      const audioBlob = await synthesizeVoiceDna({
+        profileId: serverProfileId,
+        text,
+        speakingStyle: selectedVoiceDnaProfile.speakingStyle,
+        consentConfirmed: true,
+        referenceAudio: sample,
+      });
+
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+      await new Promise<void>((resolve, reject) => {
+        const done = () => {
+          URL.revokeObjectURL(url);
+          setVoicePlaybackBusy(false);
+          resolve();
+        };
+        audio.onended = done;
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          setVoicePlaybackBusy(false);
+          reject(new Error(language === 'ar' ? 'تعذر تشغيل ملف الصوت.' : 'Generated audio could not be played.'));
+        };
+        void audio.play().catch((error) => {
+          URL.revokeObjectURL(url);
+          setVoicePlaybackBusy(false);
+          reject(error);
+        });
+      });
+      return true;
+    } catch (error: any) {
+      setVoicePlaybackBusy(false);
+      console.error('SMART VOICE DNA playback failed:', error);
+      return false;
+    }
+  };
 
   const quickPrompts = [
     { ar: '📊 قارن مصاريف هذا الشهر بالشهر الماضي', en: 'Compare this month expenses to last month' },
@@ -103,7 +185,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       });
 
       if (isVoiceEnabled && data.reply) {
-        speakSmartAi(data.reply, smartLanguage, selectedVoice);
+        const usedDna = await speakWithSelectedVoice(data.reply);
+        if (!usedDna && selectedVoiceDnaProfile) {
+          speakSmartAi(data.reply, smartLanguage, selectedVoice);
+        }
       }
 
       const aiMessage: AiMessage = {
@@ -188,29 +273,36 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
-            <select value={selectedVoice} onChange={(event) => {
-              const id = event.target.value as SmartAiVoiceId;
-              setSelectedVoice(id);
-              saveSmartAiVoiceId(id);
-            }} className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 border-0 outline-none">
-              {SMART_AI_VOICE_PROFILES.map((voice) => (
-                <option key={voice.id} value={voice.id}>{language === 'ar' ? voice.labelAr : voice.labelEn}</option>
-              ))}
-            </select>
+            {voiceDnaProfiles.length > 0 ? (
+              <select value={selectedVoiceDnaId || ''} onChange={(event) => setSelectedVoiceDnaId(event.target.value || null)} className="max-w-[180px] px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
+                <option value="">{language === 'ar' ? 'صوت SMART AI العادي' : 'SMART AI browser voice'}</option>
+                {voiceDnaProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.displayName}{profile.origin === 'shared' ? (language === 'ar' ? ' · مشترك' : ' · shared') : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select value={selectedVoice} onChange={(event) => {
+                const id = event.target.value as SmartAiVoiceId;
+                setSelectedVoice(id);
+                saveSmartAiVoiceId(id);
+              }} className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 border-0 outline-none">
+                {SMART_AI_VOICE_PROFILES.map((voice) => (
+                  <option key={voice.id} value={voice.id}>{language === 'ar' ? voice.labelAr : voice.labelEn}</option>
+                ))}
+              </select>
+            )}
             <button type="button" onClick={() => {
               if (isVoiceEnabled) {
                 stopSmartAiVoice();
                 setIsVoiceEnabled(false);
               } else {
-                const started = speakSmartAi(
-                  smartLanguage === 'ar' ? 'أهلًا بك في SMART TIME.' : 'Welcome to SMART TIME.',
-                  smartLanguage,
-                  selectedVoice,
-                );
-                setIsVoiceEnabled(started);
+                const starter = smartLanguage === 'ar' ? 'أهلًا بك في SMART TIME.' : 'Welcome to SMART TIME.';
+                void speakWithSelectedVoice(starter).then((started) => setIsVoiceEnabled(started));
               }
             }} className="p-2 text-slate-500 hover:text-purple-600 rounded-xl" title={language === 'ar' ? 'صوت SMART AI' : 'SMART AI voice'}>
-              {isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              {voicePlaybackBusy ? <Volume2 className="w-4 h-4 animate-pulse" /> : isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
             <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
               ✨ SMART TIME AI
@@ -269,7 +361,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
                   <span>{msg.timestamp}</span>
                   {isAi && (
                     <>
-                      <button type="button" onClick={() => speakSmartAi(msg.text, smartLanguage, selectedVoice)} className="flex items-center gap-1 hover:opacity-100" title={language === 'ar' ? 'استماع' : 'Listen'}>
+                      <button type="button" onClick={() => { void speakWithSelectedVoice(msg.text); }} className="flex items-center gap-1 hover:opacity-100" title={language === 'ar' ? 'استماع' : 'Listen'}>
                         <Volume2 className="w-3 h-3" />
                         <span>{language === 'ar' ? 'استماع' : 'Listen'}</span>
                       </button>
