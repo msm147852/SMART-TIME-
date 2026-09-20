@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2 } from "lucide-react";
 import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
-import { createVoiceDnaShare, registerVoiceDnaProfile } from "../services/smartVoiceDnaClient";
+import { acceptVoiceDnaShare, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaShare, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
 import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
@@ -43,6 +43,8 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const [isDefault, setIsDefault] = useState(false);
   const [shareTarget, setShareTarget] = useState<Record<string, string>>({});
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [incomingShares, setIncomingShares] = useState<VoiceDnaShareRecord[]>([]);
+  const [outgoingShares, setOutgoingShares] = useState<VoiceDnaShareRecord[]>([]);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [message, setMessage] = useState("");
@@ -56,6 +58,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
   useEffect(() => {
     void refreshProfiles();
+    void refreshShares();
     return () => stopActiveRecorder();
   }, []);
 
@@ -64,6 +67,16 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
       setProfiles(await listVoiceDnaProfiles());
     } catch {
       setMessage(ar ? "تعذر فتح تخزين Voice DNA المحلي." : "Could not open local Voice DNA storage.");
+    }
+  };
+
+  const refreshShares = async () => {
+    try {
+      const result = await listVoiceDnaShares();
+      setIncomingShares(result.incoming || []);
+      setOutgoingShares(result.outgoing || []);
+    } catch {
+      // Sharing is optional; local Voice DNA remains usable when the server is offline.
     }
   };
 
@@ -334,6 +347,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                         try {
                           await createVoiceDnaShare(profile.id, target);
                           setShareTarget((current) => ({ ...current, [profile.id]: "" }));
+                          await refreshShares();
                           setMessage(ar ? "تم إرسال طلب مشاركة خاصة. الصوت نفسه لم يُرفع." : "Private share request sent. The voice sample was not uploaded.");
                         } catch (error: any) {
                           setMessage(error?.message || (ar ? "تعذر المشاركة." : "Sharing failed."));
@@ -353,6 +367,77 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                 <div className="text-[10px] text-amber-200/90 mt-1">
                   {ar ? "المحرك الصوتي المحلي: غير موصول بعد" : "Local voice engine: not connected yet"}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+<div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center gap-2 text-xs font-extrabold"><UserPlus className="w-4 h-4 text-purple-300" />{ar ? "دعوات واردة" : "Incoming invitations"}</div>
+          <div className="space-y-2 mt-3">
+            {incomingShares.length === 0 && <div className="text-[10px] text-slate-500">{ar ? "مفيش دعوات مشاركة حاليًا." : "No incoming voice invitations."}</div>}
+            {incomingShares.map((share) => (
+              <div key={share.id} className="rounded-xl border border-white/10 bg-black/10 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold truncate">{share.displayName}</div>
+                    <div className="text-[9px] text-slate-500">{share.ownerUsername || ""}</div>
+                  </div>
+                  <span className="text-[9px] text-amber-200">{share.status}</span>
+                </div>
+                {share.status === "pending" && (
+                  <button type="button" onClick={async () => {
+                    try {
+                      await acceptVoiceDnaShare(share.id);
+                      await refreshShares();
+                      setMessage(ar ? "تم قبول مشاركة الصوت." : "Voice share accepted.");
+                    } catch (error: any) {
+                      setMessage(error?.message || (ar ? "تعذر قبول المشاركة." : "Could not accept the share."));
+                    }
+                  }} className="mt-2 w-full rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-bold">{ar ? "قبول" : "Accept"}</button>
+                )}
+                {share.status === "active" && (
+                  <button type="button" onClick={async () => {
+                    try {
+                      await revokeVoiceDnaShare(share.id);
+                      await refreshShares();
+                      setMessage(ar ? "تم إلغاء الوصول لهذا الصوت." : "Access to this voice was revoked.");
+                    } catch (error: any) {
+                      setMessage(error?.message || (ar ? "تعذر إلغاء الوصول." : "Could not revoke access."));
+                    }
+                  }} className="mt-2 w-full rounded-lg border border-rose-400/20 px-2 py-1.5 text-[10px] font-bold text-rose-200">{ar ? "إلغاء الوصول" : "Revoke access"}</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center gap-2 text-xs font-extrabold"><Share2 className="w-4 h-4 text-purple-300" />{ar ? "المشاركات الصادرة" : "Outgoing shares"}</div>
+          <div className="space-y-2 mt-3">
+            {outgoingShares.length === 0 && <div className="text-[10px] text-slate-500">{ar ? "مفيش مشاركات صادرة." : "No outgoing shares."}</div>}
+            {outgoingShares.map((share) => (
+              <div key={share.id} className="rounded-xl border border-white/10 bg-black/10 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold truncate">{share.displayName}</div>
+                    <div className="text-[9px] text-slate-500">{share.recipientUsername || ""}</div>
+                  </div>
+                  <span className="text-[9px] text-amber-200">{share.status}</span>
+                </div>
+                {share.status !== "revoked" && (
+                  <button type="button" onClick={async () => {
+                    try {
+                      await revokeVoiceDnaShare(share.id);
+                      await refreshShares();
+                      setMessage(ar ? "تم إلغاء مشاركة الصوت." : "Voice share revoked.");
+                    } catch (error: any) {
+                      setMessage(error?.message || (ar ? "تعذر إلغاء المشاركة." : "Could not revoke the share."));
+                    }
+                  }} className="mt-2 w-full rounded-lg border border-rose-400/20 px-2 py-1.5 text-[10px] font-bold text-rose-200">{ar ? "إلغاء المشاركة" : "Revoke share"}</button>
+                )}
               </div>
             ))}
           </div>
