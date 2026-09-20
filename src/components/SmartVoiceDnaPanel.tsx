@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Mic, ShieldCheck, Trash2, X } from "lucide-react";
+import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2 } from "lucide-react";
 import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
+import { createVoiceDnaShare, registerVoiceDnaProfile } from "../services/smartVoiceDnaClient";
 import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
@@ -40,6 +41,8 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const [guardianConfirmed, setGuardianConfirmed] = useState(false);
   const [speakingStyle, setSpeakingStyle] = useState<SmartVoiceDnaSpeakingStyle>("natural");
   const [isDefault, setIsDefault] = useState(false);
+  const [shareTarget, setShareTarget] = useState<Record<string, string>>({});
+  const [sharingId, setSharingId] = useState<string | null>(null);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [message, setMessage] = useState("");
@@ -147,6 +150,15 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
           await saveVoiceDnaProfile(profile);
           await saveVoiceDnaSample(profileId, new Blob(chunksRef.current, { type: mimeType }), durationMs);
+          await registerVoiceDnaProfile({
+            id: profileId,
+            displayName: profile.displayName,
+            relationship: profile.relationship,
+            language: profile.language,
+            dialect: profile.dialect,
+            speakingStyle: profile.speakingStyle,
+            engineStatus: profile.engineStatus,
+          });
           if (isDefault) await setDefaultVoiceDnaProfile(profileId);
           await refreshProfiles();
           setRecordState("idle");
@@ -299,6 +311,42 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                   <span>{ar ? "محلي ومشفّر" : "Local and encrypted"}</span>
                 </div>
                 <div className="text-[10px] text-purple-200/90 mt-1">{profile.speakingStyle ? (ar ? `الأسلوب: ${profile.speakingStyle}` : `Style: ${profile.speakingStyle}`) : ""}</div>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                    {ar ? "مشاركة خاصة مع فرد من العائلة" : "Private family sharing"}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      value={shareTarget[profile.id] || ""}
+                      onChange={(event) => setShareTarget((current) => ({ ...current, [profile.id]: event.target.value }))}
+                      className="flex-1 rounded-lg bg-black/20 border border-white/10 px-2.5 py-1.5 text-[10px] outline-none"
+                      placeholder={ar ? "اسم المستخدم أو البريد الإلكتروني" : "Username or email"}
+                    />
+                    <button
+                      type="button"
+                      disabled={sharingId === profile.id || !String(shareTarget[profile.id] || "").trim()}
+                      onClick={async () => {
+                        const target = String(shareTarget[profile.id] || "").trim();
+                        setSharingId(profile.id);
+                        try {
+                          await createVoiceDnaShare(profile.id, target);
+                          setShareTarget((current) => ({ ...current, [profile.id]: "" }));
+                          setMessage(ar ? "تم إرسال طلب مشاركة خاصة. الصوت نفسه لم يُرفع." : "Private share request sent. The voice sample was not uploaded.");
+                        } catch (error: any) {
+                          setMessage(error?.message || (ar ? "تعذر المشاركة." : "Sharing failed."));
+                        } finally {
+                          setSharingId(null);
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-purple-600 text-white text-[10px] font-bold disabled:opacity-50"
+                    >
+                      {sharingId === profile.id ? "…" : (ar ? "مشاركة" : "Share")}
+                    </button>
+                  </div>
+                  <div className="text-[9px] text-slate-500 mt-1">
+                    {ar ? "المشاركة هنا هي صلاحية خاصة فقط؛ نقل العينة الصوتية سيأتي مع مزامنة آمنة لاحقًا." : "This grants private access metadata only; secure sample sync comes later."}
+                  </div>
+                </div>
                 <div className="text-[10px] text-amber-200/90 mt-1">
                   {ar ? "المحرك الصوتي المحلي: غير موصول بعد" : "Local voice engine: not connected yet"}
                 </div>

@@ -45,3 +45,10 @@ Use private family sharing with revocation when the same profile is made availab
 ## Browser fallback
 
 Until the local engine is wired, the browser Web Speech adapter remains available for generic male/female/youth/child playback. Those presets are not Voice DNA clones.
+
+
+## Private family sharing
+
+V1 now supports server-side sharing metadata. The owner registers the profile metadata and can send a private share request to another SMART TIME account by username or email. The recipient can accept or revoke access.
+
+The reference audio is intentionally not uploaded or copied by this sharing layer. The share status is a permission record only. Secure sample synchronization is a separate future step so that audio storage, encryption, and revocation can be designed independently.

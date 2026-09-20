@@ -412,6 +412,157 @@ app.get("/api/ai/status", (req, res) => {
 });
 
 // ----------------------------------------------------
+// SMART VOICE DNA - private family sharing metadata
+// ----------------------------------------------------
+// This API stores only profile metadata and share permissions.
+// Reference audio remains on the owner's device in V1.
+app.post("/api/voice-dna/profiles", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+    const id = String(req.body?.id || "").trim();
+    const displayName = String(req.body?.displayName || "").trim().slice(0, 120);
+    const relationship = String(req.body?.relationship || "family").trim().slice(0, 40);
+    const language = String(req.body?.language || "ar") === "en" ? "en" : "ar";
+    const locale = language === "en" ? "en-US" : "ar-EG";
+    const dialect = String(req.body?.dialect || locale).trim().slice(0, 20);
+    const speakingStyle = String(req.body?.speakingStyle || "natural").trim().slice(0, 30);
+    const engineStatus = String(req.body?.engineStatus || "pending_local_engine").trim().slice(0, 40);
+
+    if (!id || !displayName) return res.status(400).json({ error: "Voice profile id and name are required." });
+
+    db.prepare(`INSERT INTO voice_dna_profiles
+      (id, owner_user_id, display_name, relationship, language, locale, dialect, speaking_style, engine_status, created_at, revoked_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,NULL)
+      ON CONFLICT(id) DO UPDATE SET
+        display_name=excluded.display_name,
+        relationship=excluded.relationship,
+        language=excluded.language,
+        locale=excluded.locale,
+        dialect=excluded.dialect,
+        speaking_style=excluded.speaking_style,
+        engine_status=excluded.engine_status,
+        revoked_at=NULL`)
+      .run(id, user.id, displayName, relationship, language, locale, dialect, speakingStyle, engineStatus, new Date().toISOString());
+
+    return res.json({ ok: true, id });
+  } catch (error: any) {
+    console.error("Voice DNA profile registration error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر تسجيل ملف Voice DNA." });
+  }
+});
+
+app.get("/api/voice-dna/profiles", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const rows = db.prepare(`SELECT id, owner_user_id as ownerUserId, display_name as displayName,
+      relationship, language, locale, dialect, speaking_style as speakingStyle,
+      engine_status as engineStatus, created_at as createdAt, revoked_at as revokedAt
+      FROM voice_dna_profiles
+      WHERE owner_user_id=? AND revoked_at IS NULL
+      ORDER BY created_at ASC`).all(user.id);
+    return res.json({ profiles: rows });
+  } catch (error: any) {
+    return res.status(500).json({ error: "تعذر قراءة ملفات Voice DNA." });
+  }
+});
+
+app.post("/api/voice-dna/shares", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+    const profileId = String(req.body?.profileId || "").trim();
+    const recipientIdentifier = String(req.body?.recipientIdentifier || "").trim().toLowerCase();
+
+    const profile = db.prepare("SELECT id FROM voice_dna_profiles WHERE id=? AND owner_user_id=? AND revoked_at IS NULL").get(profileId, user.id) as any;
+    if (!profile) return res.status(404).json({ error: "Voice DNA profile not found." });
+    if (!recipientIdentifier) return res.status(400).json({ error: "Recipient username or email is required." });
+
+    const recipient = db.prepare("SELECT id FROM users WHERE lower(username)=? OR lower(email)=?").get(recipientIdentifier, recipientIdentifier) as any;
+    if (!recipient) return res.status(404).json({ error: "المستخدم المستلم غير موجود." });
+    if (recipient.id === user.id) return res.status(400).json({ error: "لا يمكن مشاركة الصوت مع نفس الحساب." });
+
+    const shareId = "vshare_" + crypto.randomUUID();
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO voice_dna_shares
+      (id, profile_id, owner_user_id, recipient_user_id, status, created_at, accepted_at, revoked_at)
+      VALUES (?,?,?,?, 'pending', ?, NULL, NULL)
+      ON CONFLICT(profile_id, recipient_user_id) DO UPDATE SET status='pending', created_at=excluded.created_at, accepted_at=NULL, revoked_at=NULL`)
+      .run(shareId, profileId, user.id, recipient.id, now);
+
+    return res.json({ ok: true, status: "pending" });
+  } catch (error: any) {
+    console.error("Voice DNA share error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر إنشاء مشاركة Voice DNA." });
+  }
+});
+
+app.get("/api/voice-dna/shares", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+    const outgoing = db.prepare(`SELECT s.id, s.profile_id as profileId, p.display_name as displayName,
+      s.recipient_user_id as recipientUserId, u.username as recipientUsername, s.status, s.created_at as createdAt,
+      s.accepted_at as acceptedAt, s.revoked_at as revokedAt
+      FROM voice_dna_shares s
+      JOIN voice_dna_profiles p ON p.id=s.profile_id
+      JOIN users u ON u.id=s.recipient_user_id
+      WHERE s.owner_user_id=?
+      ORDER BY s.created_at DESC`).all(user.id);
+
+    const incoming = db.prepare(`SELECT s.id, s.profile_id as profileId, p.display_name as displayName,
+      s.owner_user_id as ownerUserId, u.username as ownerUsername, s.status, s.created_at as createdAt,
+      s.accepted_at as acceptedAt, s.revoked_at as revokedAt
+      FROM voice_dna_shares s
+      JOIN voice_dna_profiles p ON p.id=s.profile_id
+      JOIN users u ON u.id=s.owner_user_id
+      WHERE s.recipient_user_id=?
+      ORDER BY s.created_at DESC`).all(user.id);
+
+    return res.json({ outgoing, incoming });
+  } catch (error: any) {
+    return res.status(500).json({ error: "تعذر قراءة مشاركات Voice DNA." });
+  }
+});
+
+app.post("/api/voice-dna/shares/:id/accept", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const shareId = String(req.params.id || "").trim();
+    const row = db.prepare("SELECT id FROM voice_dna_shares WHERE id=? AND recipient_user_id=? AND status='pending'").get(shareId, user.id) as any;
+    if (!row) return res.status(404).json({ error: "دعوة مشاركة الصوت غير موجودة." });
+
+    db.prepare("UPDATE voice_dna_shares SET status='active', accepted_at=?, revoked_at=NULL WHERE id=?")
+      .run(new Date().toISOString(), shareId);
+    return res.json({ ok: true, status: "active" });
+  } catch (error: any) {
+    return res.status(500).json({ error: "تعذر قبول مشاركة Voice DNA." });
+  }
+});
+
+app.post("/api/voice-dna/shares/:id/revoke", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const shareId = String(req.params.id || "").trim();
+    const row = db.prepare("SELECT id FROM voice_dna_shares WHERE id=? AND (owner_user_id=? OR recipient_user_id=?)")
+      .get(shareId, user.id, user.id) as any;
+    if (!row) return res.status(404).json({ error: "مشاركة الصوت غير موجودة." });
+
+    db.prepare("UPDATE voice_dna_shares SET status='revoked', revoked_at=? WHERE id=?")
+      .run(new Date().toISOString(), shareId);
+    return res.json({ ok: true, status: "revoked" });
+  } catch (error: any) {
+    return res.status(500).json({ error: "تعذر إلغاء مشاركة Voice DNA." });
+  }
+});
+
+// ----------------------------------------------------
 // 3. Smart Search Intent Parser
 // ----------------------------------------------------
 app.post("/api/ai/search-intent", async (req, res) => {

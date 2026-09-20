@@ -127,6 +127,30 @@ CREATE TABLE IF NOT EXISTS ride_quotes (
   raw_json TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS voice_dna_profiles (
+  id TEXT PRIMARY KEY,
+  owner_user_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  relationship TEXT NOT NULL,
+  language TEXT NOT NULL,
+  locale TEXT NOT NULL,
+  dialect TEXT NOT NULL,
+  speaking_style TEXT NOT NULL,
+  engine_status TEXT NOT NULL DEFAULT 'pending_local_engine',
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS voice_dna_shares (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  owner_user_id TEXT NOT NULL,
+  recipient_user_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  accepted_at TEXT,
+  revoked_at TEXT,
+  UNIQUE(profile_id, recipient_user_id)
+);
 `);
 
 try { db.exec('ALTER TABLE users ADD COLUMN username TEXT'); } catch {}
@@ -345,3 +369,7 @@ export function seedDefaultChatRooms() {
   }
 }
 
+
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN revoked_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN accepted_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN revoked_at TEXT'); } catch {}
