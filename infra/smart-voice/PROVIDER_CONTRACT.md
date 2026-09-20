@@ -27,3 +27,8 @@ The UI requires explicit voice-owner consent before personalized synthesis.
 ## Egyptian Arabic
 
 VoiceTuT-TTS currently documents Egyptian-Arabic specialization, zero-shot voice cloning, code-switching, and local/self-hosted deployment. Its public repository states Apache-2.0 for the project; verify model and commercial deployment terms before production use.
+## SMART TIME synthesis bridge
+
+When `SMART_VOICE_DNA_PROVIDER_URL` is configured, authenticated SMART TIME users can call `POST /api/voice-dna/synthesize`. The server verifies profile ownership or an active share and checks the stored consent flags before forwarding the reference sample in memory to the configured provider. The sample is not persisted by the bridge.
+
+The bridge is disabled when the provider URL is empty. The provider secret remains server-side and is never sent to the browser.
