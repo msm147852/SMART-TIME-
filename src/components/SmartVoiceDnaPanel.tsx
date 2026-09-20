@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2 } from "lucide-react";
+import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2, Volume2 } from "lucide-react";
 import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
-import { acceptVoiceDnaShare, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaShare, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
+import { acceptVoiceDnaShare, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaShare, synthesizeVoiceDna, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
 import { ensureVoiceDnaPublicKeyRegistered, uploadEncryptedVoiceDnaPackage, listIncomingVoiceDnaPackages, decryptIncomingVoiceDnaPackage } from "../services/smartVoiceDnaCrypto";
 import {
   createVoiceDnaId,
@@ -47,6 +47,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const [incomingShares, setIncomingShares] = useState<VoiceDnaShareRecord[]>([]);
   const [outgoingShares, setOutgoingShares] = useState<VoiceDnaShareRecord[]>([]);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [message, setMessage] = useState("");
@@ -214,6 +215,33 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+  };
+
+  const playVoiceDnaSample = async (profile: SmartVoiceDnaProfile) => {
+    setPlayingId(profile.id);
+    try {
+      const sample = await readVoiceDnaSample(profile.id);
+      if (!sample) throw new Error(ar ? "العينة المحلية غير موجودة." : "Local voice sample not found.");
+      const phrase = ar
+        ? "أهلاً، أنا صوتي الشخصي داخل SMART TIME. النهارده عندي حاجة مهمة أقولها لك."
+        : "Hello, this is my personal voice inside SMART TIME. I have something important to tell you.";
+      const audioBlob = await synthesizeVoiceDna({
+        profileId: profile.id,
+        text: phrase,
+        speakingStyle: profile.speakingStyle,
+        consentConfirmed: profile.ownerConfirmed && ((profile.relationship !== "son" && profile.relationship !== "daughter") || profile.guardianConfirmed),
+        referenceAudio: sample,
+      });
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+      const done = () => { URL.revokeObjectURL(url); setPlayingId(null); };
+      audio.onended = done;
+      audio.onerror = done;
+      await audio.play();
+    } catch (error: any) {
+      setPlayingId(null);
+      setMessage(error?.message || (ar ? "تعذر تشغيل Voice DNA. المحرك المحلي غير موصل." : "Voice DNA playback failed. The local engine is not connected."));
+    }
   };
 
   const syncProfileToRecipient = async (profileId: string, share: VoiceDnaShareRecord) => {
@@ -431,6 +459,9 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                 <div className="text-[10px] text-amber-200/90 mt-1">
                   {ar ? "المحرك الصوتي المحلي: غير موصول بعد" : "Local voice engine: not connected yet"}
                 </div>
+                <button type="button" onClick={() => void playVoiceDnaSample(profile)} disabled={playingId === profile.id} className="mt-2 w-full rounded-lg border border-purple-400/30 px-2 py-1.5 text-[10px] font-bold text-purple-200 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5" />{playingId === profile.id ? "…" : (ar ? "تجربة الصوت" : "Test voice")}
+                </button>
               </div>
             ))}
           </div>
