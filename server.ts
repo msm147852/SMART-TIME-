@@ -481,6 +481,25 @@ app.post("/api/voice-dna/profiles", async (req, res) => {
   }
 });
 
+app.post("/api/voice-dna/profiles/:id/revoke", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const profileId = String(req.params.id || "").trim();
+    const profile = db.prepare("SELECT id FROM voice_dna_profiles WHERE id=? AND owner_user_id=? AND revoked_at IS NULL").get(profileId, user.id) as any;
+    if (!profile) return res.status(404).json({ error: "ملف Voice DNA غير موجود." });
+
+    const now = new Date().toISOString();
+    db.prepare("UPDATE voice_dna_profiles SET revoked_at=? WHERE id=? AND owner_user_id=?").run(now, profileId, user.id);
+    db.prepare("UPDATE voice_dna_shares SET status='revoked', revoked_at=? WHERE profile_id=?").run(now, profileId);
+    db.prepare("UPDATE voice_dna_sync_packages SET revoked_at=? WHERE profile_id=? AND revoked_at IS NULL").run(now, profileId);
+    return res.json({ ok: true, status: "revoked" });
+  } catch (error: any) {
+    console.error("Voice DNA profile revoke error:", error?.message || error);
+    return res.status(500).json({ error: "تعذر إلغاء ملف Voice DNA." });
+  }
+});
+
 app.get("/api/voice-dna/profiles", async (req, res) => {
   try {
     const user = authUser(req);
@@ -805,6 +824,23 @@ app.post("/api/voice-dna/sync/upload", async (req, res) => {
   } catch (error: any) {
     console.error("Voice DNA encrypted upload error:", error?.message || error);
     return res.status(500).json({ error: "تعذر مزامنة Voice DNA المشفّر." });
+  }
+});
+
+app.post("/api/voice-dna/sync/ack", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const packageId = String(req.body?.packageId || "").trim();
+    if (!packageId) return res.status(400).json({ error: "Package id is required." });
+
+    const pkg = db.prepare("SELECT id FROM voice_dna_sync_packages WHERE id=? AND recipient_user_id=? AND revoked_at IS NULL").get(packageId, user.id) as any;
+    if (!pkg) return res.status(404).json({ error: "حزمة Voice DNA غير موجودة أو تم سحبها." });
+
+    db.prepare("DELETE FROM voice_dna_sync_packages WHERE id=? AND recipient_user_id=?").run(packageId, user.id);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "تعذر تأكيد استلام حزمة Voice DNA." });
   }
 });
 
