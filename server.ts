@@ -1,9 +1,6 @@
 import express from "express";
 import http from "node:http";
 import path from "path";
-import { createRequire } from "node:module";
-const require = createRequire(path.resolve(process.cwd(), "server.ts"));
-const { GoogleGenAI } = require("@google/genai") as { GoogleGenAI: new (options: { apiKey: string }) => any };
 import dotenv from "dotenv";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
@@ -15,18 +12,6 @@ import { estimateProviderPrice, type RideProvider, type RideCategory } from "./s
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 
 dotenv.config();
-
-let geminiClient: any | null = null;
-function getGemini(): any {
-  if (!geminiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is required");
-    }
-    geminiClient = new GoogleGenAI({ apiKey });
-  }
-  return geminiClient;
-}
 
 const app = express();
 app.set("trust proxy", 1);
@@ -925,37 +910,26 @@ app.post("/api/maps/parse-voice-trip", async (req, res) => {
   try {
     const text = String(req.body.text || "").trim();
     if (!text) return res.status(400).json({ error: "Text is required" });
-    
-    // Use Gemini for Arabic speech extraction
-    try {
-      const gemini = getGemini();
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `You are an Arabic transport route parser for Egypt. Extract the pickup location and dropoff/destination location from the following user voice text:
-"${text}"
-Return ONLY valid JSON matching this schema:
-{
-  "pickup": "pickup location in Arabic (e.g. مدينة نصر، شارع عباس العقاد)",
-  "dropoff": "dropoff destination in Arabic (e.g. مطار القاهرة الدولي)"
-}`,
-        config: {
-          responseMimeType: "application/json",
-        },
-      });
-      const parsed = JSON.parse(response.text?.trim() || "{}");
-      return res.json({ success: true, pickup: parsed.pickup || "", dropoff: parsed.dropoff || "" });
-    } catch (gErr) {
-      let pickup = "";
-      let dropoff = "";
-      const match1 = text.match(/(?:من|من عند|من مكان)\s+(.+?)\s+(?:إلى|الى|لحد|رايح|ل|لـ)\s+(.+)/i);
-      if (match1) {
-        pickup = match1[1].trim();
-        dropoff = match1[2].trim();
+
+    // Keyless SMART TIME route parser. Voice recognition happens on the client;
+    // this endpoint only extracts pickup/dropoff from the recognized Arabic text.
+    let pickup = "";
+    let dropoff = "";
+    const match = text.match(/(?:من|من عند|من مكان)\s+(.+?)\s+(?:إلى|الى|لحد|رايح|ل|لـ|على)\s+(.+)/i);
+    if (match) {
+      pickup = match[1].trim();
+      dropoff = match[2].trim();
+    } else {
+      const separators = text.split(/\s+(?:الى|إلى|رايح|لـ|ل)\s+/i);
+      if (separators.length >= 2) {
+        pickup = separators[0].replace(/^من\s+/i, "").trim();
+        dropoff = separators.slice(1).join(" إلى ").trim();
       } else {
         pickup = text;
       }
-      return res.json({ success: true, pickup, dropoff });
     }
+
+    return res.json({ success: true, pickup, dropoff, provider: "smart-ai", engine: "rules" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
