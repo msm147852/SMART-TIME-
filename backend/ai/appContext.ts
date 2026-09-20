@@ -57,10 +57,10 @@ function resolvePeriod(message: string): { key: string; from: Date; to: Date } |
   const q = message.toLowerCase();
   const now = new Date();
 
-  if (q.includes("الشهر اللي فات") || q.includes("الشهر الماضي") || q.includes("last month")) {
+  if (q.includes("الشهر اللي فات") || q.includes("الشهر الماضي") || q.includes("الشهر السابق") || q.includes("last month") || q.includes("previous month")) {
     return { key: "last_month", from: startOfLastMonth(now), to: endOfLastMonth(now) };
   }
-  if (q.includes("الأسبوع اللي فات") || q.includes("الاسبوع اللي فات") || q.includes("last week")) {
+  if (q.includes("الأسبوع اللي فات") || q.includes("الاسبوع اللي فات") || q.includes("الأسبوع الماضي") || q.includes("الاسبوع الماضي") || q.includes("الأسبوع السابق") || q.includes("last week") || q.includes("previous week")) {
     const thisWeek = startOfWeek(now);
     const from = new Date(thisWeek);
     from.setDate(from.getDate() - 7);
@@ -127,6 +127,12 @@ function sanitize(value: unknown, depth = 0): unknown {
   return undefined;
 }
 
+function monthKey(value: unknown): string | null {
+  const raw = text(value, 32);
+  const match = raw.match(/^(\d{4}-\d{2})/);
+  return match ? match[1] : null;
+}
+
 export function buildSmartTimeData(rawContext: unknown, message: string): Record<string, unknown> {
   const context = sanitize(rawContext);
   if (!isRecord(context)) throw new Error("بيانات SMART TIME غير صالحة.");
@@ -134,6 +140,19 @@ export function buildSmartTimeData(rawContext: unknown, message: string): Record
   const period = resolvePeriod(message);
   const expenses = asArray(context.expenses);
   const income = asArray(context.monthlyIncome);
+
+  const now = new Date();
+  const thisMonthStart = startOfMonth(now);
+  const lastMonthStart = startOfLastMonth(now);
+  const lastMonthEnd = endOfLastMonth(now);
+  const thisMonthExpenses = expenses.filter((row) => inPeriod(row.date, thisMonthStart, now));
+  const lastMonthExpenses = expenses.filter((row) => inPeriod(row.date, lastMonthStart, lastMonthEnd));
+  const thisMonthKey = now.toISOString().slice(0, 7);
+  const lastMonthKey = lastMonthStart.toISOString().slice(0, 7);
+  const incomeForMonth = (key: string) => Math.round(income.reduce((sum, row) => {
+    if (monthKey(row.month) !== key) return sum;
+    return sum + num(row.salary) + num(row.bonuses) + num(row.otherIncome);
+  }, 0) * 100) / 100;
   const fuel = asArray(context.fuelRecords);
   const education = asArray(context.educationExpenses);
   const vehicles = asArray(context.vehicles);
@@ -164,6 +183,12 @@ export function buildSmartTimeData(rawContext: unknown, message: string): Record
     education: {
       count: scopedEducation.length,
       total: Math.round(scopedEducation.reduce((s, x) => s + num(x.amount), 0) * 100) / 100
+    },
+    comparisons: {
+      thisMonth: summarizeExpenseRows(thisMonthExpenses),
+      lastMonth: summarizeExpenseRows(lastMonthExpenses),
+      thisMonthIncome: incomeForMonth(thisMonthKey),
+      lastMonthIncome: incomeForMonth(lastMonthKey)
     },
     income: income.slice(-12).map((x) => ({
       month: text(x.month, 20),
