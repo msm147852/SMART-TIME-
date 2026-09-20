@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2, Volume2 } from "lucide-react";
 import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
-import { acceptVoiceDnaShare, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaShare, synthesizeVoiceDna, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
+import { acceptVoiceDnaShare, acknowledgeVoiceDnaSyncPackage, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaProfile, revokeVoiceDnaShare, synthesizeVoiceDna, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
 import { createVoiceDnaRecoveryEnvelope, deleteVoiceDnaRecoveryEnvelope, ensureVoiceDnaPublicKeyRegistered, hasVoiceDnaRecoveryEnvelope, uploadEncryptedVoiceDnaPackage, listIncomingVoiceDnaPackages, decryptIncomingVoiceDnaPackage, restoreVoiceDnaFromRecovery } from "../services/smartVoiceDnaCrypto";
 import {
   createVoiceDnaId,
@@ -82,8 +82,21 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const refreshShares = async () => {
     try {
       const result = await listVoiceDnaShares();
-      setIncomingShares(result.incoming || []);
+      const incoming = result.incoming || [];
+      setIncomingShares(incoming);
       setOutgoingShares(result.outgoing || []);
+
+      const activeIncomingIds = new Set(
+        incoming.filter((share) => share.status === "active").map((share) => share.id)
+      );
+      const localProfiles = await listVoiceDnaProfiles();
+      const staleShared = localProfiles.filter(
+        (profile) => profile.origin === "shared" && profile.shareId && !activeIncomingIds.has(profile.shareId)
+      );
+      for (const profile of staleShared) {
+        await deleteVoiceDnaProfile(profile.id);
+      }
+      if (staleShared.length > 0) await refreshProfiles();
     } catch {
       // Sharing is optional; local Voice DNA remains usable when the server is offline.
     }
@@ -345,6 +358,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
         };
         await saveVoiceDnaProfile(profile);
         await saveVoiceDnaSample(profileId, blob, 0);
+        await acknowledgeVoiceDnaSyncPackage(String(pkg.id));
       }
       await refreshProfiles();
       setMessage(packages.length
@@ -359,11 +373,24 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
   const handleDelete = async (id: string) => {
     try {
+      const profile = profiles.find((item) => item.id === id);
+      if (!profile) return;
+
+      if (profile.origin === "shared" && profile.shareId) {
+        await revokeVoiceDnaShare(profile.shareId);
+      } else {
+        await revokeVoiceDnaProfile(id);
+      }
+
       await deleteVoiceDnaProfile(id);
+      if (profile.isDefault) await clearDefaultVoiceDnaProfile();
       await refreshProfiles();
-      setMessage(ar ? "تم حذف ملف Voice DNA وعينته المحلية." : "Voice DNA profile and local sample deleted.");
-    } catch {
-      setMessage(ar ? "تعذر حذف الملف." : "Could not delete the profile.");
+      await refreshShares();
+      setMessage(ar
+        ? "تم حذف ملف Voice DNA وعينته المحلية وإلغاء صلاحية المشاركة."
+        : "Voice DNA profile and local sample were deleted and access was revoked.");
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر حذف الملف." : "Could not delete the profile."));
     }
   };
 
@@ -591,8 +618,15 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                   <button type="button" onClick={async () => {
                     try {
                       await revokeVoiceDnaShare(share.id);
+                      const localProfiles = await listVoiceDnaProfiles();
+                      for (const profile of localProfiles) {
+                        if (profile.origin === "shared" && profile.shareId === share.id) {
+                          await deleteVoiceDnaProfile(profile.id);
+                        }
+                      }
                       await refreshShares();
-                      setMessage(ar ? "تم إلغاء مشاركة الصوت." : "Voice share revoked.");
+                      await refreshProfiles();
+                      setMessage(ar ? "تم إلغاء مشاركة الصوت ومسح النسخة المحلية." : "Voice share revoked and the local shared copy was removed.");
                     } catch (error: any) {
                       setMessage(error?.message || (ar ? "تعذر إلغاء المشاركة." : "Could not revoke the share."));
                     }
