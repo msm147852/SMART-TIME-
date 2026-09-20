@@ -17,7 +17,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   appContext,
   onApplyAction,
 }) => {
-  const [selectedModel] = useState<AiModelType>('gemini-3.8-flash');
+  const selectedModel: AiModelType = 'smart-time-core';
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +42,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
           : 'Welcome to SMART AI. I can analyze your SMART TIME data and prepare clear actions for you to confirm.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       model: selectedModel,
-      provider: 'gemini',
+      provider: 'smart-ai',
     };
     setMessages([welcome]);
     ChatRepository.saveAiChatHistory([welcome]);
@@ -173,7 +173,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
-            ✨ Gemini 3.8 Flash
+            ✨ SMART TIME AI
           </span>
           <button
             type="button"
