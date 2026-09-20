@@ -95,3 +95,17 @@ export async function synthesizeVoiceDna(input: {
   }
   return await response.blob();
 }
+
+
+export async function getVoiceDnaStatus(): Promise<{ provider: string; configured: boolean; localOnly: boolean }> {
+  const response = await fetch(apiUrl("/api/voice-dna/status"), {
+    headers: { ...authHeaders() },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || "تعذر قراءة حالة محرك Voice DNA.");
+  return {
+    provider: String(payload?.provider || "disabled"),
+    configured: Boolean(payload?.configured),
+    localOnly: Boolean(payload?.localOnly),
+  };
+}
