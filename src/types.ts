@@ -572,6 +572,8 @@ export interface PrayerTimesData {
   timeRemaining: string;
 }
 
+export type SmartAiVoiceId = 'male' | 'female' | 'youth' | 'child';
+
 // ---------------------------
 // 9. AI CENTER
 // ---------------------------
