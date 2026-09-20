@@ -289,15 +289,51 @@ async function getRecoveryEnvelope(): Promise<any> {
   return payload;
 }
 
-export async function backupVoiceDnaSamplesForRecovery(passphrase: string): Promise<number> {
-  const envelope = await getRecoveryEnvelope();
+async function getValidatedRecoveryKey(envelope: any, passphrase: string): Promise<CryptoKey> {
   const salt = fromBase64(String(envelope.salt || ""));
+  const iv = fromBase64(String(envelope.iv || ""));
   const iterations = Number(envelope.iterations);
-  if (salt.length !== 16 || !Number.isInteger(iterations) || iterations < 100000 || iterations > 2000000) {
+  if (
+    salt.length !== 16 ||
+    iv.length !== 12 ||
+    !Number.isInteger(iterations) ||
+    iterations < 100000 ||
+    iterations > 2000000 ||
+    !envelope.ciphertext ||
+    !envelope.publicJwk
+  ) {
     throw new Error("نسخة الاسترداد غير صالحة.");
   }
 
   const recoveryKey = await deriveRecoveryKey(passphrase, salt, iterations);
+  let privateJwk: JsonWebKey;
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      recoveryKey,
+      fromBase64(String(envelope.ciphertext))
+    );
+    privateJwk = JSON.parse(new TextDecoder().decode(decrypted));
+  } catch {
+    throw new Error("مفتاح الاسترداد غير صحيح.");
+  }
+
+  const publicJwk = envelope.publicJwk as JsonWebKey;
+  if (
+    privateJwk.kty !== "RSA" ||
+    publicJwk.kty !== "RSA" ||
+    privateJwk.n !== publicJwk.n ||
+    privateJwk.e !== publicJwk.e
+  ) {
+    throw new Error("مفتاح الاسترداد غير صحيح.");
+  }
+
+  return recoveryKey;
+}
+
+export async function backupVoiceDnaSamplesForRecovery(passphrase: string): Promise<number> {
+  const envelope = await getRecoveryEnvelope();
+  const recoveryKey = await getValidatedRecoveryKey(envelope, passphrase);
   const profiles = await listVoiceDnaProfiles();
   let count = 0;
 
