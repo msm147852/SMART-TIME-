@@ -32,7 +32,7 @@ interface StoredVoiceSample {
 }
 
 const DB_NAME = "smart-time-voice-dna";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const PROFILE_STORE = "profiles";
 const SAMPLE_STORE = "samples";
 const KEY_STORE = "keys";
