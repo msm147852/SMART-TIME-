@@ -575,8 +575,8 @@ export interface PrayerTimesData {
 // ---------------------------
 // 9. AI CENTER
 // ---------------------------
-export type AiModelType = 'gemini-2.5-flash' | 'chatgpt-4o' | 'claude-3-5-sonnet' | 'manus-agent' | string;
-export type AIProviderId = 'gemini' | 'chatgpt' | 'claude' | 'manus';
+export type AiModelType = 'smart-time-core' | 'gemini-2.5-flash' | 'chatgpt-4o' | 'claude-3-5-sonnet' | 'manus-agent' | string;
+export type AIProviderId = 'smart-ai' | 'gemini' | 'chatgpt' | 'claude' | 'manus';
 
 export interface AiMessage {
   id: string;
