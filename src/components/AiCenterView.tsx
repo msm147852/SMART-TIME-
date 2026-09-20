@@ -44,6 +44,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isVoiceDnaOpen) void refreshVoiceDnaProfiles();
+  }, [isVoiceDnaOpen]);
+
+  useEffect(() => {
     const saved = ChatRepository.getAiChatHistory();
     if (saved?.length) {
       setMessages(saved);
