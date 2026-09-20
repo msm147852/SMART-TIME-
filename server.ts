@@ -11,12 +11,18 @@ import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
+import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 
 dotenv.config();
 
 const app = express();
 app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT || 3000);
+const SMART_VOICE_DNA_PROVIDER_URL = String(process.env.SMART_VOICE_DNA_PROVIDER_URL || "").trim();
+const SMART_VOICE_DNA_PROVIDER_TOKEN = String(process.env.SMART_VOICE_DNA_PROVIDER_TOKEN || "").trim();
+const smartVoiceDnaProvider = SMART_VOICE_DNA_PROVIDER_URL
+  ? createHttpVoiceDnaProvider({ id: "voicetut-local", url: SMART_VOICE_DNA_PROVIDER_URL, token: SMART_VOICE_DNA_PROVIDER_TOKEN || undefined, timeoutMs: Number(process.env.SMART_VOICE_DNA_PROVIDER_TIMEOUT_MS || 120000) })
+  : new DisabledVoiceDnaProvider();
 
 // CORS for the Vercel-hosted frontend talking to the Railway API.
 // Keep credentials disabled; SMART TIME auth uses bearer tokens explicitly.
@@ -575,6 +581,70 @@ app.post("/api/voice-dna/shares/:id/revoke", async (req, res) => {
 
 // ----------------------------------------------------
 // SMART VOICE DNA - encrypted sync
+app.get("/api/voice-dna/status", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    return res.json({ provider: smartVoiceDnaProvider.id, configured: smartVoiceDnaProvider.isAvailable(), localOnly: smartVoiceDnaProvider.id === "voicetut-local" });
+  } catch {
+    return res.status(500).json({ error: "تعذر قراءة حالة Voice DNA." });
+  }
+});
+
+app.post("/api/voice-dna/synthesize", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    if (!smartVoiceDnaProvider.isAvailable()) return res.status(503).json({ error: "محرك Voice DNA المحلي غير موصل حاليًا." });
+    if (req.body?.consentConfirmed !== true) return res.status(400).json({ error: "لازم تأكيد موافقة استخدام الصوت قبل التوليد." });
+
+    const profileId = String(req.body?.profileId || "").trim();
+    const text = String(req.body?.text || "").trim();
+    const referenceAudioBase64 = String(req.body?.referenceAudioBase64 || "").trim();
+    const referenceMimeType = String(req.body?.referenceMimeType || "audio/webm").trim().slice(0, 100);
+    const referenceText = String(req.body?.referenceText || "").trim().slice(0, 1000);
+    const speakingStyle = String(req.body?.speakingStyle || "natural").trim();
+
+    if (!profileId || !text || !referenceAudioBase64) return res.status(400).json({ error: "بيانات توليد الصوت غير مكتملة." });
+    if (text.length > 4000) return res.status(413).json({ error: "النص طويل جدًا." });
+
+    const profile = db.prepare(`SELECT id, owner_user_id as ownerUserId, language, locale, dialect, speaking_style as speakingStyle,
+      relationship, owner_confirmed as ownerConfirmed, guardian_confirmed as guardianConfirmed
+      FROM voice_dna_profiles WHERE id=? AND revoked_at IS NULL`).get(profileId) as any;
+    if (!profile) return res.status(404).json({ error: "ملف Voice DNA غير موجود." });
+
+    const owns = String(profile.ownerUserId) === String(user.id);
+    const shared = Boolean(db.prepare("SELECT 1 FROM voice_dna_shares WHERE profile_id=? AND recipient_user_id=? AND status='active'").get(profileId, user.id));
+    if (!owns && !shared) return res.status(403).json({ error: "لا توجد صلاحية لاستخدام هذا الصوت." });
+    if (!profile.ownerConfirmed) return res.status(403).json({ error: "ملف الصوت لا يحمل موافقة صاحبه." });
+    if ((profile.relationship === "son" || profile.relationship === "daughter") && !profile.guardianConfirmed) return res.status(403).json({ error: "موافقة ولي الأمر غير مكتملة." });
+
+    const referenceAudio = Uint8Array.from(Buffer.from(referenceAudioBase64, "base64"));
+    const maxBytes = Math.max(256 * 1024, Number(process.env.SMART_VOICE_DNA_MAX_REFERENCE_BYTES || 8 * 1024 * 1024));
+    if (referenceAudio.length === 0 || referenceAudio.length > maxBytes) return res.status(413).json({ error: "حجم عينة الصوت غير مسموح." });
+
+    const result = await smartVoiceDnaProvider.synthesize({
+      text,
+      language: profile.language === "en" ? "en" : "ar",
+      locale: profile.locale === "en-US" ? "en-US" : "ar-EG",
+      profileId,
+      referenceAudio,
+      referenceMimeType,
+      referenceText,
+      speakingStyle: ["natural", "calm", "warm", "formal", "alert"].includes(speakingStyle) ? speakingStyle as any : "natural",
+    });
+
+    res.setHeader("Content-Type", result.contentType || "audio/wav");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-SMART-VOICE-PROVIDER", result.provider);
+    return res.send(Buffer.from(result.audio));
+  } catch (error: any) {
+    console.error("Voice DNA synthesis error:", error?.message || error);
+    return res.status(502).json({ error: "تعذر توليد الصوت من المحرك المحلي." });
+  }
+});
+
+
 // ----------------------------------------------------
 app.post("/api/voice-dna/keys/public", async (req, res) => {
   try {
