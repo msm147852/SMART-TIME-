@@ -175,6 +175,19 @@ CREATE TABLE IF NOT EXISTS voice_dna_recovery_envelopes (
   created_at TEXT NOT NULL,
   rotated_at TEXT
 );
+CREATE TABLE IF NOT EXISTS voice_dna_recovery_samples (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_dna_recovery_sample_profile ON voice_dna_recovery_samples(user_id, profile_id);
 CREATE TABLE IF NOT EXISTS voice_dna_shares (
   id TEXT PRIMARY KEY,
   profile_id TEXT NOT NULL,
