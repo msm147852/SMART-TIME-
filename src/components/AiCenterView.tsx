@@ -6,7 +6,7 @@ import { ChatRepository } from '../services';
 import { askSmartAi, buildSmartAiContext, SmartAiAction } from '../services/aiService';
 import { loadSmartAiVoiceId, saveSmartAiVoiceId, speakSmartAi, stopSmartAiVoice, SMART_AI_VOICE_PROFILES } from '../services/smartAiVoiceService';
 import { listVoiceDnaProfiles, readVoiceDnaSample, type SmartVoiceDnaProfile } from '../services/smartVoiceDnaService';
-import { synthesizeVoiceDna } from '../services/smartVoiceDnaClient';
+import { getVoiceDnaStatus, synthesizeVoiceDna } from '../services/smartVoiceDnaClient';
 import type { SmartAiVoiceId } from '../types';
 
 interface AiCenterViewProps {
@@ -36,15 +36,29 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const [selectedVoiceDnaId, setSelectedVoiceDnaId] = useState<string | null>(null);
   const [isVoiceDnaOpen, setIsVoiceDnaOpen] = useState(false);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
+  const [voiceDnaProviderReady, setVoiceDnaProviderReady] = useState(false);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void refreshVoiceDnaProfiles();
+    void refreshVoiceDnaProviderStatus();
   }, []);
 
+  const refreshVoiceDnaProviderStatus = async () => {
+    try {
+      const status = await getVoiceDnaStatus();
+      setVoiceDnaProviderReady(status.configured);
+    } catch {
+      setVoiceDnaProviderReady(false);
+    }
+  };
+
   useEffect(() => {
-    if (!isVoiceDnaOpen) void refreshVoiceDnaProfiles();
+    if (!isVoiceDnaOpen) {
+      void refreshVoiceDnaProfiles();
+      void refreshVoiceDnaProviderStatus();
+    }
   }, [isVoiceDnaOpen]);
 
   useEffect(() => {
@@ -72,8 +86,12 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
     try {
       const profiles = await listVoiceDnaProfiles();
       setVoiceDnaProfiles(profiles);
-      const preferred = profiles.find((profile) => profile.isDefault)?.id || profiles[0]?.id || null;
-      setSelectedVoiceDnaId((current) => current && profiles.some((profile) => profile.id === current) ? current : preferred);
+      let saved: string | null = null;
+      try { saved = localStorage.getItem("smart-time-selected-voice-dna"); } catch {}
+      const preferred = saved && profiles.some((profile) => profile.id === saved)
+        ? saved
+        : profiles.find((profile) => profile.isDefault)?.id || profiles[0]?.id || null;
+      setSelectedVoiceDnaId(preferred);
     } catch {
       setVoiceDnaProfiles([]);
       setSelectedVoiceDnaId(null);
@@ -278,7 +296,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
             {voiceDnaProfiles.length > 0 ? (
-              <select value={selectedVoiceDnaId || ''} onChange={(event) => setSelectedVoiceDnaId(event.target.value || null)} className="max-w-[180px] px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
+              <select value={selectedVoiceDnaId || ''} onChange={(event) => { const id = event.target.value || null; setSelectedVoiceDnaId(id); try { if (id) localStorage.setItem("smart-time-selected-voice-dna", id); else localStorage.removeItem("smart-time-selected-voice-dna"); } catch {} }} className="max-w-[180px px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
                 <option value="">{language === 'ar' ? 'صوت SMART AI العادي' : 'SMART AI browser voice'}</option>
                 {voiceDnaProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
@@ -310,6 +328,9 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
             </button>
             <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
               ✨ SMART TIME AI
+            </span>
+            <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold ${voiceDnaProviderReady ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}">
+              ${voiceDnaProviderReady ? (language === 'ar' ? 'Voice DNA محلي جاهز' : 'Local Voice DNA ready') : (language === 'ar' ? 'Voice DNA غير موصل' : 'Voice DNA offline')}
             </span>
             <button
               type="button"
