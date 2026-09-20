@@ -41,7 +41,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
           ? 'مرحبًا بك في SMART AI. أقدر أقرأ بيانات المصاريف والدخل والرحلات والسيارات والطلاب والتذكيرات، وأساعدك في التحليل أو تجهيز عملية واضحة للتنفيذ.'
           : 'Welcome to SMART AI. I can analyze your SMART TIME data and prepare clear actions for you to confirm.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      model: selectedModel,
+
       provider: 'smart-ai',
     };
     setMessages([welcome]);
@@ -68,8 +68,8 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       sender: 'user',
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      model: selectedModel,
-      provider: 'gemini',
+
+      provider: 'smart-ai',
     };
     const nextMessages = [...messages, userMessage];
 
@@ -83,7 +83,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       const data = await askSmartAi({
         message: textToSend,
         language,
-        model: selectedModel,
+
         conversationHistory: nextMessages.slice(-8).map((m) => ({
           sender: m.sender === 'user' ? 'user' : 'model',
           text: m.text,
@@ -112,11 +112,11 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         sender: 'ai',
         text:
           language === 'ar'
-            ? 'تعذر الاتصال بخدمة SMART AI الآن. تأكد من إعداد GEMINI_API_KEY على الخادم.'
-            : 'SMART AI is unavailable right now. Check GEMINI_API_KEY on the server.',
+            ? 'تعذر تشغيل SMART AI الآن. لم يتم تعديل أي بيانات.'
+            : 'SMART AI is unavailable right now. No app data was changed.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: selectedModel,
-        provider: 'gemini',
+
+        provider: 'smart-ai',
       };
       setMessages([...nextMessages, fallback]);
       ChatRepository.saveAiChatHistory([...nextMessages, fallback]);
@@ -160,7 +160,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
             <h2 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
               <span>SMART AI</span>
               <span className="px-2 py-0.5 text-[10px] rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-extrabold">
-                Gemini
+                Core
               </span>
             </h2>
             <p className="text-xs text-slate-400">
