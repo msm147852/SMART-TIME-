@@ -108,7 +108,7 @@ export async function synthesizeVoiceDna(input: {
 }
 
 
-export async function getVoiceDnaStatus(): Promise<{ provider: string; configured: boolean; localOnly: boolean }> {
+export async function getVoiceDnaStatus(): Promise<{ provider: string; configured: boolean; healthy: boolean; localOnly: boolean }> {
   const response = await fetch(apiUrl("/api/voice-dna/status"), {
     headers: { ...authHeaders() },
   });
@@ -117,6 +117,7 @@ export async function getVoiceDnaStatus(): Promise<{ provider: string; configure
   return {
     provider: String(payload?.provider || "disabled"),
     configured: Boolean(payload?.configured),
+    healthy: Boolean(payload?.healthy),
     localOnly: Boolean(payload?.localOnly),
   };
 }
