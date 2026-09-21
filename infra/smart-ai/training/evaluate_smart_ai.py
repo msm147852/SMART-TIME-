@@ -17,17 +17,16 @@ ROOT = Path(__file__).resolve().parents[3]
 EVAL_FILE = ROOT / "backend/ai/training/smart-time-eval-v1.jsonl"
 MODEL = os.getenv("MODEL", "").strip()
 BASE_MODEL = os.getenv("BASE_MODEL", "").strip()
-OUTPUT = Path(os.getenv("EVAL_OUTPUT", str(ROOT / "infra/smart-ai/training/eval-predictions.jsonl")))
+OUTPUT = Path(os.getenv(
+    "EVAL_OUTPUT",
+    str(ROOT / "infra/smart-ai/training/eval-predictions.jsonl"),
+))
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "220"))
 
 SYSTEM_AR = (
     "أنت SMART AI داخل SMART TIME. استخدم بيانات SMART TIME فقط للأرقام والسجلات، "
     "لا تخترع معلومات، ولا تنفذ تعديلًا قبل تأكيد المستخدم."
 )
-
-
-def prompt(text: str) -> str:
-    return f"<|system|>\n{SYSTEM_AR}\n<|user|>\n{text.strip()}\n<|assistant|>\n"
 
 
 def model_dtype() -> torch.dtype:
@@ -62,6 +61,20 @@ def load_model_and_tokenizer():
     return model, tokenizer
 
 
+def build_inputs(tokenizer, text: str):
+    messages = [
+        {"role": "system", "content": SYSTEM_AR},
+        {"role": "user", "content": text.strip()},
+    ]
+    rendered = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    return tokenizer(rendered, return_tensors="pt")
+
+
 def main() -> None:
     ds = load_dataset("json", data_files=str(EVAL_FILE), split="train")
     model, tokenizer = load_model_and_tokenizer()
@@ -69,7 +82,7 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT.open("w", encoding="utf-8") as handle:
         for row in ds:
-            inputs = tokenizer(prompt(row["input"]), return_tensors="pt")
+            inputs = build_inputs(tokenizer, row["input"])
             if torch.cuda.is_available():
                 inputs = {k: v.to(model.device) for k, v in inputs.items()}
             with torch.no_grad():
