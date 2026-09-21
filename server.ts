@@ -25,6 +25,37 @@ const smartVoiceDnaProvider = SMART_VOICE_DNA_PROVIDER_URL
   : new DisabledVoiceDnaProvider();
 const SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE || 8));
 const voiceDnaRequestWindow = new Map<string, { startedAt: number; count: number }>();
+let voiceDnaProviderHealth = { checkedAt: 0, healthy: false };
+
+async function checkVoiceDnaProviderHealth(): Promise<boolean> {
+  if (!smartVoiceDnaProvider.isAvailable()) return false;
+  const now = Date.now();
+  if (now - voiceDnaProviderHealth.checkedAt < 15_000) return voiceDnaProviderHealth.healthy;
+
+  try {
+    const configuredUrl = new URL(SMART_VOICE_DNA_PROVIDER_URL);
+    configuredUrl.pathname = configuredUrl.pathname.replace(/\/synthesize\/?$/, "/health") || "/health";
+    if (!configuredUrl.pathname) configuredUrl.pathname = "/health";
+    configuredUrl.search = "";
+    configuredUrl.hash = "";
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4_000);
+    try {
+      const response = await fetch(configuredUrl, { headers: { Accept: "application/json" }, signal: controller.signal });
+      const payload = await response.json().catch(() => ({}));
+      voiceDnaProviderHealth = {
+        checkedAt: now,
+        healthy: response.ok && payload?.ok === true,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch {
+    voiceDnaProviderHealth = { checkedAt: now, healthy: false };
+  }
+  return voiceDnaProviderHealth.healthy;
+}
 function consumeVoiceDnaQuota(userId: string): boolean {
   const now = Date.now();
   const current = voiceDnaRequestWindow.get(userId);
@@ -631,7 +662,14 @@ app.get("/api/voice-dna/status", async (req, res) => {
   try {
     const user = authUser(req);
     if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
-    return res.json({ provider: smartVoiceDnaProvider.id, configured: smartVoiceDnaProvider.isAvailable(), localOnly: smartVoiceDnaProvider.id === "voicetut-local" });
+    const configured = smartVoiceDnaProvider.isAvailable();
+    const healthy = configured ? await checkVoiceDnaProviderHealth() : false;
+    return res.json({
+      provider: smartVoiceDnaProvider.id,
+      configured,
+      healthy,
+      localOnly: smartVoiceDnaProvider.id === "voicetut-local",
+    });
   } catch {
     return res.status(500).json({ error: "تعذر قراءة حالة Voice DNA." });
   }
