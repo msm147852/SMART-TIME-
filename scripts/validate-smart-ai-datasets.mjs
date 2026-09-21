@@ -5,6 +5,7 @@ import path from "node:path";
 const root = process.cwd();
 const files = [
   "backend/ai/training/smart-time-v2.jsonl",
+  "backend/ai/training/smart-time-grounded-v1.jsonl",
   "backend/ai/training/smart-time-eval-v1.jsonl",
 ];
 
