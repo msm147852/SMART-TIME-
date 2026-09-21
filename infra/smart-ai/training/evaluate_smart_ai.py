@@ -9,12 +9,14 @@ from pathlib import Path
 
 import torch
 from datasets import load_dataset
+from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 ROOT = Path(__file__).resolve().parents[3]
 EVAL_FILE = ROOT / "backend/ai/training/smart-time-eval-v1.jsonl"
 MODEL = os.getenv("MODEL", "").strip()
+BASE_MODEL = os.getenv("BASE_MODEL", "").strip()
 OUTPUT = Path(os.getenv("EVAL_OUTPUT", str(ROOT / "infra/smart-ai/training/eval-predictions.jsonl")))
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "220"))
 
@@ -28,20 +30,41 @@ def prompt(text: str) -> str:
     return f"<|system|>\n{SYSTEM_AR}\n<|user|>\n{text.strip()}\n<|assistant|>\n"
 
 
-def main() -> None:
+def model_dtype() -> torch.dtype:
+    if not torch.cuda.is_available():
+        return torch.float32
+    return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+
+
+def load_model_and_tokenizer():
     if not MODEL:
-        raise SystemExit("MODEL is required and should point to the trained model or LoRA output.")
-    ds = load_dataset("json", data_files=str(EVAL_FILE), split="train")
+        raise SystemExit("MODEL is required.")
     tokenizer = AutoTokenizer.from_pretrained(MODEL, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL,
-        torch_dtype=torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        else torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto" if torch.cuda.is_available() else None,
-    )
+
+    if (Path(MODEL) / "adapter_config.json").exists():
+        if not BASE_MODEL:
+            raise SystemExit("This is a LoRA adapter. Set BASE_MODEL to the original base model.")
+        base = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL,
+            torch_dtype=model_dtype(),
+            device_map="auto" if torch.cuda.is_available() else None,
+        )
+        model = PeftModel.from_pretrained(base, MODEL)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL,
+            torch_dtype=model_dtype(),
+            device_map="auto" if torch.cuda.is_available() else None,
+        )
     model.eval()
+    return model, tokenizer
+
+
+def main() -> None:
+    ds = load_dataset("json", data_files=str(EVAL_FILE), split="train")
+    model, tokenizer = load_model_and_tokenizer()
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT.open("w", encoding="utf-8") as handle:
