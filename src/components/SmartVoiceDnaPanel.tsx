@@ -332,6 +332,7 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
         text: phrase,
         speakingStyle: profile.speakingStyle,
         consentConfirmed: profile.ownerConfirmed && ((profile.relationship !== "son" && profile.relationship !== "daughter") || profile.guardianConfirmed),
+        referenceText: ar ? CONSENT_PHRASE_AR : CONSENT_PHRASE_EN,
         referenceAudio: sample,
       });
       const url = URL.createObjectURL(audioBlob);
