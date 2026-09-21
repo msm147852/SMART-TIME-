@@ -11,7 +11,7 @@ The provider receives text plus the selected profile reference audio in memory:
 - profileId
 - referenceAudio
 - referenceMimeType
-- optional referenceText
+- optional referenceText (transcription of the reference recording)
 - optional speakingStyle
 
 ## Response
