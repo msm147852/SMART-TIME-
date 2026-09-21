@@ -264,18 +264,23 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
           await saveVoiceDnaProfile(profile);
           await saveVoiceDnaSample(profileId, new Blob(chunksRef.current, { type: mimeType }), durationMs);
-          await registerVoiceDnaProfile({
-            id: profileId,
-            displayName: profile.displayName,
-            relationship: profile.relationship,
-            language: profile.language,
-            dialect: profile.dialect,
-            speakingStyle: profile.speakingStyle,
-            engineStatus: profile.engineStatus,
-            ownerConfirmed: profile.ownerConfirmed,
-            guardianConfirmed: profile.guardianConfirmed,
-            consentRecordedAt: profile.consentRecordedAt,
-          });
+          try {
+            await registerVoiceDnaProfile({
+              id: profileId,
+              displayName: profile.displayName,
+              relationship: profile.relationship,
+              language: profile.language,
+              dialect: profile.dialect,
+              speakingStyle: profile.speakingStyle,
+              engineStatus: profile.engineStatus,
+              ownerConfirmed: profile.ownerConfirmed,
+              guardianConfirmed: profile.guardianConfirmed,
+              consentRecordedAt: profile.consentRecordedAt,
+            });
+          } catch (registrationError) {
+            await deleteVoiceDnaProfile(profileId).catch(() => undefined);
+            throw registrationError;
+          }
           if (isDefault) await setDefaultVoiceDnaProfile(profileId);
           await refreshProfiles();
           setRecordState("idle");
