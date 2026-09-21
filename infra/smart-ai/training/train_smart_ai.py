@@ -20,7 +20,6 @@ from trl import SFTConfig, SFTTrainer
 
 ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILE = ROOT / "backend/ai/training/smart-time-v2.jsonl"
-EVAL_FILE = ROOT / "backend/ai/training/smart-time-eval-v1.jsonl"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
 BASE_MODEL = os.getenv("BASE_MODEL", "").strip()
 USE_LORA = os.getenv("USE_LORA", "1").strip().lower() not in {"0", "false", "no"}
@@ -32,7 +31,6 @@ GRAD_ACCUM = int(os.getenv("GRADIENT_ACCUMULATION_STEPS", "8"))
 LORA_R = int(os.getenv("LORA_R", "16"))
 LORA_ALPHA = int(os.getenv("LORA_ALPHA", "32"))
 LORA_DROPOUT = float(os.getenv("LORA_DROPOUT", "0.05"))
-
 
 SYSTEM_AR = (
     "أنت SMART AI داخل SMART TIME.\n"
@@ -54,11 +52,15 @@ SYSTEM_EN = (
 
 
 def build_prompt(example: dict) -> str:
-    language = "en" if any(ord(char) < 128 for char in example["input"]) and not any(
-        "\u0600" <= char <= "\u06ff" for char in example["input"]
-    ) else "ar"
-    system = SYSTEM_EN if language == "en" else SYSTEM_AR
-    return f"<|system|>\n{system}\n<|user|>\n{example['input'].strip()}\n<|assistant|>\n"
+    has_arabic = any("\u0600" <= char <= "\u06ff" for char in example["input"])
+    language_system = SYSTEM_AR if has_arabic else SYSTEM_EN
+    instruction = example["instruction"].strip()
+    return (
+        f"<|system|>\n{language_system}\n"
+        f"<|instruction|>\n{instruction}\n"
+        f"<|user|>\n{example['input'].strip()}\n"
+        "<|assistant|>\n"
+    )
 
 
 def add_prompt_completion(example: dict) -> dict:
@@ -68,16 +70,14 @@ def add_prompt_completion(example: dict) -> dict:
     }
 
 
-def prepare_dataset(path: Path):
-    dataset = load_dataset("json", data_files=str(path), split="train")
-    required = {"instruction", "input", "output", "category"} if "v2" in path.name else {"category", "input", "expected_behavior"}
+def load_training_dataset():
+    dataset = load_dataset("json", data_files=str(TRAIN_FILE), split="train")
+    required = {"instruction", "input", "output", "category"}
     missing = required - set(dataset.column_names)
     if missing:
-        raise ValueError(f"{path.name}: missing columns: {sorted(missing)}")
-    if "v2" in path.name:
-        dataset = dataset.map(add_prompt_completion)
-        dataset = dataset.remove_columns([c for c in dataset.column_names if c not in {"prompt", "completion"}])
-    return dataset
+        raise ValueError(f"Training dataset missing columns: {sorted(missing)}")
+    dataset = dataset.map(add_prompt_completion)
+    return dataset.remove_columns([c for c in dataset.column_names if c not in {"prompt", "completion"}])
 
 
 def choose_dtype() -> torch.dtype:
@@ -94,17 +94,12 @@ def main() -> None:
             "BASE_MODEL is required. Set it to a compatible local/instruct causal LM "
             "that you have permission to fine-tune."
         )
-    if not TRAIN_FILE.exists() or not EVAL_FILE.exists():
-        raise SystemExit("Training/evaluation dataset files are missing.")
+    if not TRAIN_FILE.exists():
+        raise SystemExit("Training dataset is missing.")
 
-    train_ds = prepare_dataset(TRAIN_FILE)
-    eval_ds = prepare_dataset(TRAIN_FILE) if os.getenv("SMOKE_EVAL_FROM_TRAIN") else None
-    # The held-out eval file is behavior-oriented and intentionally not fed into training.
-    # A separate generation evaluator consumes it; Trainer eval can use a validation slice
-    # only when explicitly requested to avoid silently mixing datasets.
-    if eval_ds is None:
-        split = train_ds.train_test_split(test_size=min(0.15, max(2 / len(train_ds), 0.05)), seed=42)
-        train_ds, eval_ds = split["train"], split["test"]
+    dataset = load_training_dataset()
+    split = dataset.train_test_split(test_size=min(0.15, max(2 / len(dataset), 0.05)), seed=42)
+    train_ds, eval_ds = split["train"], split["test"]
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True)
     if tokenizer.pad_token is None:
@@ -165,6 +160,7 @@ def main() -> None:
             metrics["perplexity"] = math.exp(float(metrics["eval_loss"]))
         except OverflowError:
             metrics["perplexity"] = float("inf")
+
     trainer.save_model(str(OUTPUT_DIR))
     tokenizer.save_pretrained(str(OUTPUT_DIR))
     print({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
