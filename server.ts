@@ -893,6 +893,19 @@ app.delete("/api/voice-dna/recovery/samples", async (req, res) => {
   }
 });
 
+app.delete("/api/voice-dna/recovery/samples/:profileId", async (req, res) => {
+  try {
+    const user = authUser(req);
+    if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+    const profileId = String(req.params.profileId || "").trim();
+    if (!profileId) return res.status(400).json({ error: "Profile id is required." });
+    db.prepare("DELETE FROM voice_dna_recovery_samples WHERE user_id=? AND profile_id=?").run(user.id, profileId);
+    return res.json({ ok: true, profileId });
+  } catch {
+    return res.status(500).json({ error: "تعذر حذف نسخة الصوت الاحتياطية." });
+  }
+});
+
 
 
 app.post("/api/voice-dna/sync/upload", async (req, res) => {
