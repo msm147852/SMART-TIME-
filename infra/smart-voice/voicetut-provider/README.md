@@ -31,6 +31,17 @@ Put the service behind TLS/private networking in production.
 
 ## Run
 
+Create a long random provider token, then run the isolated GPU service:
+
+```bash
+export SMART_VOICE_DNA_PROVIDER_TOKEN="replace-with-a-long-random-secret"
+docker compose up --build -d
+```
+
+The service listens on `127.0.0.1:8000` through the published Docker port. The Compose setup uses the NVIDIA GPU, drops Linux capabilities, enables `no-new-privileges`, mounts a temporary writable `/tmp`, and runs the container read-only.
+
+For a one-off run without Compose:
+
 ```bash
 docker build -t smart-time-voicetut ./infra/smart-voice/voicetut-provider
 docker run --rm --gpus all -p 8000:8000 \
