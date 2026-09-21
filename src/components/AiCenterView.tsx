@@ -136,6 +136,9 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         text,
         speakingStyle: selectedVoiceDnaProfile.speakingStyle,
         consentConfirmed: true,
+        referenceText: selectedVoiceDnaProfile.language === 'ar'
+          ? 'أنا صاحب الصوت، وأوافق على إنشاء ملف صوتي خاص بي داخل SMART TIME.'
+          : 'I am the voice owner, and I consent to creating my private SMART TIME voice profile.',
         referenceAudio: sample,
       });
 
