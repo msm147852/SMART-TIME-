@@ -336,10 +336,31 @@ export async function backupVoiceDnaSamplesForRecovery(passphrase: string): Prom
   const salt = fromBase64(String(envelope.salt || ""));
   const recoveryKey = await getValidatedRecoveryKey(envelope, passphrase);
   const profiles = await listVoiceDnaProfiles();
+  const ownerProfiles = profiles.filter((profile) => profile.origin !== "shared");
+  const currentProfileIds = new Set(ownerProfiles.map((profile) => profile.id));
+
+  const existingResponse = await fetch(apiUrl("/api/voice-dna/recovery/samples"), {
+    headers: { ...authHeaders() },
+  });
+  const existingPayload = await existingResponse.json().catch(() => ({}));
+  if (!existingResponse.ok) throw new Error(existingPayload?.error || "تعذر قراءة النسخة الاحتياطية للصوت.");
+  for (const item of Array.isArray(existingPayload?.samples) ? existingPayload.samples : []) {
+    const existingId = String(item?.profileId || "");
+    if (existingId && !currentProfileIds.has(existingId)) {
+      const deleteResponse = await fetch(apiUrl("/api/voice-dna/recovery/samples/" + encodeURIComponent(existingId)), {
+        method: "DELETE",
+        headers: { ...authHeaders() },
+      });
+      if (!deleteResponse.ok) {
+        const deletePayload = await deleteResponse.json().catch(() => ({}));
+        throw new Error(deletePayload?.error || "تعذر تنظيف النسخ الاحتياطية القديمة.");
+      }
+    }
+  }
+
   let count = 0;
 
-  for (const profile of profiles) {
-    if (profile.origin === "shared") continue;
+  for (const profile of ownerProfiles) {
     const sample = await readVoiceDnaSample(profile.id);
     if (!sample) continue;
 
