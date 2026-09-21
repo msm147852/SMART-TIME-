@@ -24,8 +24,8 @@ OUTPUT = Path(os.getenv(
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "220"))
 
 SYSTEM_AR = (
-    "أنت SMART AI داخل SMART TIME. استخدم بيانات SMART TIME فقط للأرقام والسجلات، "
-    "لا تخترع معلومات، ولا تنفذ تعديلًا قبل تأكيد المستخدم."
+    "أنت SMART AI داخل SMART TIME. استخدم بيانات SMART TIME المرفقة فقط للأرقام "
+    "والسجلات، لا تخترع معلومات، ولا تنفذ تعديلًا قبل تأكيد المستخدم."
 )
 
 
@@ -61,11 +61,23 @@ def load_model_and_tokenizer():
     return model, tokenizer
 
 
-def build_inputs(tokenizer, text: str):
+def build_inputs(tokenizer, row: dict):
     messages = [
         {"role": "system", "content": SYSTEM_AR},
-        {"role": "user", "content": text.strip()},
+        {"role": "user", "content": row["input"].strip()},
     ]
+    if row.get("smartTimeData") is not None:
+        messages.append({
+            "role": "user",
+            "content": "Synthetic SMART TIME data:\n" + json.dumps(
+                row["smartTimeData"], ensure_ascii=False
+            ),
+        })
+        messages.append({
+            "role": "user",
+            "content": "Answer the original request using that data.",
+        })
+
     rendered = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
@@ -82,7 +94,7 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT.open("w", encoding="utf-8") as handle:
         for row in ds:
-            inputs = build_inputs(tokenizer, row["input"])
+            inputs = build_inputs(tokenizer, row)
             if torch.cuda.is_available():
                 inputs = {k: v.to(model.device) for k, v in inputs.items()}
             with torch.no_grad():
@@ -93,10 +105,14 @@ def main() -> None:
                     pad_token_id=tokenizer.eos_token_id,
                 )
             continuation = generated[0][inputs["input_ids"].shape[1]:]
-            prediction = tokenizer.decode(continuation, skip_special_tokens=True).strip()
+            prediction = tokenizer.decode(
+                continuation,
+                skip_special_tokens=True,
+            ).strip()
             handle.write(json.dumps({
                 "category": row["category"],
                 "input": row["input"],
+                "smartTimeData": row.get("smartTimeData"),
                 "expected_behavior": row["expected_behavior"],
                 "prediction": prediction,
             }, ensure_ascii=False) + "\n")
