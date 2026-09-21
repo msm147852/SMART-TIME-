@@ -451,11 +451,24 @@ app.post("/api/voice-dna/profiles", async (req, res) => {
     const ownerConfirmed = req.body?.ownerConfirmed === true;
     const guardianConfirmed = req.body?.guardianConfirmed === true;
     const consentRecordedAt = String(req.body?.consentRecordedAt || "").trim().slice(0, 60);
+    const validRelationships = new Set(["self", "father", "mother", "spouse", "son", "daughter", "family"]);
+    const validDialects = new Set(["ar-EG", "en-US"]);
+    const validSpeakingStyles = new Set(["natural", "calm", "warm", "formal", "alert"]);
+    const validEngineStatuses = new Set(["pending_local_engine", "ready"]);
     const requiresGuardian = relationship === "son" || relationship === "daughter";
 
     if (!id || !displayName) return res.status(400).json({ error: "Voice profile id and name are required." });
+    if (!validRelationships.has(relationship)) return res.status(400).json({ error: "صلة القرابة غير صالحة." });
+    if (!validDialects.has(dialect) || dialect !== locale) return res.status(400).json({ error: "لهجة Voice DNA غير متوافقة مع اللغة." });
+    if (!validSpeakingStyles.has(speakingStyle)) return res.status(400).json({ error: "أسلوب الكلام غير صالح." });
+    if (!validEngineStatuses.has(engineStatus)) return res.status(400).json({ error: "حالة محرك Voice DNA غير صالحة." });
     if (!ownerConfirmed) return res.status(400).json({ error: "صاحب الصوت لازم يوافق بنفسه." });
     if (requiresGuardian && !guardianConfirmed) return res.status(400).json({ error: "موافقة ولي الأمر مطلوبة لصوت الطفل." });
+
+    const existingProfile = db.prepare("SELECT owner_user_id as ownerUserId, revoked_at as revokedAt FROM voice_dna_profiles WHERE id=?").get(id) as any;
+    if (existingProfile && String(existingProfile.ownerUserId) !== String(user.id)) {
+      return res.status(403).json({ error: "ملف Voice DNA مرتبط بحساب آخر." });
+    }
 
     db.prepare(`INSERT INTO voice_dna_profiles
       (id, owner_user_id, display_name, relationship, language, locale, dialect, speaking_style, engine_status, owner_confirmed, guardian_confirmed, consent_recorded_at, created_at, revoked_at)
