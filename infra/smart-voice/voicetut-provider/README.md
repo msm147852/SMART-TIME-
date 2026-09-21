@@ -38,7 +38,7 @@ export SMART_VOICE_DNA_PROVIDER_TOKEN="replace-with-a-long-random-secret"
 docker compose up --build -d
 ```
 
-The service listens on `127.0.0.1:8000` through the published Docker port. The Compose setup uses the NVIDIA GPU, drops Linux capabilities, enables `no-new-privileges`, mounts a temporary writable `/tmp`, and runs the container read-only.
+The service listens on `127.0.0.1:8000` through the published Docker port. The Compose setup uses the NVIDIA GPU, drops Linux capabilities, enables `no-new-privileges`, mounts a temporary writable `/tmp`, and runs the container read-only. The Hugging Face model cache is persisted in a dedicated Docker volume so the model can be downloaded once without making the application filesystem writable.
 
 For a one-off run without Compose:
 
