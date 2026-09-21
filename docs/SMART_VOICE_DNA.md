@@ -74,6 +74,6 @@ The recovery passphrase is separate from the SMART TIME account password and sho
 
 Recovery now covers the local owner voice samples as encrypted backup records in addition to the RSA sync key. Each sample is encrypted in the browser with AES-GCM using a key derived from the user's recovery passphrase through PBKDF2-SHA-256. The server stores only the encrypted sample, IV, salt, MIME metadata, and duration.
 
-The recovery passphrase is never uploaded. Restoring a device retrieves the owner's active Voice DNA metadata and encrypted samples, decrypts them locally, and recreates the local encrypted sample store.
+The recovery passphrase is never uploaded. Restoring a device retrieves the owner's active Voice DNA metadata and encrypted samples, decrypts them locally, and recreates the local encrypted sample store. Refreshing the backup also reconciles deleted owner profiles so their old encrypted recovery copies are removed from the server.
 
 Shared family profiles are not included in the owner's recovery backup; they are re-synced through the active family-share flow after recovery.
