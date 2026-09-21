@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fine-tune a local SMART AI model on synthetic SMART TIME behavior data.
 
-The script intentionally trains only on repository-owned examples. Customer
-records, chat history, secrets, and Voice DNA recordings are never loaded.
+Training is repository-data-only: customer records, chat history, secrets,
+and Voice DNA recordings are never loaded by this script.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from trl import SFTConfig, SFTTrainer
 ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILE = ROOT / "backend/ai/training/smart-time-v2.jsonl"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
-BASE_MODEL = os.getenv("BASE_MODEL", "").strip()
+BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen3-4B").strip()
 USE_LORA = os.getenv("USE_LORA", "1").strip().lower() not in {"0", "false", "no"}
 MAX_LENGTH = int(os.getenv("MAX_LENGTH", "1024"))
 EPOCHS = float(os.getenv("EPOCHS", "3"))
@@ -51,22 +51,17 @@ SYSTEM_EN = (
 )
 
 
-def build_prompt(example: dict) -> str:
+def build_prompt_messages(example: dict) -> dict:
     has_arabic = any("\u0600" <= char <= "\u06ff" for char in example["input"])
-    language_system = SYSTEM_AR if has_arabic else SYSTEM_EN
-    instruction = example["instruction"].strip()
-    return (
-        f"<|system|>\n{language_system}\n"
-        f"<|instruction|>\n{instruction}\n"
-        f"<|user|>\n{example['input'].strip()}\n"
-        "<|assistant|>\n"
-    )
-
-
-def add_prompt_completion(example: dict) -> dict:
+    system = SYSTEM_AR if has_arabic else SYSTEM_EN
     return {
-        "prompt": build_prompt(example),
-        "completion": example["output"].strip(),
+        "prompt": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": example["input"].strip()},
+        ],
+        "completion": [
+            {"role": "assistant", "content": example["output"].strip()},
+        ],
     }
 
 
@@ -76,8 +71,21 @@ def load_training_dataset():
     missing = required - set(dataset.column_names)
     if missing:
         raise ValueError(f"Training dataset missing columns: {sorted(missing)}")
-    dataset = dataset.map(add_prompt_completion)
-    return dataset.remove_columns([c for c in dataset.column_names if c not in {"prompt", "completion"}])
+
+    dataset = dataset.map(build_prompt_messages)
+
+    # Keep the original instruction in the user-visible supervised prompt by
+    # injecting it into the system message for the training example.
+    def add_instruction(example: dict) -> dict:
+        instruction = str(example["instruction"]).strip()
+        if instruction:
+            example["prompt"][0]["content"] += "\nTraining behavior:\n" + instruction
+        return example
+
+    dataset = dataset.map(add_instruction)
+    return dataset.remove_columns([
+        c for c in dataset.column_names if c not in {"prompt", "completion"}
+    ])
 
 
 def choose_dtype() -> torch.dtype:
@@ -89,16 +97,14 @@ def choose_dtype() -> torch.dtype:
 
 
 def main() -> None:
-    if not BASE_MODEL:
-        raise SystemExit(
-            "BASE_MODEL is required. Set it to a compatible local/instruct causal LM "
-            "that you have permission to fine-tune."
-        )
     if not TRAIN_FILE.exists():
         raise SystemExit("Training dataset is missing.")
 
     dataset = load_training_dataset()
-    split = dataset.train_test_split(test_size=min(0.15, max(2 / len(dataset), 0.05)), seed=42)
+    split = dataset.train_test_split(
+        test_size=min(0.15, max(2 / len(dataset), 0.05)),
+        seed=42,
+    )
     train_ds, eval_ds = split["train"], split["test"]
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True)
