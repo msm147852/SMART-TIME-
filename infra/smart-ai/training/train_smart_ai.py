@@ -7,19 +7,23 @@ and Voice DNA recordings are never loaded by this script.
 
 from __future__ import annotations
 
+import json
 import math
 import os
 from pathlib import Path
 
 import torch
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset
 from peft import LoraConfig, TaskType
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
 
 ROOT = Path(__file__).resolve().parents[3]
-TRAIN_FILE = ROOT / "backend/ai/training/smart-time-v2.jsonl"
+TRAIN_FILES = [
+    ROOT / "backend/ai/training/smart-time-v2.jsonl",
+    ROOT / "backend/ai/training/smart-time-grounded-v1.jsonl",
+]
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
 BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen3-4B").strip()
 USE_LORA = os.getenv("USE_LORA", "1").strip().lower() not in {"0", "false", "no"}
@@ -54,11 +58,30 @@ SYSTEM_EN = (
 def build_prompt_messages(example: dict) -> dict:
     has_arabic = any("\u0600" <= char <= "\u06ff" for char in example["input"])
     system = SYSTEM_AR if has_arabic else SYSTEM_EN
+    instruction = str(example.get("instruction", "")).strip()
+    if instruction:
+        system += "\nTraining behavior:\n" + instruction
+
+    prompt = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": example["input"].strip()},
+    ]
+
+    context = example.get("smartTimeData")
+    if context is not None:
+        prompt.append({
+            "role": "user",
+            "content": "Synthetic SMART TIME data:\n" + json.dumps(
+                context, ensure_ascii=False
+            ),
+        })
+        prompt.append({
+            "role": "user",
+            "content": "Answer the original request using that data.",
+        })
+
     return {
-        "prompt": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": example["input"].strip()},
-        ],
+        "prompt": prompt,
         "completion": [
             {"role": "assistant", "content": example["output"].strip()},
         ],
@@ -66,26 +89,20 @@ def build_prompt_messages(example: dict) -> dict:
 
 
 def load_training_dataset():
-    dataset = load_dataset("json", data_files=str(TRAIN_FILE), split="train")
-    required = {"instruction", "input", "output", "category"}
-    missing = required - set(dataset.column_names)
-    if missing:
-        raise ValueError(f"Training dataset missing columns: {sorted(missing)}")
-
-    dataset = dataset.map(build_prompt_messages)
-
-    # Keep the original instruction in the user-visible supervised prompt by
-    # injecting it into the system message for the training example.
-    def add_instruction(example: dict) -> dict:
-        instruction = str(example["instruction"]).strip()
-        if instruction:
-            example["prompt"][0]["content"] += "\nTraining behavior:\n" + instruction
-        return example
-
-    dataset = dataset.map(add_instruction)
-    return dataset.remove_columns([
-        c for c in dataset.column_names if c not in {"prompt", "completion"}
-    ])
+    datasets = []
+    for file in TRAIN_FILES:
+        if not file.exists():
+            raise SystemExit(f"Training dataset is missing: {file}")
+        dataset = load_dataset("json", data_files=str(file), split="train")
+        required = {"instruction", "input", "output", "category"}
+        missing = required - set(dataset.column_names)
+        if missing:
+            raise ValueError(f"{file.name}: missing columns: {sorted(missing)}")
+        dataset = dataset.map(build_prompt_messages)
+        datasets.append(dataset.remove_columns([
+            c for c in dataset.column_names if c not in {"prompt", "completion"}
+        ]))
+    return concatenate_datasets(datasets)
 
 
 def choose_dtype() -> torch.dtype:
@@ -97,10 +114,12 @@ def choose_dtype() -> torch.dtype:
 
 
 def main() -> None:
-    if not TRAIN_FILE.exists():
-        raise SystemExit("Training dataset is missing.")
-
     dataset = load_training_dataset()
+    if len(dataset) < 80:
+        raise SystemExit(
+            f"Training dataset is too small for this experiment: {len(dataset)} examples."
+        )
+
     split = dataset.train_test_split(
         test_size=min(0.15, max(2 / len(dataset), 0.05)),
         seed=42,
@@ -169,7 +188,12 @@ def main() -> None:
 
     trainer.save_model(str(OUTPUT_DIR))
     tokenizer.save_pretrained(str(OUTPUT_DIR))
-    print({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+    print({
+        "model": BASE_MODEL,
+        "train_examples": len(train_ds),
+        "eval_examples": len(eval_ds),
+        **{k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+    })
 
 
 if __name__ == "__main__":
