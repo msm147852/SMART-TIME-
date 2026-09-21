@@ -48,7 +48,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const refreshVoiceDnaProviderStatus = async () => {
     try {
       const status = await getVoiceDnaStatus();
-      setVoiceDnaProviderReady(status.configured);
+      setVoiceDnaProviderReady(status.configured && status.healthy);
     } catch {
       setVoiceDnaProviderReady(false);
     }
