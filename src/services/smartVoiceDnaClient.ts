@@ -78,6 +78,7 @@ export async function synthesizeVoiceDna(input: {
   text: string;
   speakingStyle?: string;
   consentConfirmed: boolean;
+  referenceText?: string;
   referenceAudio: Blob;
 }): Promise<Blob> {
   const bytes = new Uint8Array(await input.referenceAudio.arrayBuffer());
@@ -95,6 +96,7 @@ export async function synthesizeVoiceDna(input: {
       text: input.text,
       speakingStyle: input.speakingStyle || "natural",
       consentConfirmed: input.consentConfirmed,
+      referenceText: input.referenceText || "",
       referenceAudioBase64: btoa(binary),
       referenceMimeType: input.referenceAudio.type || "audio/webm",
     }),
