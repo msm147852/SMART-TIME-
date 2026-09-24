@@ -1,0 +1,1 @@
+SMART AI Python smoke-test target: py_compile all *.py, then run provider-independent memory/tool smoke tests.
