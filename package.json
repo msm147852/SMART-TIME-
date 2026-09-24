@@ -9,7 +9,13 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "validate:smart-ai": "node scripts/validate-smart-ai-datasets.mjs",
+    "train:smart-ai": "python infra/smart-ai/training/train_smart_ai.py",
+    "eval:smart-ai": "python infra/smart-ai/training/evaluate_smart_ai.py",
+    "audit:smart-ai": "node scripts/audit-smart-ai-training.mjs",
+    "stats:smart-ai": "node scripts/smart-ai-training-stats.mjs",
+    "score:smart-ai": "node scripts/score-smart-ai-eval.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

@@ -12,3 +12,5 @@ export * from './permissionService';
 export * from './ridePriceEstimator';
 
 export * from './smartVoiceDnaService';
+
+export * from './smartVoiceDnaCrypto';

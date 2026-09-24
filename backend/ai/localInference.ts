@@ -54,6 +54,9 @@ export async function askLocalSmartAi(input: {
     stream: false,
     temperature: 0.2,
     max_tokens: 700,
+    // Qwen3-compatible OpenAI servers can use this to keep runtime replies
+    // concise and avoid emitting hidden reasoning blocks into the UI.
+    chat_template_kwargs: { enable_thinking: false },
     messages: [
       { role: "system", content: system },
       ...(input.conversationHistory || []).slice(-6).map((item) => ({

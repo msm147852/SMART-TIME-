@@ -1,12 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Mic, ShieldCheck, Trash2, X } from "lucide-react";
-import type { Language, SmartVoiceDnaRelationship } from "../types";
+import { Check, Loader2, Mic, ShieldCheck, Trash2, X, UserPlus, Share2, Volume2 } from "lucide-react";
+import type { Language, SmartVoiceDnaRelationship, SmartVoiceDnaSpeakingStyle } from "../types";
+import { acceptVoiceDnaShare, acknowledgeVoiceDnaSyncPackage, createVoiceDnaShare, listVoiceDnaShares, registerVoiceDnaProfile, revokeVoiceDnaProfile, revokeVoiceDnaShare, synthesizeVoiceDna, type VoiceDnaShareRecord } from "../services/smartVoiceDnaClient";
+import { backupVoiceDnaSamplesForRecovery, createVoiceDnaRecoveryEnvelope, deleteVoiceDnaRecoveryEnvelope, ensureVoiceDnaPublicKeyRegistered, hasVoiceDnaRecoveryEnvelope, uploadEncryptedVoiceDnaPackage, listIncomingVoiceDnaPackages, decryptIncomingVoiceDnaPackage, restoreVoiceDnaFromRecovery, restoreVoiceDnaSamplesFromRecovery } from "../services/smartVoiceDnaCrypto";
 import {
   createVoiceDnaId,
   deleteVoiceDnaProfile,
   listVoiceDnaProfiles,
+  readVoiceDnaSample,
   saveVoiceDnaProfile,
   saveVoiceDnaSample,
+  setDefaultVoiceDnaProfile,
+  clearDefaultVoiceDnaProfile,
   type SmartVoiceDnaProfile,
 } from "../services/smartVoiceDnaService";
 
@@ -36,6 +41,17 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
   const [relationship, setRelationship] = useState<SmartVoiceDnaRelationship>("self");
   const [ownerConfirmed, setOwnerConfirmed] = useState(false);
   const [guardianConfirmed, setGuardianConfirmed] = useState(false);
+  const [speakingStyle, setSpeakingStyle] = useState<SmartVoiceDnaSpeakingStyle>("natural");
+  const [isDefault, setIsDefault] = useState(false);
+  const [shareTarget, setShareTarget] = useState<Record<string, string>>({});
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const [incomingShares, setIncomingShares] = useState<VoiceDnaShareRecord[]>([]);
+  const [outgoingShares, setOutgoingShares] = useState<VoiceDnaShareRecord[]>([]);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [recoveryReady, setRecoveryReady] = useState(false);
+  const [recoveryPassphrase, setRecoveryPassphrase] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [message, setMessage] = useState("");
@@ -49,6 +65,9 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
   useEffect(() => {
     void refreshProfiles();
+    void refreshShares();
+    void ensureVoiceDnaPublicKeyRegistered().catch(() => undefined);
+    void refreshRecoveryStatus();
     return () => stopActiveRecorder();
   }, []);
 
@@ -57,6 +76,29 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
       setProfiles(await listVoiceDnaProfiles());
     } catch {
       setMessage(ar ? "تعذر فتح تخزين Voice DNA المحلي." : "Could not open local Voice DNA storage.");
+    }
+  };
+
+  const refreshShares = async () => {
+    try {
+      const result = await listVoiceDnaShares();
+      const incoming = result.incoming || [];
+      setIncomingShares(incoming);
+      setOutgoingShares(result.outgoing || []);
+
+      const activeIncomingIds = new Set(
+        incoming.filter((share) => share.status === "active").map((share) => share.id)
+      );
+      const localProfiles = await listVoiceDnaProfiles();
+      const staleShared = localProfiles.filter(
+        (profile) => profile.origin === "shared" && profile.shareId && !activeIncomingIds.has(profile.shareId)
+      );
+      for (const profile of staleShared) {
+        await deleteVoiceDnaProfile(profile.id);
+      }
+      if (staleShared.length > 0) await refreshProfiles();
+    } catch {
+      // Sharing is optional; local Voice DNA remains usable when the server is offline.
     }
   };
 
@@ -69,6 +111,85 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     mediaRecorderRef.current = null;
     streamRef.current = null;
+  };
+
+  const refreshRecoveryStatus = async () => {
+    try { setRecoveryReady(await hasVoiceDnaRecoveryEnvelope()); } catch { setRecoveryReady(false); }
+  };
+
+  const configureRecovery = async () => {
+    if (recoveryPassphrase.trim().length < 12) {
+      setMessage(ar ? "مفتاح الاسترداد لازم يكون 12 حرف على الأقل." : "Recovery passphrase must be at least 12 characters.");
+      return;
+    }
+    setRecoveryBusy(true);
+    let envelopeCreated = false;
+    try {
+      await createVoiceDnaRecoveryEnvelope(recoveryPassphrase);
+      envelopeCreated = true;
+      setRecoveryReady(true);
+      const backedUp = await backupVoiceDnaSamplesForRecovery(recoveryPassphrase);
+      setRecoveryPassphrase("");
+      setMessage(ar
+        ? `تم إعداد الاسترداد وتحديث نسخة آمنة لـ ${backedUp} ملف صوتي.`
+        : `Recovery is ready and ${backedUp} voice profile(s) were backed up securely.`);
+    } catch (error: any) {
+      if (envelopeCreated) {
+        setRecoveryReady(true);
+        setMessage(ar
+          ? `تم إنشاء مفتاح الاسترداد، لكن النسخة الاحتياطية لم تكتمل: ${error?.message || "حاول تحديث النسخة مرة أخرى."}`
+          : `The recovery key was created, but the backup did not finish: ${error?.message || "Refresh the backup and try again."}`);
+      } else {
+        setMessage(error?.message || (ar ? "تعذر إعداد الاسترداد." : "Could not configure recovery."));
+      }
+    } finally { setRecoveryBusy(false); }
+  };
+
+  const restoreRecovery = async () => {
+    if (recoveryPassphrase.trim().length < 12) {
+      setMessage(ar ? "اكتب مفتاح الاسترداد كاملًا." : "Enter your recovery passphrase.");
+      return;
+    }
+    setRecoveryBusy(true);
+    try {
+      await restoreVoiceDnaFromRecovery(recoveryPassphrase);
+      const restored = await restoreVoiceDnaSamplesFromRecovery(recoveryPassphrase);
+      await refreshProfiles();
+      setRecoveryPassphrase("");
+      setRecoveryReady(true);
+      setMessage(ar
+        ? `تم استرداد المفتاح والملفات الصوتية: ${restored} ملف.`
+        : `Recovery restored the key and ${restored} voice profile(s).`);
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر استرداد المفتاح." : "Could not restore the key."));
+    } finally { setRecoveryBusy(false); }
+  };
+
+  const updateRecoveryBackup = async () => {
+    if (recoveryPassphrase.trim().length < 12) {
+      setMessage(ar ? "اكتب مفتاح الاسترداد لتحديث النسخة." : "Enter the recovery passphrase to refresh the backup.");
+      return;
+    }
+    setRecoveryBusy(true);
+    try {
+      const backedUp = await backupVoiceDnaSamplesForRecovery(recoveryPassphrase);
+      setRecoveryPassphrase("");
+      setRecoveryReady(true);
+      setMessage(ar ? `تم تحديث النسخة المشفّرة لـ ${backedUp} ملف صوتي.` : `Encrypted recovery backup updated for ${backedUp} voice profile(s).`);
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر تحديث النسخة." : "Could not refresh the backup."));
+    } finally { setRecoveryBusy(false); }
+  };
+
+  const removeRecovery = async () => {
+    setRecoveryBusy(true);
+    try {
+      await deleteVoiceDnaRecoveryEnvelope();
+      setRecoveryReady(false);
+      setMessage(ar ? "تم حذف نسخة استرداد Voice DNA من الخادم. مفتاح الجهاز الحالي ما زال محليًا." : "The server recovery envelope was deleted. The current device key remains local.");
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر حذف الاسترداد." : "Could not delete recovery."));
+    } finally { setRecoveryBusy(false); }
   };
 
   const startRecording = async () => {
@@ -129,6 +250,9 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
             relationship,
             language: ar ? "ar" : "en",
             locale: ar ? "ar-EG" : "en-US",
+            dialect: ar ? "ar-EG" : "en-US",
+            speakingStyle,
+            isDefault,
             consentMode: requiresGuardian ? "guardian" : "self",
             ownerConfirmed,
             guardianConfirmed: requiresGuardian ? guardianConfirmed : false,
@@ -140,6 +264,24 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
 
           await saveVoiceDnaProfile(profile);
           await saveVoiceDnaSample(profileId, new Blob(chunksRef.current, { type: mimeType }), durationMs);
+          try {
+            await registerVoiceDnaProfile({
+              id: profileId,
+              displayName: profile.displayName,
+              relationship: profile.relationship,
+              language: profile.language,
+              dialect: profile.dialect,
+              speakingStyle: profile.speakingStyle,
+              engineStatus: profile.engineStatus,
+              ownerConfirmed: profile.ownerConfirmed,
+              guardianConfirmed: profile.guardianConfirmed,
+              consentRecordedAt: profile.consentRecordedAt,
+            });
+          } catch (registrationError) {
+            await deleteVoiceDnaProfile(profileId).catch(() => undefined);
+            throw registrationError;
+          }
+          if (isDefault) await setDefaultVoiceDnaProfile(profileId);
           await refreshProfiles();
           setRecordState("idle");
           setMessage(ar
@@ -148,6 +290,8 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
           setDisplayName("");
           setOwnerConfirmed(false);
           setGuardianConfirmed(false);
+          setSpeakingStyle("natural");
+          setIsDefault(false);
         } catch (error) {
           console.error("Voice DNA save failed:", error);
           setRecordState("idle");
@@ -175,13 +319,116 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
     if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
   };
 
+  const playVoiceDnaSample = async (profile: SmartVoiceDnaProfile) => {
+    setPlayingId(profile.id);
+    try {
+      const sample = await readVoiceDnaSample(profile.id);
+      if (!sample) throw new Error(ar ? "العينة المحلية غير موجودة." : "Local voice sample not found.");
+      const phrase = ar
+        ? "أهلاً، أنا صوتي الشخصي داخل SMART TIME. النهارده عندي حاجة مهمة أقولها لك."
+        : "Hello, this is my personal voice inside SMART TIME. I have something important to tell you.";
+      const audioBlob = await synthesizeVoiceDna({
+        profileId: profile.id,
+        text: phrase,
+        speakingStyle: profile.speakingStyle,
+        consentConfirmed: profile.ownerConfirmed && ((profile.relationship !== "son" && profile.relationship !== "daughter") || profile.guardianConfirmed),
+        referenceText: ar ? CONSENT_PHRASE_AR : CONSENT_PHRASE_EN,
+        referenceAudio: sample,
+      });
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+      const done = () => { URL.revokeObjectURL(url); setPlayingId(null); };
+      audio.onended = done;
+      audio.onerror = done;
+      await audio.play();
+    } catch (error: any) {
+      setPlayingId(null);
+      setMessage(error?.message || (ar ? "تعذر تشغيل Voice DNA. المحرك المحلي غير موصل." : "Voice DNA playback failed. The local engine is not connected."));
+    }
+  };
+
+  const syncProfileToRecipient = async (profileId: string, share: VoiceDnaShareRecord) => {
+    if (!share.recipientUserId) {
+      setMessage(ar ? "بيانات المستلم ناقصة." : "Recipient data is incomplete.");
+      return;
+    }
+    setSyncingId(share.id);
+    try {
+      const sample = await readVoiceDnaSample(profileId);
+      if (!sample) throw new Error(ar ? "العينة الصوتية غير موجودة." : "Local voice sample not found.");
+      await ensureVoiceDnaPublicKeyRegistered();
+      await uploadEncryptedVoiceDnaPackage({ profileId, shareId: share.id, recipientUserId: share.recipientUserId, audio: sample });
+      setMessage(ar ? "تمت مزامنة نسخة مشفّرة من الصوت." : "Encrypted voice copy synced.");
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر مزامنة الصوت." : "Voice sync failed."));
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const syncIncomingPackages = async () => {
+    setSyncingId("incoming");
+    try {
+      await ensureVoiceDnaPublicKeyRegistered();
+      const packages = await listIncomingVoiceDnaPackages();
+      for (const pkg of packages) {
+        const profileId = "shared_" + String(pkg.profileId);
+        const blob = await decryptIncomingVoiceDnaPackage(pkg);
+        const profile: SmartVoiceDnaProfile = {
+          id: profileId,
+          displayName: String(pkg.displayName || "Shared Voice"),
+          relationship: (pkg.relationship || "family") as SmartVoiceDnaRelationship,
+          language: pkg.language === "en" ? "en" : "ar",
+          locale: pkg.locale === "en-US" ? "en-US" : "ar-EG",
+          dialect: pkg.dialect === "en-US" ? "en-US" : "ar-EG",
+          speakingStyle: (pkg.speakingStyle || "natural") as SmartVoiceDnaSpeakingStyle,
+          isDefault: false,
+          consentMode: "self",
+          ownerConfirmed: true,
+          guardianConfirmed: false,
+          consentRecordedAt: new Date().toISOString(),
+          createdAt: String(pkg.createdAt || new Date().toISOString()),
+          sampleDurationMs: 0,
+          engineStatus: "pending_local_engine",
+          origin: "shared",
+          ownerUserId: pkg.ownerUserId,
+          shareId: pkg.shareId,
+        };
+        await saveVoiceDnaProfile(profile);
+        await saveVoiceDnaSample(profileId, blob, 0);
+        await acknowledgeVoiceDnaSyncPackage(String(pkg.id));
+      }
+      await refreshProfiles();
+      setMessage(packages.length
+        ? (ar ? "تم استلام وفك تشفير الأصوات المشتركة على الجهاز." : "Shared voices were received and decrypted locally.")
+        : (ar ? "مفيش أصوات جديدة للمزامنة." : "No new voice packages."));
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر مزامنة الأصوات الواردة." : "Incoming voice sync failed."));
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
+      const profile = profiles.find((item) => item.id === id);
+      if (!profile) return;
+
+      if (profile.origin === "shared" && profile.shareId) {
+        await revokeVoiceDnaShare(profile.shareId);
+      } else {
+        await revokeVoiceDnaProfile(id);
+      }
+
       await deleteVoiceDnaProfile(id);
+      if (profile.isDefault) await clearDefaultVoiceDnaProfile();
       await refreshProfiles();
-      setMessage(ar ? "تم حذف ملف Voice DNA وعينته المحلية." : "Voice DNA profile and local sample deleted.");
-    } catch {
-      setMessage(ar ? "تعذر حذف الملف." : "Could not delete the profile.");
+      await refreshShares();
+      setMessage(ar
+        ? "تم حذف ملف Voice DNA وعينته المحلية وإلغاء صلاحية المشاركة."
+        : "Voice DNA profile and local sample were deleted and access was revoked.");
+    } catch (error: any) {
+      setMessage(error?.message || (ar ? "تعذر حذف الملف." : "Could not delete the profile."));
     }
   };
 
@@ -232,6 +479,19 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
             </label>
           )}
 
+          <label className="block text-[11px] font-bold text-slate-300 mt-3 mb-1">{ar ? "أسلوب الكلام" : "Speaking style"}</label>
+          <select value={speakingStyle} onChange={(event) => setSpeakingStyle(event.target.value as SmartVoiceDnaSpeakingStyle)} className="w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs outline-none">
+            <option value="natural">{ar ? "طبيعي" : "Natural"}</option>
+            <option value="calm">{ar ? "هادئ" : "Calm"}</option>
+            <option value="warm">{ar ? "دافئ" : "Warm"}</option>
+            <option value="formal">{ar ? "رسمي" : "Formal"}</option>
+            <option value="alert">{ar ? "تنبيه" : "Alert"}</option>
+          </select>
+          <label className="flex items-center gap-2 mt-3 text-[11px] text-slate-300">
+            <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
+            <span>{ar ? "استخدم هذا الصوت تلقائيًا مع SMART AI" : "Use this voice by default with SMART AI"}</span>
+          </label>
+
           <div className="mt-3 rounded-xl bg-purple-500/10 border border-purple-400/20 p-2.5 text-[10px] leading-relaxed text-purple-100">
             <div className="font-bold mb-1">{ar ? "جملة الموافقة للتسجيل" : "Consent phrase"}</div>
             <div>{ar ? CONSENT_PHRASE_AR : CONSENT_PHRASE_EN}</div>
@@ -275,12 +535,183 @@ export const SmartVoiceDnaPanel: React.FC<Props> = ({ language, onClose }) => {
                   <Check className="w-3.5 h-3.5" />
                   <span>{ar ? "محلي ومشفّر" : "Local and encrypted"}</span>
                 </div>
-                <div className="text-[10px] text-amber-200/90 mt-1">
-                  {ar ? "المحرك الصوتي المحلي: غير موصول بعد" : "Local voice engine: not connected yet"}
+                <div className="text-[10px] text-purple-200/90 mt-1">{profile.speakingStyle ? (ar ? `الأسلوب: ${profile.speakingStyle}` : `Style: ${profile.speakingStyle}`) : ""}</div>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                    {ar ? "مشاركة خاصة مع فرد من العائلة" : "Private family sharing"}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      value={shareTarget[profile.id] || ""}
+                      onChange={(event) => setShareTarget((current) => ({ ...current, [profile.id]: event.target.value }))}
+                      className="flex-1 rounded-lg bg-black/20 border border-white/10 px-2.5 py-1.5 text-[10px] outline-none"
+                      placeholder={ar ? "اسم المستخدم أو البريد الإلكتروني" : "Username or email"}
+                    />
+                    <button
+                      type="button"
+                      disabled={sharingId === profile.id || !String(shareTarget[profile.id] || "").trim()}
+                      onClick={async () => {
+                        const target = String(shareTarget[profile.id] || "").trim();
+                        setSharingId(profile.id);
+                        try {
+                          await createVoiceDnaShare(profile.id, target);
+                          setShareTarget((current) => ({ ...current, [profile.id]: "" }));
+                          await refreshShares();
+                          setMessage(ar ? "تم إرسال طلب مشاركة خاصة. الصوت نفسه لم يُرفع." : "Private share request sent. The voice sample was not uploaded.");
+                        } catch (error: any) {
+                          setMessage(error?.message || (ar ? "تعذر المشاركة." : "Sharing failed."));
+                        } finally {
+                          setSharingId(null);
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-purple-600 text-white text-[10px] font-bold disabled:opacity-50"
+                    >
+                      {sharingId === profile.id ? "…" : (ar ? "مشاركة" : "Share")}
+                    </button>
+                  </div>
+                  <div className="text-[9px] text-slate-500 mt-1">
+                    {ar ? "المشاركة تمنح صلاحية فقط؛ وعند المزامنة تنتقل نسخة مشفّرة لا يملك SMART TIME مفتاح فكها." : "Sharing grants access metadata only; secure sample sync transfers an encrypted copy that SMART TIME cannot decrypt."}
+                  </div>
                 </div>
+                <div className="text-[10px] text-amber-200/90 mt-1">
+                  {ar ? "محرك الصوت المحلي: يعمل فقط عند توصيل مزوّد VoiceTuT عبر الخادم." : "Local voice engine: available when a VoiceTuT provider is connected through the server."}
+                </div>
+                <button type="button" onClick={() => void playVoiceDnaSample(profile)} disabled={playingId === profile.id} className="mt-2 w-full rounded-lg border border-purple-400/30 px-2 py-1.5 text-[10px] font-bold text-purple-200 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5" />{playingId === profile.id ? "…" : (ar ? "تجربة الصوت" : "Test voice")}
+                </button>
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+<div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-xs font-extrabold"><UserPlus className="w-4 h-4 text-purple-300" />{ar ? "دعوات واردة" : "Incoming invitations"}</div><button type="button" onClick={() => void syncIncomingPackages()} disabled={syncingId === "incoming"} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[9px] font-bold disabled:opacity-50">{syncingId === "incoming" ? "…" : (ar ? "مزامنة" : "Sync")}</button></div>
+          <div className="space-y-2 mt-3">
+            {incomingShares.length === 0 && <div className="text-[10px] text-slate-500">{ar ? "مفيش دعوات مشاركة حاليًا." : "No incoming voice invitations."}</div>}
+            {incomingShares.map((share) => (
+              <div key={share.id} className="rounded-xl border border-white/10 bg-black/10 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold truncate">{share.displayName}</div>
+                    <div className="text-[9px] text-slate-500">{share.ownerUsername || ""}</div>
+                  </div>
+                  <span className="text-[9px] text-amber-200">{share.status}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                <span className="text-[9px] text-slate-500">{share.ownerUsername || ""}</span>
+              </div>
+              {share.status === "active" && (
+                <button type="button" onClick={() => void syncIncomingPackages()} disabled={syncingId === "incoming"} className="mt-2 w-full rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-bold disabled:opacity-50">
+                  {syncingId === "incoming" ? "…" : (ar ? "استلام الصوت المشفّر" : "Receive encrypted voice")}
+                </button>
+              )}
+                {share.status === "pending" && (
+                  <button type="button" onClick={async () => {
+                    try {
+                      await acceptVoiceDnaShare(share.id);
+                      await refreshShares();
+                      setMessage(ar ? "تم قبول مشاركة الصوت." : "Voice share accepted.");
+                    } catch (error: any) {
+                      setMessage(error?.message || (ar ? "تعذر قبول المشاركة." : "Could not accept the share."));
+                    }
+                  }} className="mt-2 w-full rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-bold">{ar ? "قبول" : "Accept"}</button>
+                )}
+                {share.status === "active" && (
+                  <button type="button" onClick={async () => {
+                    try {
+                      await revokeVoiceDnaShare(share.id);
+                      await refreshShares();
+                      setMessage(ar ? "تم إلغاء الوصول لهذا الصوت." : "Access to this voice was revoked.");
+                    } catch (error: any) {
+                      setMessage(error?.message || (ar ? "تعذر إلغاء الوصول." : "Could not revoke access."));
+                    }
+                  }} className="mt-2 w-full rounded-lg border border-rose-400/20 px-2 py-1.5 text-[10px] font-bold text-rose-200">{ar ? "إلغاء الوصول" : "Revoke access"}</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center gap-2 text-xs font-extrabold"><Share2 className="w-4 h-4 text-purple-300" />{ar ? "المشاركات الصادرة" : "Outgoing shares"}</div>
+          <div className="space-y-2 mt-3">
+            {outgoingShares.length === 0 && <div className="text-[10px] text-slate-500">{ar ? "مفيش مشاركات صادرة." : "No outgoing shares."}</div>}
+            {outgoingShares.map((share) => (
+              <div key={share.id} className="rounded-xl border border-white/10 bg-black/10 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold truncate">{share.displayName}</div>
+                    <div className="text-[9px] text-slate-500">{share.recipientUsername || ""}</div>
+                  </div>
+                  <span className="text-[9px] text-amber-200">{share.status}</span>
+                </div>
+                {share.status === "active" && (
+                  <button type="button" disabled={syncingId === share.id} onClick={() => void syncProfileToRecipient(share.profileId, share)} className="mt-2 w-full rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-bold disabled:opacity-50">
+                    {syncingId === share.id ? "…" : (ar ? "مزامنة الصوت المشفّر" : "Sync encrypted voice")}
+                  </button>
+                )}
+                {share.status !== "revoked" && (
+                  <button type="button" onClick={async () => {
+                    try {
+                      await revokeVoiceDnaShare(share.id);
+                      const localProfiles = await listVoiceDnaProfiles();
+                      for (const profile of localProfiles) {
+                        if (profile.origin === "shared" && profile.shareId === share.id) {
+                          await deleteVoiceDnaProfile(profile.id);
+                        }
+                      }
+                      await refreshShares();
+                      await refreshProfiles();
+                      setMessage(ar ? "تم إلغاء مشاركة الصوت ومسح النسخة المحلية." : "Voice share revoked and the local shared copy was removed.");
+                    } catch (error: any) {
+                      setMessage(error?.message || (ar ? "تعذر إلغاء المشاركة." : "Could not revoke the share."));
+                    }
+                  }} className="mt-2 w-full rounded-lg border border-rose-400/20 px-2 py-1.5 text-[10px] font-bold text-rose-200">{ar ? "إلغاء المشاركة" : "Revoke share"}</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-extrabold">{ar ? "استرداد Voice DNA على جهاز جديد" : "Voice DNA device recovery"}</div>
+            <div className="text-[9px] text-slate-400 mt-1">
+              {ar ? "نسخة المفتاح مشفّرة بكلمة مرور استرداد لا يتم إرسالها للخادم." : "The recovery key is encrypted with a passphrase that is never sent to the server."}
+            </div>
+          </div>
+          <span className={recoveryReady ? "text-[9px] font-bold text-emerald-300" : "text-[9px] font-bold text-slate-500"}>
+            {recoveryReady ? (ar ? "مفعل" : "Ready") : (ar ? "غير مفعل" : "Not set")}
+          </span>
+        </div>
+        <input
+          type="password"
+          value={recoveryPassphrase}
+          onChange={(event) => setRecoveryPassphrase(event.target.value)}
+          className="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-[11px] outline-none"
+          placeholder={ar ? "كلمة مرور استرداد طويلة (12+ حرف)" : "Long recovery passphrase (12+ chars)"}
+          autoComplete="new-password"
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
+          <button type="button" onClick={() => void configureRecovery()} disabled={recoveryBusy} className="rounded-lg bg-cyan-600 px-2 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {ar ? "إعداد/تدوير" : "Set / rotate"}
+          </button>
+          <button type="button" onClick={() => void updateRecoveryBackup()} disabled={recoveryBusy || !recoveryReady} className="rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {ar ? "تحديث النسخة" : "Refresh backup"}
+          </button>
+          <button type="button" onClick={() => void restoreRecovery()} disabled={recoveryBusy || !recoveryReady} className="rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {ar ? "استرداد الجهاز" : "Restore device"}
+          </button>
+          <button type="button" onClick={() => void removeRecovery()} disabled={recoveryBusy || !recoveryReady} className="rounded-lg border border-rose-400/20 px-2 py-1.5 text-[10px] font-bold text-rose-200 disabled:opacity-50">
+            {ar ? "حذف النسخة" : "Delete backup"}
+          </button>
+        </div>
+        <div className="text-[9px] text-cyan-100/70 mt-2 leading-relaxed">
+          {ar ? "إعداد الاسترداد يولّد مفتاح مزامنة جديدًا. الحزم القديمة المشفّرة بالمفتاح السابق تحتاج إعادة مزامنة من صاحب الصوت." : "Setting recovery creates a new sync key. Packages encrypted to the previous key need to be re-synced by the voice owner."}
         </div>
       </div>
 

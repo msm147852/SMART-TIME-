@@ -45,3 +45,35 @@ Use private family sharing with revocation when the same profile is made availab
 ## Browser fallback
 
 Until the local engine is wired, the browser Web Speech adapter remains available for generic male/female/youth/child playback. Those presets are not Voice DNA clones.
+
+
+## Private family sharing
+
+V1 now supports server-side sharing metadata. The owner registers the profile metadata and can send a private share request to another SMART TIME account by username or email. The recipient can accept or revoke access.
+
+The reference audio is intentionally not uploaded or copied by this sharing layer. The share status is a permission record only. Secure sample synchronization is a separate future step so that audio storage, encryption, and revocation can be designed independently.
+
+
+Server-side profile registration now re-checks explicit owner consent and guardian consent for child profiles. This is separate from the local recording step and prevents a client-only checkbox from being the sole authorization gate.
+
+
+## Multi-device recovery
+
+Voice DNA now supports an optional recovery envelope for the device sync key.
+
+When recovery is configured, the browser generates a fresh RSA-OAEP sync key, exports the private JWK only in memory, encrypts that private JWK with AES-GCM using a PBKDF2-derived key from a user-selected recovery passphrase, and uploads only the encrypted envelope plus the matching public JWK.
+
+The recovery passphrase is never sent to SMART TIME. The server cannot decrypt the private key. Restoring on another device decrypts the envelope locally, imports the private key as non-exportable, and re-registers the public key.
+
+Configuring recovery rotates the sync key and starts a new encrypted sample-backup generation. Previous recovery sample backups are discarded when the envelope rotates, so the owner should refresh the backup after rotation. Packages encrypted to the previous sync key are not re-keyed by the server; the voice owner must re-sync shared voices after recovery.
+
+The recovery passphrase is separate from the SMART TIME account password and should be kept in a secure password manager. It must never be committed to the repository or logged.
+
+
+## Encrypted sample backup
+
+Recovery now covers the local owner voice samples as encrypted backup records in addition to the RSA sync key. Each sample is encrypted in the browser with AES-GCM using a key derived from the user's recovery passphrase through PBKDF2-SHA-256. The server stores only the encrypted sample, IV, salt, MIME metadata, and duration.
+
+The recovery passphrase is never uploaded. Restoring a device retrieves the owner's active Voice DNA metadata and encrypted samples, decrypts them locally, and recreates the local encrypted sample store. Refreshing the backup also reconciles deleted owner profiles so their old encrypted recovery copies are removed from the server.
+
+Shared family profiles are not included in the owner's recovery backup; they are re-synced through the active family-share flow after recovery.

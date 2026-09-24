@@ -575,6 +575,8 @@ export interface PrayerTimesData {
 export type SmartAiVoiceId = 'male' | 'female' | 'youth' | 'child';
 export type SmartVoiceDnaRelationship = 'self' | 'father' | 'mother' | 'spouse' | 'son' | 'daughter' | 'family';
 export type SmartVoiceDnaConsentMode = 'self' | 'guardian';
+export type SmartVoiceDnaDialect = 'ar-EG' | 'en-US';
+export type SmartVoiceDnaSpeakingStyle = 'natural' | 'calm' | 'warm' | 'formal' | 'alert';
 
 // ---------------------------
 // 9. AI CENTER
