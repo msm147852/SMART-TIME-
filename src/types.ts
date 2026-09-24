@@ -189,7 +189,6 @@ export interface DailyTask {
 // 2. EXPENSES & BUDGET
 // ---------------------------
 export type ExpenseCategoryType =
-  | 'food'
   | 'transport'
   | 'vehicle'
   | 'education'
