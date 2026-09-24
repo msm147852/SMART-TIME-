@@ -1,0 +1,1 @@
+SMART AI Tool v2.1 external integrations only. Existing SMART TIME application files remain outside this scope.
