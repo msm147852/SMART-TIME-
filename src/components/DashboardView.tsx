@@ -4,7 +4,6 @@ import {
   MessageSquare,
   DollarSign,
   Navigation,
-  Utensils,
   Trophy,
   FileText,
   Shield,
