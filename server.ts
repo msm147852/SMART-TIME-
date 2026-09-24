@@ -1047,10 +1047,7 @@ app.post("/api/ai/search-intent", async (req, res) => {
     } else if (qLower.includes("عربية") || qLower.includes("سيارة") || qLower.includes("بنزين") || qLower.includes("زيت") || qLower.includes("car") || qLower.includes("fuel")) {
       parsed.detectedCategory = "vehicles";
     } else if (qLower.includes("ملاحظ") || qLower.includes("نوت") || qLower.includes("note") || qLower.includes("كتبت")) {
-      parsed.detectedCategory = "notes";
-    } else if (qLower.includes("طعام") || qLower.includes("أكل") || qLower.includes("وصفة") || qLower.includes("طبخ") || qLower.includes("كيتو") || qLower.includes("recipe") || qLower.includes("food")) {
-      parsed.detectedCategory = "food";
-    } else if (qLower.includes("رحلة") || qLower.includes("مشوار") || qLower.includes("اوبر") || qLower.includes("كريم") || qLower.includes("trip") || qLower.includes("uber")) {
+      parsed.detectedCategory = "notes";    } else if (qLower.includes("رحلة") || qLower.includes("مشوار") || qLower.includes("اوبر") || qLower.includes("كريم") || qLower.includes("trip") || qLower.includes("uber")) {
       parsed.detectedCategory = "trips";
     } else if (qLower.includes("مدرسة") || qLower.includes("تعليم") || qLower.includes("درس") || qLower.includes("طالب") || qLower.includes("school") || qLower.includes("lesson")) {
       parsed.detectedCategory = "education";
