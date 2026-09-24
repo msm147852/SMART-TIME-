@@ -16,8 +16,6 @@ export const STORAGE_KEYS = {
   STUDENTS: 'smart_time_students',
   LESSONS: 'smart_time_lessons',
   EDUCATION_EXPENSES: 'smart_time_edu_expenses',
-  RECIPES: 'smart_time_recipes',
-  SHOPPING_LIST: 'smart_time_shopping_list',
   FAVORITE_PLACES: 'smart_time_favorite_places',
   RECENT_TRIPS: 'smart_time_recent_trips',
   SECURE_RECORDS: 'smart_time_secure_records',
