@@ -143,8 +143,8 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
   const latestAiMessage = useMemo(() => [...messages].reverse().find((message) => message.sender !== 'user') || null, [messages]);
   const questionMessages = useMemo(() => latestAiMessage ? messages.filter((message) => message.id !== latestAiMessage.id) : messages, [messages, latestAiMessage]);
 
-  const playEmbeddedVoice = async (voice: SmartAiSystemVoice, text: string): Promise<boolean> => {
-    if (!voice.path || !text.trim()) return false;
+  const playEmbeddedVoice = async (voice: SmartAiSystemVoice): Promise<boolean> => {
+    if (!voice.path) return false;
     try {
       const audio = new Audio(voice.path);
       audio.preload = 'auto';
@@ -160,8 +160,8 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
 
   const speakWithSelectedVoice = async (text: string): Promise<boolean> => {
     if (!text.trim()) return false;
-    const embedded = [...systemVoices, ...familyVoices].find((voice) => voice.id === selectedVoiceId);
-    if (embedded && await playEmbeddedVoice(embedded, text)) return true;
+    // Embedded WAV files are curated voice samples/previews. They cannot synthesize arbitrary AI text.
+    // Dynamic replies therefore use Voice DNA when available, otherwise the existing Web Speech API.
     if (!selectedVoiceDnaProfile) return speakSmartAi(text, smartLanguage, selectedVoice);
     setVoicePlaybackBusy(true);
     try {
@@ -225,7 +225,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({ language, onOpenVoic
     <div className="h-[calc(100vh-140px)] min-h-[620px] flex flex-col gap-4" id="ai-center-module">
       <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white dark:bg-slate-850 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm shrink-0">
         <div className="flex items-center gap-3"><div className="p-2.5 rounded-2xl bg-accent-500 text-white shadow-lg shadow-accent-500/20"><Sparkles className="w-5 h-5" /></div><div><h2 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2"><span>SMART AI</span><span className="px-2 py-0.5 text-[10px] rounded-full bg-theme-ocean/10 text-accent-500 font-extrabold">Core</span></h2><p className="text-xs text-slate-400">{language === 'ar' ? 'مساحة ذكاء عملية: فهم، نتيجة، سؤال، ثم تنفيذ مؤكد' : 'An AI workspace for understanding, results, questions and confirmed actions'}</p></div></div>
-        <div className="flex flex-wrap items-center gap-2"><SmartAiVoicePicker language={smartLanguage} selectedVoiceId={selectedVoiceId} systemVoices={systemVoices} familyVoices={familyVoices} onChange={setSelectedVoiceId} onPreview={(voice) => { void playEmbeddedVoice(voice, language === 'ar' ? 'أهلًا بك في SMART AI.' : 'Welcome to SMART AI.'); }} /><SmartAiVoiceSettings language={smartLanguage} enabled={isVoiceEnabled} onEnabledChange={async (enabled) => { setIsVoiceEnabled(enabled); if (!enabled) stopSmartAiVoice(); else await speakWithSelectedVoice(language === 'ar' ? 'أهلًا بك في SMART AI.' : 'Welcome to SMART AI.'); }} onStop={stopSmartAiVoice} voiceLabel={selectedVoiceLabel} /><button type="button" onClick={() => setIsVoiceDnaOpen((open) => !open)} className="px-3 py-2 rounded-xl bg-theme-ocean/10 text-accent-500 text-xs font-bold border border-accent-500/20">Voice DNA</button><button type="button" onClick={handleClearChat} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl" title={language === 'ar' ? 'مسح المحادثة' : 'Clear chat'}><RotateCcw className="w-4 h-4" /></button></div>
+        <div className="flex flex-wrap items-center gap-2"><SmartAiVoicePicker language={smartLanguage} selectedVoiceId={selectedVoiceId} systemVoices={systemVoices} familyVoices={familyVoices} onChange={setSelectedVoiceId} onPreview={(voice) => { void playEmbeddedVoice(voice); }} /><SmartAiVoiceSettings language={smartLanguage} enabled={isVoiceEnabled} onEnabledChange={async (enabled) => { setIsVoiceEnabled(enabled); if (!enabled) stopSmartAiVoice(); else await speakWithSelectedVoice(language === 'ar' ? 'أهلًا بك في SMART AI.' : 'Welcome to SMART AI.'); }} onStop={stopSmartAiVoice} voiceLabel={selectedVoiceLabel} /><button type="button" onClick={() => setIsVoiceDnaOpen((open) => !open)} className="px-3 py-2 rounded-xl bg-theme-ocean/10 text-accent-500 text-xs font-bold border border-accent-500/20">Voice DNA</button><button type="button" onClick={handleClearChat} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl" title={language === 'ar' ? 'مسح المحادثة' : 'Clear chat'}><RotateCcw className="w-4 h-4" /></button></div>
       </header>
 
       {isVoiceDnaOpen && <SmartVoiceDnaPanel language={language} onClose={() => setIsVoiceDnaOpen(false)} />}
