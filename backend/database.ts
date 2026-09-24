@@ -127,6 +127,78 @@ CREATE TABLE IF NOT EXISTS ride_quotes (
   raw_json TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS voice_dna_profiles (
+  id TEXT PRIMARY KEY,
+  owner_user_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  relationship TEXT NOT NULL,
+  language TEXT NOT NULL,
+  locale TEXT NOT NULL,
+  dialect TEXT NOT NULL,
+  speaking_style TEXT NOT NULL,
+  engine_status TEXT NOT NULL DEFAULT 'pending_local_engine',
+  owner_confirmed INTEGER NOT NULL DEFAULT 0,
+  guardian_confirmed INTEGER NOT NULL DEFAULT 0,
+  consent_recorded_at TEXT,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS voice_dna_public_keys (
+  user_id TEXT PRIMARY KEY,
+  algorithm TEXT NOT NULL,
+  public_jwk_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS voice_dna_sync_packages (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  owner_user_id TEXT NOT NULL,
+  recipient_user_id TEXT NOT NULL,
+  share_id TEXT NOT NULL,
+  wrapped_key TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS voice_dna_recovery_envelopes (
+  user_id TEXT PRIMARY KEY,
+  algorithm TEXT NOT NULL,
+  kdf TEXT NOT NULL,
+  iterations INTEGER NOT NULL,
+  salt TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  public_jwk_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS voice_dna_recovery_samples (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_dna_recovery_sample_profile ON voice_dna_recovery_samples(user_id, profile_id);
+CREATE TABLE IF NOT EXISTS voice_dna_shares (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  owner_user_id TEXT NOT NULL,
+  recipient_user_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  accepted_at TEXT,
+  revoked_at TEXT,
+  UNIQUE(profile_id, recipient_user_id)
+);
 `);
 
 try { db.exec('ALTER TABLE users ADD COLUMN username TEXT'); } catch {}
@@ -345,3 +417,13 @@ export function seedDefaultChatRooms() {
   }
 }
 
+
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN revoked_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN accepted_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_shares ADD COLUMN revoked_at TEXT'); } catch {}
+
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN owner_confirmed INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN guardian_confirmed INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE voice_dna_profiles ADD COLUMN consent_recorded_at TEXT'); } catch {}
+
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_voice_dna_sync_recipient ON voice_dna_sync_packages(recipient_user_id, created_at)'); } catch {}

@@ -13,7 +13,6 @@ export type AppView =
   | 'trips'
   | 'vehicles'
   | 'education'
-  | 'food'
   | 'religious'
   | 'vault'
   | 'ai'
@@ -90,12 +89,6 @@ export interface ReligiousDetails {
   athkarReminderEnabled?: boolean;
 }
 
-export interface FoodPreferences {
-  dietType?: 'balanced' | 'keto' | 'vegetarian' | 'lowCalorie';
-  favoriteDish?: string;
-  autoAddToShoppingList?: boolean;
-}
-
 export interface EducationPreferences {
   defaultGradeLevel?: string;
   homeworkAlerts?: boolean;
@@ -128,7 +121,6 @@ export interface UserProfile {
   vehiclePreferences?: VehiclePreferences;
   budgetPreferences?: BudgetPreferences;
   religiousDetails?: ReligiousDetails;
-  foodPreferences?: FoodPreferences;
   educationPreferences?: EducationPreferences;
 }
 
@@ -395,72 +387,6 @@ export interface EducationExpense {
 }
 
 // ---------------------------
-// 5. FOOD & SHOPPING
-// ---------------------------
-export type RecipeCategory =
-  | 'normal'
-  | 'keto'
-  | 'tayyibat'
-  | 'sports'
-  | 'weight_loss'
-  | 'family'
-  | 'fast'
-  | 'desserts'
-  | 'favorites'
-  | string;
-
-export type DietCategory = RecipeCategory;
-
-export interface RecipeIngredient {
-  name: string;
-  amount: string;
-  unit: string;
-}
-
-export type FoodMainSection = 'eastern' | 'eastern_desserts' | 'diet';
-export type FoodSubcategory = 'starches' | 'pastries' | 'desserts';
-export type DietSystem = 'keto' | 'tayyibat' | 'common';
-export type FoodCompatibility = 'allowed' | 'not_allowed' | 'needs_review';
-
-export interface Recipe {
-  id: string;
-  title: string;
-  category: RecipeCategory;
-  image: string;
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  ingredients: RecipeIngredient[];
-  steps: string[];
-  isFavorite: boolean;
-  mainSection?: FoodMainSection;
-  subcategory?: FoodSubcategory;
-  dietSystems?: DietSystem[];
-  compatibility?: Partial<Record<DietSystem, FoodCompatibility>>;
-  source?: string;
-  sourceAuthor?: string;
-  sourcePage?: string;
-  sourceUrl?: string;
-  tags?: string[];
-  notes?: string;
-  servings?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
-}
-
-export interface ShoppingItem {
-  id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  isCompleted: boolean;
-  category: string;
-  addedFromRecipeId?: string;
-}
-
-// ---------------------------
 // 6. TRIPS & SMART TRANSPORT
 // ---------------------------
 export interface GeoPoint {
@@ -646,11 +572,17 @@ export interface PrayerTimesData {
   timeRemaining: string;
 }
 
+export type SmartAiVoiceId = 'male' | 'female' | 'youth' | 'child';
+export type SmartVoiceDnaRelationship = 'self' | 'father' | 'mother' | 'spouse' | 'son' | 'daughter' | 'family';
+export type SmartVoiceDnaConsentMode = 'self' | 'guardian';
+export type SmartVoiceDnaDialect = 'ar-EG' | 'en-US';
+export type SmartVoiceDnaSpeakingStyle = 'natural' | 'calm' | 'warm' | 'formal' | 'alert';
+
 // ---------------------------
 // 9. AI CENTER
 // ---------------------------
-export type AiModelType = 'gemini-2.5-flash' | 'chatgpt-4o' | 'claude-3-5-sonnet' | 'manus-agent' | string;
-export type AIProviderId = 'gemini' | 'chatgpt' | 'claude' | 'manus';
+export type AiModelType = 'smart-time-core' | 'gemini-2.5-flash' | 'chatgpt-4o' | 'claude-3-5-sonnet' | 'manus-agent' | string;
+export type AIProviderId = 'smart-ai' | 'gemini' | 'chatgpt' | 'claude' | 'manus';
 
 export interface AiMessage {
   id: string;
@@ -896,6 +828,8 @@ export type CardShadow = 'none' | 'subtle' | 'medium' | 'deep' | 'glow';
 export type CardBlur = 'none' | 'low' | 'medium' | 'high';
 export type CardAnimation = 'off' | 'subtle' | 'normal' | 'dynamic';
 export type CardDensity = 'compact' | 'normal' | 'spacious';
+export type CardIconSize = 'small' | 'medium' | 'large';
+export type CardBackgroundTheme = 'default' | 'sky' | 'mint' | 'lavender' | 'peach' | 'candy';
 export type CardPresetId =
   | 'elegant'
   | 'darkPremium'
@@ -916,6 +850,8 @@ export interface CardPreferences {
   showBadges: boolean;
   showGlow: boolean;
   tilt3D: boolean;
+  iconSize?: CardIconSize;
+  backgroundTheme?: CardBackgroundTheme;
   activePreset?: CardPresetId;
   hiddenCardIds?: string[];
   cardSizes?: Record<string, 'small' | 'medium' | 'large' | 'wide'>;

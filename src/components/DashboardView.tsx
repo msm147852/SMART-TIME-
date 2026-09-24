@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, Expense, Note, Recipe, Vehicle, ChatRoom, AppView } from '../types';
+import { UserProfile, Expense, Note, Vehicle, ChatRoom, AppView } from '../types';
 import {
   MessageSquare,
   DollarSign,
@@ -40,6 +40,7 @@ import { useCardPreferences } from '../context/CardSettingsContext';
 import {
   resolveCardContainerClasses,
   getCardDensityClasses,
+  getCardIconSizeClass,
 } from '../utils/cardDesignHelper';
 import { CardCustomizerModal } from './CardCustomizerModal';
 import { Organic3DDashboard } from './Organic3DDashboard';
@@ -49,7 +50,6 @@ interface DashboardViewProps {
   user: UserProfile;
   expenses: Expense[];
   notes: Note[];
-  recipes: Recipe[];
   vehicles: Vehicle[];
   chatRooms: ChatRoom[];
   onNavigate: (tab: AppView, subView?: string) => void;
@@ -122,18 +122,7 @@ const ALL_SECTIONS: SectionCard[] = [
     gradient: 'from-sky-500/20 via-blue-500/10 to-transparent',
     darkGradient: 'from-sky-950/40 via-blue-950/20 to-slate-900',
   },
-  {
-    id: 'food',
-    titleAr: 'الطعام والمشتريات',
-    titleEn: 'Food & Pantry',
-    subtitleAr: 'الوصفات الشهية، قائمة التسوق والمؤونة',
-    subtitleEn: 'Recipes, shopping list & inventory',
-    icon: Utensils,
-    emoji: '🍽️',
-    tone: 'food',
-    gradient: 'from-pink-500/20 via-rose-500/10 to-transparent',
-    darkGradient: 'from-pink-950/40 via-rose-950/20 to-slate-900',
-  },
+
   {
     id: 'ai',
     titleAr: 'الذكاء الاصطناعي',
@@ -312,6 +301,7 @@ const Interactive3DCard: React.FC<{
   const IconComponent = section.icon;
   const densityClasses = getCardDensityClasses(preferences.density);
   const cardContainerClass = resolveCardContainerClasses(preferences, section.tone, isReorderMode);
+  const iconSizeClass = preferences.iconSize ? getCardIconSizeClass(preferences.iconSize) : densityClasses.iconSize;
 
   // Detailed / Wide Card Layout
   if (layoutMode === 'detailed' || isWide) {
@@ -374,7 +364,7 @@ const Interactive3DCard: React.FC<{
                   ? 'translateZ(20px)'
                   : 'translateZ(0px)',
             }}
-            className={`dashboard-section-icon ${densityClasses.iconSize} rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-200 shadow-sm`}
+            className={`dashboard-section-icon ${iconSizeClass} rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-200 shadow-sm`}
           >
             <IconComponent className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
@@ -671,7 +661,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   user,
   expenses,
   notes,
-  recipes,
   vehicles,
   chatRooms,
   onNavigate,
@@ -845,8 +834,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return expenses.length > 0 ? `${expenses.length} سجل` : undefined;
       case 'notes':
         return notes.length > 0 ? `${notes.length} ملاحظة` : undefined;
-      case 'food':
-        return recipes.length > 0 ? `${recipes.length} وصفة` : undefined;
       case 'vehicles':
         return vehicles.length > 0 ? `${vehicles.length} مركبة` : undefined;
       case 'chat':
@@ -874,7 +861,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div
-      className="w-full min-h-full flex flex-col pb-16 select-none animate-fade-in space-y-4"
+      className="w-full min-h-full flex flex-col pb-16 select-none animate-fade-in space-y-4 smart-dashboard-reference-bg"
       id="android-dashboard-grid-view"
       dir={isAr ? 'rtl' : 'ltr'}
     >
@@ -968,7 +955,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Gear Cog Icon for Card Customizer Studio */}
           <button
             type="button"
-            onClick={() => setIsCustomizerOpen(true)}
+            onClick={(e) => { e.stopPropagation(); setIsCustomizerOpen(true); }}
             className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90"
             title={isAr ? 'ضبط وتخصيص نمط وتصميم البطاقات' : 'Card Design & Settings'}
           >
@@ -1095,6 +1082,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isOpen={isCustomizerOpen}
         onClose={() => setIsCustomizerOpen(false)}
         language={user.language || 'ar'}
+        sections={sections.map((section) => ({
+          id: section.id,
+          titleAr: section.titleAr,
+          titleEn: section.titleEn,
+          emoji: section.emoji,
+        }))}
       />
     </div>
   );

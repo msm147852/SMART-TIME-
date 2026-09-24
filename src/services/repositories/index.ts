@@ -3,7 +3,6 @@ export * from './notesRepository';
 export * from './expensesRepository';
 export * from './vehiclesRepository';
 export * from './educationRepository';
-export * from './foodRepository';
 export * from './religiousRepository';
 export * from './vaultRepository';
 export * from './tripsRepository';

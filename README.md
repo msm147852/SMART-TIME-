@@ -6,8 +6,6 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/e6e3433e-6362-4d70-9b85-2377fce00f85
-
 ## Run Locally
 
 **Prerequisites:**  Node.js
@@ -15,7 +13,7 @@ View your app in AI Studio: https://ai.studio/apps/e6e3433e-6362-4d70-9b85-2377f
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Copy `.env.example` to your local environment and configure only the services you actually use.
 3. Run the app:
    `npm run dev`
 
@@ -61,25 +59,24 @@ Until an official provider fare API is configured, transport prices are explicit
 ### Secrets
 Keep API keys in server `.env` variables only. Do not put secrets in `VITE_*` variables or frontend source code.
 
-## قسم الطعام — تحديث سبتمبر 2026
-- تم دمج محتوى تقرير نظام الطيبات في واجهة منظمة: نظرة عامة، القواعد، المسموحات حسب التكرار، الممنوعات، الوصفات، والخطة الأسبوعية.
-- تمت إضافة تنبيه واضح بأن المحتوى منقول من التقرير وليس توصية طبية، مع عدم إيقاف أي دواء موصوف دون طبيب.
-- تم توسيع مكتبة الأكلات المصرية لتشمل وجبات رئيسية، أطباق شعبية، محاشي، طواجن، أسماك، فطور، ومخبوزات.
-- تمت إضافة مكتبة مستقلة للحلويات المصرية.
-- تمت إضافة وصفات طيبات مبنية على الأصناف المسموحة الواردة في التقرير مع تمييز ما هو تجميع وصفي وليس نصًا حرفيًا من المصدر.
-- الملف الأصلي للتقرير محفوظ في `docs/tayyibat-report-source.txt`.
-
-
-## مكتبة الطعام التفصيلية
-تمت إضافة مكتبة منظمة قابلة للتوسع تشمل: المحاشي، المشويات (الدجاج والكفتة والحمام والسمان والسمك)، المشروبات الساخنة والباردة، العصائر، المخبوزات، والسلطات. كل وصفة تحتوي على صورة، كمية شراء، مكونات، تتبيلة عند الحاجة، خطوات تحضير وطهي، ونصائح. ويمكن إضافة مكونات الوصفة مباشرة إلى قائمة المشتريات.
-
 ## Sports & Fitness Hub
 - SportsView now provides four interactive cards: Exercise Library, Favorites, My Sport/Search, and Sports News.
 - ExerciseDB requests are proxied through `/api/sports/exercises` so the RapidAPI key is not exposed in browser code.
 - Set `RAPIDAPI_KEY` in `.env` (see `.env.example`) before running the server.
 
-## AI Food Images
-- Food recipe cards now request a dedicated AI-generated image from `/api/food/generated-image` using the exact recipe title/category.
-- The API uses the server-side `GEMINI_API_KEY` and the Gemini image model `gemini-3.1-flash-image`; the key is never sent to the browser.
-- Generated images are cached in server memory for reuse.
-- In category cards, the dish name is fully visible below the image. Clicking the name toggles the ingredients open/closed.
+## SMART AI
+- SMART AI is a first-party, keyless application intelligence layer. Its deterministic V1 core handles common SMART TIME data questions without a cloud LLM.
+- The default runtime uses the SMART TIME rules/data engine for calculations, summaries, period filters, and safety boundaries.
+- An optional local OpenAI-compatible inference adapter can be enabled with `SMART_AI_LOCAL_URL`, `SMART_AI_LOCAL_MODEL`, and `SMART_AI_LOCAL_TOKEN`.
+- GPU-side inference deployment files live under `infra/smart-ai/`; the model itself is intentionally selected at deployment time.
+- Customer records are runtime context, not training data. Training examples should teach SMART TIME behavior, terminology, and safe tool usage.
+- Secure Vault secrets and authentication tokens are excluded from the AI context.
+- Voice playback supports male, female, youth, and child profiles through browser TTS in V1; a dedicated first-party TTS engine is planned separately.
+
+
+## SMART VOICE DNA
+- Added a privacy-first Voice DNA foundation for personalized speech profiles.
+- Voice profiles require explicit owner consent; child profiles also require guardian consent.
+- Recorded samples stay on-device in encrypted IndexedDB in V1 and are not sent to SMART AI or external APIs.
+- The current browser voice presets are not voice clones. Voice DNA remains pending until a dedicated local TTS engine is connected.
+- Architecture and safety rules: docs/SMART_VOICE_DNA.md

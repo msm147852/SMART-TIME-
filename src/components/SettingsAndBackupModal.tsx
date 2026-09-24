@@ -55,7 +55,6 @@ import {
   VehiclePreferences,
   BudgetPreferences,
   ReligiousDetails,
-  FoodPreferences,
   EducationPreferences,
 } from '../types';
 import { translations } from '../services/i18n';
@@ -337,14 +336,6 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
     }
   );
 
-  const [foodPrefs, setFoodPrefs] = useState<FoodPreferences>(
-    userProfile.foodPreferences || {
-      dietType: 'balanced',
-      favoriteDish: 'كشري مصري بيتي وصينية بطاطس بالدجاج',
-      autoAddToShoppingList: true,
-    }
-  );
-
   const [eduPrefs, setEduPrefs] = useState<EducationPreferences>(
     userProfile.educationPreferences || {
       defaultGradeLevel: 'الصف الثالث الإعدادي',
@@ -441,7 +432,6 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
       vehiclePreferences: vehiclePrefs,
       budgetPreferences: budgetPrefs,
       religiousDetails: relDetails,
-      foodPreferences: foodPrefs,
       educationPreferences: eduPrefs,
     };
     onUpdateProfile(updated);
@@ -1864,47 +1854,6 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                         setRelDetails({ ...relDetails, reciter: e.target.value })
                       }
                       placeholder="الشيخ الحصري، المنشاوي، عبد الباسط..."
-                      className="w-full p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. قسم المطبخ والتغذية */}
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold">
-                  <Utensils className="w-4 h-4" />
-                  <span>{isAr ? 'قسم المطبخ والوجبات' : 'Food & Kitchen'}</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                      {isAr ? 'النظام الغذائي' : 'Diet Plan'}
-                    </label>
-                    <select
-                      value={foodPrefs.dietType || 'balanced'}
-                      onChange={(e) =>
-                        setFoodPrefs({ ...foodPrefs, dietType: e.target.value as any })
-                      }
-                      className="w-full p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                    >
-                      <option value="balanced">{isAr ? 'متوازن وصحي' : 'Balanced'}</option>
-                      <option value="keto">{isAr ? 'حمية كيتو' : 'Keto'}</option>
-                      <option value="vegetarian">{isAr ? 'نباتي' : 'Vegetarian'}</option>
-                      <option value="lowCalorie">{isAr ? 'قليل السعرات' : 'Low Calorie'}</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                      {isAr ? 'وجبتك المفضلة' : 'Favorite Dish'}
-                    </label>
-                    <input
-                      type="text"
-                      value={foodPrefs.favoriteDish || ''}
-                      onChange={(e) =>
-                        setFoodPrefs({ ...foodPrefs, favoriteDish: e.target.value })
-                      }
                       className="w-full p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
                     />
                   </div>
