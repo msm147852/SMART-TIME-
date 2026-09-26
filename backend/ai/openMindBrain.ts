@@ -61,7 +61,7 @@ function parseAction(message: string): SmartAiAction {
 export function classifyIntent(message: string): BrainIntent {
   const m = message.toLowerCase();
   if (/صرفت|دفعت|مصروف|expense|spent|paid/.test(m) && extractAmount(message) !== null) return "app_action";
-  if (/مهمة|task|ذكرني|remind|سجل|أضف|عدّل|غير|نفذ|execute|add|delete|update/.test(m)) return "app_action";
+  if (/مهمة|task|ذكرني|remind|سجل|أضف|عدّل|غير|نفذ|امسح|احذف|execute|add|delete|update/.test(m)) return "app_action";
   if (/بحث|ابحث|مصادر|آخر|latest|search|research/.test(m)) return "web_research";
   if (/pdf|تقرير|report|excel|xlsx|word|docx/.test(m)) return "report_generation";
   if (/dwg|dxf|cad|كاد|لوحة هندسية/.test(m)) return "cad_analysis";
