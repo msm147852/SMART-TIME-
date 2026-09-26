@@ -42,7 +42,8 @@ Create a versioned evaluation set with at least these categories:
 - model health
 - /v1/models HTTP 200
 - /v1/chat/completions HTTP 200
-- streaming
+- streaming parser/unit test
+- live GPU streaming endpoint
 - structured tool-call validity
 - verified DB mutation
 - file creation + read-back
