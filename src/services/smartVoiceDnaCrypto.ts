@@ -108,7 +108,7 @@ export async function listIncomingVoiceDnaPackages(): Promise<any[]> {
 }
 export async function decryptIncomingVoiceDnaPackage(pkg: { wrappedKey: string; iv: string; ciphertext: string; mimeType: string }): Promise<Blob> {
   const keyPair = await getIdentityKeyPair();
-  const contentKey = await crypto.subtle.unwrapKey("raw", fromBase64(pkg.wrappedKey) as any, keyPair.privateKey, { name: "RSA-OAEP", hash: "SHA-256" }, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const contentKey = await crypto.subtle.unwrapKey("raw", fromBase64(pkg.wrappedKey) as any, keyPair.privateKey, { name: "RSA-OAEP", hash: "SHA-256" } as any, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
   const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(pkg.iv) as any }, contentKey, fromBase64(pkg.ciphertext) as any);
   return new Blob([plaintext], { type: pkg.mimeType || "audio/webm" });
 }
