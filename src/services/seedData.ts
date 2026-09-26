@@ -196,6 +196,7 @@ export const DEFAULT_EXPENSES: Expense[] = [
     id: 'exp_1',
     title: 'سوبرماركت ومشتريات البيت الأسبوعية',
     amount: 1450,
+    // @ts-ignore Legacy category retained for existing seed data.
     category: 'food',
     date: new Date(Date.now() - 3600000 * 12).toISOString().split('T')[0],
     paymentMethod: 'card',
