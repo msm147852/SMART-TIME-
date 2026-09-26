@@ -26,7 +26,7 @@ Present:
 - optional local inference adapter
 
 Current limitation:
-- local model is consulted only after deterministic planning and only for non-action requests.
+- local model is still consulted only after deterministic planning and only for non-action requests.
 - the model cannot currently emit/execute a general structured tool-call loop.
 - unsupported requests can still end in the no-verified-tool path instead of autonomous tool planning.
 
@@ -42,8 +42,8 @@ Present:
 - apiKeyRequired=false in /api/ai/status
 
 Current limitation:
-- localInference sends stream=false.
-- there is no streaming implementation.
+- localInference now supports both non-streaming and OpenAI-compatible SSE streaming via streamLocalSmartAi().
+- streaming parser has a focused unit test, but GPU/runtime execution remains unverified.
 - runtime GPU endpoint configuration is not stored in repository and must be verified in the deployment environment.
 
 ## 4. Qwen + LoRA
