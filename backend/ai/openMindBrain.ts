@@ -91,7 +91,7 @@ export function planRequest(request: SmartAiRequest): BrainPlan {
   return {
     intent,
     steps,
-    requiresConfirmation: !!action,
+    requiresConfirmation: intent === "app_action" || !!action,
     action,
     factsRequired: intent === "maps" ? ["origin", "destination or coordinates"] : []
   };
