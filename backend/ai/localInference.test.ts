@@ -1,5 +1,3 @@
-import { streamLocalSmartAi } from "./localInference.js";
-
 const originalFetch = globalThis.fetch;
 const encoder = new TextEncoder();
 
@@ -16,7 +14,9 @@ globalThis.fetch = (async () => {
 }) as typeof fetch;
 
 process.env.SMART_AI_LOCAL_URL = "http://test";
+const { streamLocalSmartAi } = await import("./localInference.js");
 const chunks: string[] = [];
+
 for await (const event of streamLocalSmartAi({
   language: "ar",
   message: "قول أهلاً",
