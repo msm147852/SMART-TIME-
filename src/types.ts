@@ -21,7 +21,8 @@ export type AppView =
   | 'sports'
   | 'wallet'
   | 'admin-wallet'
-  | 'settings';
+  | 'settings'
+  | 'food';
 
 export interface TickerPreferences {
   showTimeAndDate: boolean;
@@ -95,6 +96,7 @@ export interface EducationPreferences {
 }
 
 export interface UserProfile {
+  foodPreferences?: any;
   id: string;
   name: string;
   email: string;

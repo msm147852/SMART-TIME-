@@ -54,12 +54,13 @@ function isHelpQuestion(q: string): boolean {
 
 export function answerWithRules(message: string, language: "ar" | "en", data: SmartTimeData): SmartAiResponse {
   const q = message.toLowerCase();
-  const currency = String(data.profile.currency || "EGP");
+  const typedData = data as any;
+  const currency = String(typedData.profile.currency || "EGP");
   const action = actionFromMessage(message);
 
   if (isComparisonQuestion(q)) {
-    const current = data.comparisons?.thisMonth;
-    const previous = data.comparisons?.lastMonth;
+    const current = typedData.comparisons?.thisMonth;
+    const previous = typedData.comparisons?.lastMonth;
     const currentTotal = Number(current?.total || 0);
     const previousTotal = Number(previous?.total || 0);
     const delta = Math.round((currentTotal - previousTotal) * 100) / 100;
@@ -80,8 +81,8 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
   }
 
   if (isNetIncomeQuestion(q)) {
-    const income = Number(data.comparisons?.thisMonthIncome || 0);
-    const expenses = Number(data.comparisons?.thisMonth?.total || 0);
+    const income = Number(typedData.comparisons?.thisMonthIncome || 0);
+    const expenses = Number(typedData.comparisons?.thisMonth?.total || 0);
     const net = Math.round((income - expenses) * 100) / 100;
     return {
       reply: language === "ar"
@@ -109,10 +110,10 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
   }
 
   if (isFuelQuestion(q)) {
-    const total = Number(data.fuel?.totalCost || 0);
-    const liters = Number(data.fuel?.liters || 0);
-    const count = Number(data.fuel?.count || 0);
-    const p = periodLabel(data.period?.key, language);
+    const total = Number(typedData.fuel?.totalCost || 0);
+    const liters = Number(typedData.fuel?.liters || 0);
+    const count = Number(typedData.fuel?.count || 0);
+    const p = periodLabel(typedData.period?.key, language);
     return {
       reply: language === "ar"
         ? "في " + p + " سجلت " + count + " عمليات تموين، بإجمالي " + money(total, currency) + " و" + liters.toFixed(2) + " لتر."
@@ -125,9 +126,9 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
   }
 
   if (isEducationQuestion(q)) {
-    const total = Number(data.education?.total || 0);
-    const count = Number(data.education?.count || 0);
-    const p = periodLabel(data.period?.key, language);
+    const total = Number(typedData.education?.total || 0);
+    const count = Number(typedData.education?.count || 0);
+    const p = periodLabel(typedData.period?.key, language);
     return {
       reply: language === "ar"
         ? "في " + p + " عندك " + count + " مصروف تعليمي بإجمالي " + money(total, currency) + "."
@@ -139,13 +140,13 @@ export function answerWithRules(message: string, language: "ar" | "en", data: Sm
     };
   }
 
-  if (isExpenseQuestion(q) || data.period) {
-    const total = Number(data.expenses?.total || 0);
-    const count = Number(data.expenses?.count || 0);
-    const categories = Array.isArray(data.expenses?.categories) ? data.expenses.categories : [];
+  if (isExpenseQuestion(q) || typedData.period) {
+    const total = Number(typedData.expenses?.total || 0);
+    const count = Number(typedData.expenses?.count || 0);
+    const categories = Array.isArray(typedData.expenses?.categories) ? typedData.expenses.categories : [];
     let reply = language === "ar"
-      ? "إجمالي المصاريف في " + periodLabel(data.period?.key, "ar") + " هو " + money(total, currency) + " من " + count + " عملية."
-      : "Total expenses for " + periodLabel(data.period?.key, "en") + ": " + money(total, currency) + " across " + count + " records.";
+      ? "إجمالي المصاريف في " + periodLabel(typedData.period?.key, "ar") + " هو " + money(total, currency) + " من " + count + " عملية."
+      : "Total expenses for " + periodLabel(typedData.period?.key, "en") + ": " + money(total, currency) + " across " + count + " records.";
     if (language === "ar" && categories.length) {
       const top = categories.slice(0, 3).map((x: any) => String(x.category) + ": " + money(Number(x.amount || 0), currency)).join("، ");
       reply += " أكبر البنود: " + top + ".";
