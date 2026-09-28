@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "scanned_at": "2026-09-28T14:33:44.304Z",
+  "scanned_at": "2026-09-28T15:34:40.237Z",
   "scope": {
     "root": "src",
     "extensions": [
@@ -21,7 +21,7 @@
   },
   "known_registry": {
     "file": "src/services/storageKeys.ts",
-    "key_count": 28,
+    "key_count": 33,
     "keys": [
       "smart_time_accident_records",
       "smart_time_ai_chat_history",
@@ -32,8 +32,11 @@
       "smart_time_chat_messages",
       "smart_time_chat_rooms",
       "smart_time_daily_tasks",
+      "smart_time_dashboard_layout",
+      "smart_time_dashboard_sections_v2",
       "smart_time_edu_expenses",
       "smart_time_expenses",
+      "smart_time_expenses_sections_order",
       "smart_time_favorite_places",
       "smart_time_fuel_records",
       "smart_time_lessons",
@@ -48,15 +51,17 @@
       "smart_time_notifications",
       "smart_time_recent_trips",
       "smart_time_secure_records",
+      "smart_time_sports_cards_order",
       "smart_time_students",
       "smart_time_user_profile",
-      "smart_time_vehicles"
+      "smart_time_vehicles",
+      "smart_time_workout_logs"
     ]
   },
   "scan": {
     "files_scanned": 111,
     "total_discovered_keys": 64,
-    "hidden_discovered_keys": 36,
+    "hidden_discovered_keys": 31,
     "hidden_keys": [
       "smart_time_adhan_alert",
       "smart_time_auth_session",
@@ -68,11 +73,8 @@
       "smart_time_christian_reading",
       "smart_time_contacts_",
       "smart_time_contacts_changed",
-      "smart_time_dashboard_layout",
       "smart_time_dashboard_layout_settings_v1",
-      "smart_time_dashboard_sections_v2",
       "smart_time_device_id",
-      "smart_time_expenses_sections_order",
       "smart_time_house_expenses",
       "smart_time_medical_expenses",
       "smart_time_permission_audit_logs_v1",
@@ -84,7 +86,6 @@
       "smart_time_quran_bookmarks",
       "smart_time_quran_last_stop",
       "smart_time_quran_wird",
-      "smart_time_sports_cards_order",
       "smart_time_student_expenses",
       "smart_time_surah_cache_",
       "smart_time_trip_home",
@@ -92,8 +93,7 @@
       "smart_time_vehicle_fuel",
       "smart_time_vehicle_maint",
       "smart_time_vehicle_oil_filters",
-      "smart_time_work_expenses",
-      "smart_time_workout_logs"
+      "smart_time_work_expenses"
     ],
     "findings": {
       "smart_time_permissions_changed": [
@@ -109,50 +109,6 @@
         },
         {
           "file": "src/services/permissionService.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_dashboard_layout": [
-        {
-          "file": "src/components/DashboardView.tsx",
-          "access": "getItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/DashboardView.tsx",
-          "access": "setItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/DashboardView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        },
-        {
-          "file": "src/services/storageSchema.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_dashboard_sections_v2": [
-        {
-          "file": "src/components/DashboardView.tsx",
-          "access": "getItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/DashboardView.tsx",
-          "access": "setItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/DashboardView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        },
-        {
-          "file": "src/services/storageSchema.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -268,7 +224,7 @@
           "evidence": "smart_time-literal"
         },
         {
-          "file": "src/services/storageSchema.ts",
+          "file": "src/services/storageKeys.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -285,7 +241,7 @@
           "evidence": "smart_time-literal"
         },
         {
-          "file": "src/services/storageSchema.ts",
+          "file": "src/services/storageKeys.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -338,7 +294,7 @@
           "evidence": "smart_time-literal"
         },
         {
-          "file": "src/services/storageSchema.ts",
+          "file": "src/services/storageKeys.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -641,6 +597,20 @@
         }
       ],
       "smart_time_ai_chat_history": [
+        {
+          "file": "src/services/storageKeys.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        }
+      ],
+      "smart_time_dashboard_layout": [
+        {
+          "file": "src/services/storageKeys.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        }
+      ],
+      "smart_time_dashboard_sections_v2": [
         {
           "file": "src/services/storageKeys.ts",
           "access": "string-reference",
