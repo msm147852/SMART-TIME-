@@ -160,6 +160,27 @@ export function getConversationSummary(
   return row?.summary;
 }
 
+export function conversationMessagesForModel(
+  bundle: SmartContextBundle,
+  limit = 8,
+): Array<{ sender: "user" | "model"; text: string }> {
+  const messages = bundle.messages.filter((m) => m.role === "user" || m.role === "assistant");
+  return messages.slice(-normalizeLimit(limit, 8, 20)).map((m) => ({
+    sender: m.role === "user" ? "user" : "model",
+    text: m.content,
+  }));
+}
+
+export function memoryContextForModel(
+  memories: SmartMemoryRecord[],
+  limit = 12,
+): string {
+  return memories
+    .slice(0, normalizeLimit(limit, 12, 20))
+    .map((m) => `[${m.type}] ${m.content}`)
+    .join("\n");
+}
+
 export function buildSmartContext(input: SmartContextInput): SmartContextBundle {
   const maxMessages = normalizeLimit(input.maxMessages, 20, 100);
   const maxMemories = normalizeLimit(input.maxMemories, 12, 50);
