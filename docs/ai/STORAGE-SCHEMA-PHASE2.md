@@ -75,6 +75,18 @@ Phase 1 evidence reports:
 Phase 2 implementation currently registers:
 - 28 known + 5 hidden = **33 typed schema entries**
 
+## Official Closure
+
+**STATUS: CLOSED**
+
+Closure validation completed on 2026-09-28 via GitHub Actions workflow **Phase 2 - Verify Central Schema**, run **#18** (`36443832208`), with the following required checks passing:
+- Phase 2 schema gate: **PASS** — 28 known + 5 hidden = 33 entries.
+- Production build: **PASS**.
+
+The repository-wide TypeScript lint remains a separate existing gate; its unrelated pre-existing errors are not used as a Phase 2 closure criterion.
+
+No Expense API changes were made for Phase 2.
+
 Next gate:
 - Phase 3 — StorageKeys Registry Expansion
 
