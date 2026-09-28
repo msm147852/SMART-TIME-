@@ -67,7 +67,7 @@ import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
 import { startTrialSession } from './services/authService';
-import { fetchSmartAiState } from './services/aiService';
+import { createCanonicalTask, deleteCanonicalTask, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
 // Icons
 import {
@@ -165,11 +165,9 @@ export default function App() {
         }
 
         if (state.tasks.length > 0) {
-          setDailyTasks((current) => {
-            const byId = new Map(current.map((item) => [item.id, item]));
-            for (const task of state.tasks) byId.set(task.id, task);
-            return Array.from(byId.values());
-          });
+          setDailyTasks(state.tasks);
+        } else if (dailyTasks.length > 0) {
+          await importCanonicalTasks(dailyTasks);
         }
 
         if (state.budget) {
@@ -191,24 +189,52 @@ export default function App() {
 
   const handleNavigateSafe = (nextView: AppView) => handleNavigate(nextView);
 
-  const handleToggleDailyTask = (id: string) => {
-    const updated = NotesRepository.toggleDailyTask(id);
-    setDailyTasks(updated);
+  const handleToggleDailyTask = async (id: string) => {
+    const current = dailyTasks.find((task) => task.id === id);
+    if (!current) return;
+    try {
+      const updatedTask = await updateCanonicalTask({
+        ...current,
+        completed: !current.completed,
+        completedAt: !current.completed ? new Date().toISOString() : undefined,
+      });
+      setDailyTasks((items) => items.map((item) => item.id === id ? updatedTask : item));
+    } catch (error) {
+      console.error('Canonical task update failed:', error);
+    }
   };
 
-  const handleAddDailyTask = (task: Omit<DailyTask, 'id' | 'createdAt'>) => {
-    const updated = NotesRepository.addDailyTask(task);
-    setDailyTasks(updated);
+  const handleAddDailyTask = async (task: Omit<DailyTask, 'id' | 'createdAt'>) => {
+    try {
+      const created = await createCanonicalTask(task);
+      setDailyTasks((items) => [created, ...items.filter((item) => item.id !== created.id)]);
+    } catch (error) {
+      console.error('Canonical task creation failed:', error);
+    }
   };
 
-  const handleDeleteDailyTask = (id: string) => {
-    const updated = NotesRepository.deleteDailyTask(id);
-    setDailyTasks(updated);
+  const handleDeleteDailyTask = async (id: string) => {
+    try {
+      await deleteCanonicalTask(id);
+      setDailyTasks((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error('Canonical task deletion failed:', error);
+    }
   };
 
-  const handleUpdateDailyTasks = (updated: DailyTask[]) => {
-    setDailyTasks(updated);
-    NotesRepository.saveDailyTasks(updated);
+  const handleUpdateDailyTasks = async (updated: DailyTask[]) => {
+    try {
+      const changed = updated.find((next) => {
+        const previous = dailyTasks.find((item) => item.id === next.id);
+        return previous && JSON.stringify(previous) !== JSON.stringify(next);
+      });
+      if (changed) {
+        const saved = await updateCanonicalTask(changed);
+        setDailyTasks((items) => items.map((item) => item.id === saved.id ? saved : item));
+      }
+    } catch (error) {
+      console.error('Canonical task bulk update failed:', error);
+    }
   };
 
   // Setup Theme & RTL
