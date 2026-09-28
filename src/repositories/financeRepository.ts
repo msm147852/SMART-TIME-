@@ -2,16 +2,7 @@ import type {
   Budget, Category, ExpenseType, FinanceReports, Income, Transaction,
 } from "../types/finance";
 import type { EducationExpense, Expense, FuelRecord, MaintenanceRecord } from "../types";
-import { StorageAdapter } from "../services/storageAdapter";
-import { STORAGE_KEYS } from "../services/storageKeys";
-import { fetchCanonicalFinanceOverview, type FinanceOverview } from "../services/financeService";
-
-export class FinanceRepositoryWriteDeferredError extends Error {
-  constructor() {
-    super("Canonical finance writes are deferred until Phase 5.4 migration/API activation.");
-    this.name = "FinanceRepositoryWriteDeferredError";
-  }
-}
+import { createCanonicalFinanceExpense, deleteCanonicalFinanceExpense, fetchCanonicalFinanceOverview, updateCanonicalFinanceExpense, type CanonicalExpenseInput, type FinanceOverview } from "../services/financeService";
 
 export interface FinanceRepositorySnapshot {
   finance: FinanceOverview;
@@ -229,14 +220,16 @@ export class FinanceRepository {
     };
   }
 
-  static addTransaction(_transaction: FinanceTransactionInput): never {
-    throw new FinanceRepositoryWriteDeferredError();
+  static async addTransaction(transaction: FinanceTransactionInput): Promise<Record<string, unknown>> {
+    const input: CanonicalExpenseInput = { type: transaction.type, title: transaction.note?.trim() || transaction.categoryId || transaction.type, amount: transaction.amount, category: transaction.categoryId || transaction.type, date: transaction.date, paymentMethod: "cash", notes: transaction.note };
+    return createCanonicalFinanceExpense(input);
   }
-  static updateTransaction(_transaction: Transaction): never {
-    throw new FinanceRepositoryWriteDeferredError();
+  static async updateTransaction(transaction: Transaction): Promise<Record<string, unknown>> {
+    const patch: Partial<CanonicalExpenseInput> = { type: transaction.type, title: transaction.note?.trim() || transaction.categoryId || transaction.type, amount: transaction.amount, category: transaction.categoryId || transaction.type, date: transaction.date, paymentMethod: "cash", notes: transaction.note };
+    return updateCanonicalFinanceExpense(transaction.id, patch);
   }
-  static deleteTransaction(_id: string): never {
-    throw new FinanceRepositoryWriteDeferredError();
+  static async deleteTransaction(id: string): Promise<void> {
+    await deleteCanonicalFinanceExpense(id);
   }
 }
 
