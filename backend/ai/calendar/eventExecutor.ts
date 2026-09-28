@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { db } from "../database.js";
+import { db } from "../../database.js";
 
 export interface CalendarEventRecord {
   id: string;
