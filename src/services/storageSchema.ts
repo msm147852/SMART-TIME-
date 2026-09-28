@@ -334,7 +334,7 @@ export function validateStorageValue<K extends StorageSchemaKey>(
   key: K,
   value: unknown,
 ): value is StorageSchemaValueMap[K] {
-  const entry = STORAGE_SCHEMA[key] as StorageSchemaEntry<K>;
+  const entry = STORAGE_SCHEMA[key] as unknown as StorageSchemaEntry<K>;
   return entry.validate(value);
 }
 
