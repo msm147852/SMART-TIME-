@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "scanned_at": "2026-09-28T15:34:40.237Z",
+  "scanned_at": "2026-09-28T16:41:23.403Z",
   "scope": {
     "root": "src",
     "extensions": [
@@ -212,40 +212,6 @@
           "evidence": "smart_time-literal"
         }
       ],
-      "smart_time_workout_logs": [
-        {
-          "file": "src/components/SportsView.tsx",
-          "access": "setItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/SportsView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        },
-        {
-          "file": "src/services/storageKeys.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_sports_cards_order": [
-        {
-          "file": "src/components/SportsView.tsx",
-          "access": "setItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/SportsView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        },
-        {
-          "file": "src/services/storageKeys.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
       "smart_time_trip_home": [
         {
           "file": "src/components/TripsView.tsx",
@@ -277,28 +243,6 @@
           "evidence": "smart_time-literal"
         }
       ],
-      "smart_time_expenses_sections_order": [
-        {
-          "file": "src/components/expenses/SectionsMenuScreen.tsx",
-          "access": "getItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/expenses/SectionsMenuScreen.tsx",
-          "access": "setItem",
-          "evidence": "storage-call"
-        },
-        {
-          "file": "src/components/expenses/SectionsMenuScreen.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        },
-        {
-          "file": "src/services/storageKeys.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
       "smart_time_auth_session": [
         {
           "file": "src/services/authService.ts",
@@ -309,18 +253,6 @@
       "smart_time_device_id": [
         {
           "file": "src/services/authService.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_notification_sound": [
-        {
-          "file": "src/services/notificationSoundService.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        },
-        {
-          "file": "src/services/storageKeys.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -603,6 +535,13 @@
           "evidence": "smart_time-literal"
         }
       ],
+      "smart_time_notification_sound": [
+        {
+          "file": "src/services/storageKeys.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        }
+      ],
       "smart_time_dashboard_layout": [
         {
           "file": "src/services/storageKeys.ts",
@@ -611,6 +550,27 @@
         }
       ],
       "smart_time_dashboard_sections_v2": [
+        {
+          "file": "src/services/storageKeys.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        }
+      ],
+      "smart_time_workout_logs": [
+        {
+          "file": "src/services/storageKeys.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        }
+      ],
+      "smart_time_sports_cards_order": [
+        {
+          "file": "src/services/storageKeys.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        }
+      ],
+      "smart_time_expenses_sections_order": [
         {
           "file": "src/services/storageKeys.ts",
           "access": "string-reference",
