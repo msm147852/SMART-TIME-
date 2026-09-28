@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ArrowLeft, BookOpen, GraduationCap, UserPlus, Plus, Trash2, Edit2, Printer, FileSpreadsheet, X, User } from 'lucide-react';
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
 import { Language, StudentProfile, StudentExpenseRecord } from '../../types';
+import { financeService } from '../../services/financeService';
 
 interface EducationExpensesSectionProps {
   language: Language;
@@ -46,6 +47,16 @@ export const EducationExpensesSection: React.FC<EducationExpensesSectionProps> =
   const [expenseTitle, setExpenseTitle] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenses, setExpenses] = useState<StudentExpenseRecord[]>([]);
+  const loadCanonicalExpenses = async () => {
+    const rows = await financeService.getExpenses({ type: 'student' });
+    setExpenses(rows.map((x) => {
+      let meta: any = {};
+      try { meta = x.notes ? JSON.parse(String(x.notes)) : {}; } catch {}
+      return { id: String(x.id), studentId: String(meta.studentId || ''), subCategory: (meta.subCategory || 'personal') as StudentExpenseRecord['subCategory'], title: String(x.title || x.category || 'مصروف تعليمي'), amount: Number(x.amount) || 0, date: String(x.date || '').slice(0, 10) };
+    }));
+  };
+  useEffect(() => { void loadCanonicalExpenses(); }, []);
 
   const currentMonthExpenses = useMemo(() => expenses.filter(e => isDateInMonth(e.date, selectedMonth)), [expenses, selectedMonth]);
   const educationTotal = currentMonthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -67,14 +78,19 @@ export const EducationExpensesSection: React.FC<EducationExpensesSectionProps> =
     setStudentFormOpen(false);
   };
 
-  const saveExpense = (ev: React.FormEvent) => {
+  const saveExpense = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!selectedStudent) { alert(isAr ? 'اختر الطالب أولاً.' : 'Select a student first.'); return; }
     const amount = Number(expenseAmount);
     if (!expenseTitle.trim() || !Number.isFinite(amount) || amount <= 0 || !expenseDate) { alert(isAr ? 'أكمل بيانات المصروف والقيمة.' : 'Complete the expense details and amount.'); return; }
     const item: StudentExpenseRecord = { id: expenseEditId || `edu_${Date.now()}`, studentId: selectedStudent.id, subCategory: expenseType, title: expenseTitle.trim(), amount, date: expenseDate };
-    onSaveExpenses(expenseEditId ? expenses.map(e => e.id === expenseEditId ? item : e) : [item, ...expenses]);
-    setExpenseFormOpen(false);
+    try {
+      const notes = JSON.stringify({ studentId: item.studentId, subCategory: item.subCategory });
+      if (expenseEditId) await financeService.updateCanonicalFinanceExpense(expenseEditId, { type: 'student', title: item.title, category: item.subCategory, amount: item.amount, date: item.date, notes });
+      else await financeService.addExpense({ type: 'student', title: item.title, category: item.subCategory, amount: item.amount, date: item.date, notes });
+      await loadCanonicalExpenses();
+      setExpenseFormOpen(false);
+    } catch (error) { alert(error instanceof Error ? error.message : 'تعذر حفظ المصروف التعليمي.'); }
   };
 
   const exportStudent = (student: StudentProfile) => {
@@ -97,7 +113,7 @@ export const EducationExpensesSection: React.FC<EducationExpensesSectionProps> =
       <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border shadow-sm overflow-hidden"><div className="w-full py-3 text-center font-black bg-slate-50 dark:bg-slate-800/70 border-b">اسم الطالب</div><div className="p-4"><div className="rounded-2xl border p-4"><div className="font-black text-lg">{selectedStudent.name}</div><div className="text-xs text-slate-500 mt-1">{selectedStudent.stage} • العمر {selectedStudent.age} • {selectedStudent.nationalId}</div></div></div></div>
       <button onClick={resetExpenseForm} className="w-full py-3 rounded-2xl bg-indigo-600 text-white font-black flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> إضافة مصروفات</button>
       <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-4"><div className="flex justify-between items-center"><span className="font-black">إجمالي مصروفات {selectedStudent.name} هذا الشهر</span><span className="font-black text-indigo-600">{formatMoney(selectedStudentMonthTotal)} {currency}</span></div></div>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm overflow-hidden"><div className="p-4 font-black border-b">تفاصيل مصروفات الطالب</div>{selectedStudentExpenses.length === 0 ? <div className="p-10 text-center text-slate-400">لا توجد مصروفات مسجلة</div> : selectedStudentExpenses.map(e => <div key={e.id} className="p-4 border-b flex items-center justify-between gap-3"><div><div className="font-bold">{e.title}</div><div className="text-xs text-slate-400 mt-1">{EXPENSE_TYPES.find(x => x.value === e.subCategory)?.label || e.subCategory} • {e.date}</div></div><div className="flex items-center gap-2"><b className="text-indigo-600">{formatMoney(e.amount)} {currency}</b><button onClick={() => openExpenseEdit(e)} className="p-2 rounded-xl bg-slate-100"><Edit2 className="w-4 h-4" /></button><button onClick={() => onSaveExpenses(expenses.filter(x => x.id !== e.id))} className="p-2 rounded-xl bg-slate-100 text-rose-600"><Trash2 className="w-4 h-4" /></button></div></div>)}</div>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm overflow-hidden"><div className="p-4 font-black border-b">تفاصيل مصروفات الطالب</div>{selectedStudentExpenses.length === 0 ? <div className="p-10 text-center text-slate-400">لا توجد مصروفات مسجلة</div> : selectedStudentExpenses.map(e => <div key={e.id} className="p-4 border-b flex items-center justify-between gap-3"><div><div className="font-bold">{e.title}</div><div className="text-xs text-slate-400 mt-1">{EXPENSE_TYPES.find(x => x.value === e.subCategory)?.label || e.subCategory} • {e.date}</div></div><div className="flex items-center gap-2"><b className="text-indigo-600">{formatMoney(e.amount)} {currency}</b><button onClick={() => openExpenseEdit(e)} className="p-2 rounded-xl bg-slate-100"><Edit2 className="w-4 h-4" /></button><button onClick={() => void financeService.deleteCanonicalFinanceExpense(e.id).then(loadCanonicalExpenses).catch(error=>alert(error instanceof Error?error.message:'تعذر حذف المصروف'))} className="p-2 rounded-xl bg-slate-100 text-rose-600"><Trash2 className="w-4 h-4" /></button></div></div>)}</div>
       {expenseFormOpen && <ExpenseModal isAr={isAr} currency={currency} editing={!!expenseEditId} type={expenseType} setType={setExpenseType} title={expenseTitle} setTitle={setExpenseTitle} amount={expenseAmount} setAmount={setExpenseAmount} date={expenseDate} setDate={setExpenseDate} onClose={() => setExpenseFormOpen(false)} onSubmit={saveExpense} />}
     </div>;
   }
