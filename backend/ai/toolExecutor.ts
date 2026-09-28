@@ -19,43 +19,6 @@ function amount(value: unknown) {
 }
 function text(value: unknown, fallback = "") { return String(value ?? fallback).trim(); }
 
-// The existing SMART TIME SQLite database did not expose expense/budget/task tables
-// as first-class backend tables. We create them once, then all AI mutations use this DB.
-db.exec(`
-CREATE TABLE IF NOT EXISTS ai_transactions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  amount REAL NOT NULL,
-  category TEXT NOT NULL,
-  date TEXT NOT NULL,
-  payment_method TEXT NOT NULL DEFAULT 'cash',
-  notes TEXT,
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_ai_transactions_user_date ON ai_transactions(user_id, date);
-CREATE TABLE IF NOT EXISTS ai_budgets (
-  user_id TEXT PRIMARY KEY,
-  monthly_limit REAL NOT NULL,
-  currency TEXT NOT NULL DEFAULT 'EGP',
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS ai_tasks (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  completed INTEGER NOT NULL DEFAULT 0,
-  priority TEXT NOT NULL DEFAULT 'medium',
-  category TEXT NOT NULL DEFAULT 'general',
-  due_date TEXT,
-  due_time TEXT,
-  note TEXT,
-  created_at TEXT NOT NULL,
-  completed_at TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_ai_tasks_user ON ai_tasks(user_id, due_date);
-`);
-
 function readBudget(userId: string) {
   return db.prepare("SELECT user_id as userId, monthly_limit as monthlyLimit, currency, updated_at as updatedAt FROM ai_budgets WHERE user_id = ?").get(userId) as any || null;
 }
