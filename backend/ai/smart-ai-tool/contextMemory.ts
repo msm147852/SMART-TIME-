@@ -220,7 +220,7 @@ export function buildSmartContext(input: SmartContextInput): SmartContextBundle 
         WHERE conversation_id=? AND is_deleted=0
         ORDER BY created_at DESC
         LIMIT ?
-      `).all(input.userId, input.conversationId, maxMessages) as SmartContextMessage[]).reverse()
+      `).all(input.userId, input.conversationId, maxMessages) as unknown as SmartContextMessage[]).reverse()
     : [];
 
   const memories = listRelevantMemories(input.userId, maxMemories);
