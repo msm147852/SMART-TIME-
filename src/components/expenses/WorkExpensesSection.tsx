@@ -17,15 +17,12 @@ import {
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
 import { Language } from '../../types';
 import { financeService } from '../../services/financeService';
-import { SpecializedExpense } from './HouseExpensesSection';
 
 interface WorkExpensesSectionProps {
   language: Language;
   currency: string;
   selectedMonth: string;
   onBack: () => void;
-  expenses: SpecializedExpense[];
-  onSaveExpenses: (list: SpecializedExpense[]) => void;
 }
 
 export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
@@ -33,8 +30,6 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  expenses: legacyExpenses,
-  onSaveExpenses,
 }) => {
   const isAr = language === 'ar';
   const [canonicalExpenses, setCanonicalExpenses] = useState<SpecializedExpense[]>([]);
