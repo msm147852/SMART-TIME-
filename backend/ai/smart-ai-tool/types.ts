@@ -13,5 +13,10 @@ export type V3ToolName =
 export interface V3ToolContext {
   userId: string;
   language: "ar" | "en";
+  currentDate: string;
+  timezone: string;
+  conversationId?: string;
+  activeTaskId?: string;
+  activeFileIds?: string[];
   canonicalData: Record<string, unknown>;
 }
