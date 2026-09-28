@@ -81,3 +81,15 @@ export interface FinanceReports {
   byMonth: FinanceReportByMonth[];
   totals: FinanceReportTotals;
 }
+
+/**
+ * Aggregate contract surface used by the Phase 5 repository/API boundary.
+ * This is a type-level contract only; it does not implement persistence.
+ */
+export interface FinanceContract {
+  Transaction: Transaction;
+  Category: Category;
+  Budget: Budget;
+  Income: Income;
+  FinanceReports: FinanceReports;
+}

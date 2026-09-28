@@ -1,33 +1,21 @@
 # SMART TIME — PHASE 5.2
 ## Canonical Finance Contract — 8 Expense Types
 
-**Status:** CONTRACT DEFINED  
+**Status:** CLOSED — Contract defined  
 **Branch:** `feat/v3-next`  
 **Protected branch:** `main` — not touched  
 **Phase:** 5 — Expense Modules Unification  
 **Step:** 5.2 — Canonical Finance Contract  
-**Contract file:** `src/types/finance.ts`
+**Contract file:** `src/types/finance.ts`  
+**Dependency:** Phase 5.1 Inventory — commit `106fa04`
+
+> Phase 5.2 is contract-only. No Expense API implementation, repository implementation, database migration, StorageAdapter change, UI migration, or Expense implementation deletion is included.
 
 ---
 
 ## 1. Purpose
 
-Phase 5.2 defines the shared TypeScript vocabulary for Finance before any repository/API migration.
-
-This commit is **contract-only**:
-
-- no Expense API implementation
-- no repository implementation
-- no database migration
-- no StorageAdapter change
-- no Expense implementation deletion
-- no UI behavior migration
-
-The implementation work starts in Phase 5.3.
-
----
-
-## 2. Canonical Contract
+Phase 5.2 fixes the shared Finance vocabulary before Phase 5.3 Repository/API Unification.
 
 The canonical contract is:
 
@@ -37,8 +25,13 @@ The canonical contract is:
 - `Budget`
 - `Income`
 - `FinanceReports`
+- `FinanceContract` as the aggregate type-level surface
 
-The eight supported Phase-5 expense types are exactly:
+The contract is persistence-neutral. SQLite rows and legacy localStorage records are translated into these shapes at the repository/API boundary.
+
+---
+
+## 2. The eight canonical expense types
 
 | Type | Meaning | Current legacy source |
 |---|---|---|
@@ -51,32 +44,46 @@ The eight supported Phase-5 expense types are exactly:
 | `vehicle_oil` | Vehicle oil/filter | `smart_time_vehicle_oil_filters` |
 | `work` | Work expenses | `smart_time_work_expenses` |
 
-The contract intentionally does not prescribe how any current UI module stores its data. That mapping belongs to the migration/repository phase.
+These are domain types, not replacement values for the existing legacy storage keys.
 
 ---
 
-## 3. Canonical Source-of-Truth Direction
+## 3. Canonical source-of-truth direction
 
-The Phase 5 target is one Finance contract over canonical SQLite persistence.
+Phase 5 target direction:
 
-The direction is:
+```
+Legacy StorageAdapter data
+        │
+        ▼
+migration / normalization
+        │
+        ▼
+Canonical Finance contract
+(Transaction / Category / Budget /
+ Income / FinanceReports)
+        │
+        ▼
+canonical SQLite Finance persistence
+        │
+        ▼
+shared Repository / Finance API
+        │
+        ├── UI
+        └── SMART AI
+```
 
-`Legacy StorageAdapter data`
-→ migration/normalization
-→ **canonical Finance contract**
-→ canonical SQLite Finance persistence
-→ shared repository/API
-→ UI + SMART AI
+The specialized `finance_*` SQLite family is the intended canonical Finance persistence family.
 
-The contract is the domain boundary. It is not itself a database schema.
+Legacy localStorage becomes migration/input data, not a second long-term Finance source.
 
-The specialized `finance_*` SQLite family is the intended canonical persistence family for Finance. Phase 5.3 will provide the repository/API layer that makes those tables conform to the contract.
+The contract itself is not a database schema and does not write data.
 
 ---
 
-## 4. Mapping the Existing `finance_*` SQLite Family
+## 4. Specialized `finance_*` SQLite mapping
 
-Phase 5.1 found these specialized tables:
+Phase 5.1 identified:
 
 - `finance_expenses`
 - `finance_monthly_income`
@@ -85,89 +92,57 @@ Phase 5.1 found these specialized tables:
 - `finance_maintenance_records`
 - `finance_education_expenses`
 
-Conceptual contract mapping:
-
-| SQLite source | Contract domain | Phase-5 type mapping |
+| SQLite source | Contract domain | Type mapping |
 |---|---|---|
 | `finance_expenses` | `Transaction` | `house`, `medical`, `personal`, `work` |
 | `finance_education_expenses` | `Transaction` | `student` |
 | `finance_fuel_records` | `Transaction` | `vehicle_fuel` |
 | `finance_maintenance_records` | `Transaction` | `vehicle_maint` |
-| `finance_maintenance_records` | `Transaction` | `vehicle_oil` when the maintenance record represents oil/filter service |
-| `finance_monthly_income` | `Income` | income records derived by the repository layer |
+| `finance_maintenance_records` | `Transaction` | `vehicle_oil` when the record represents oil/filter service |
+| `finance_monthly_income` | `Income` / income aggregation | income |
 | `finance_bank_certificates` | supporting Finance domain | not one of the eight expense types |
 
-### Important implementation gap
+The current specialized transaction tables do not all carry a first-class `ExpenseType` column. Therefore the mapping above is a **contract mapping**, not a claim that the database already enforces it.
 
-The Phase 5.1 schema does **not** currently contain a first-class `ExpenseType` column on these specialized transaction tables.
-
-Therefore this contract does **not** pretend the mapping is already implemented.
-
-Phase 5.3 must define the authoritative normalization/mapping rules so that every returned `Transaction` has exactly one of the eight `ExpenseType` values.
-
-No schema/API change is made in 5.2.
+Phase 5.3 must implement deterministic normalization rules and preserve domain-specific fields needed by the UI.
 
 ---
 
-## 5. Mapping `ai_transactions` to the Same Contract
+## 5. `ai_transactions` → same Transaction contract
 
-Phase 5.1 found that SMART AI currently writes:
-
-`backend/ai/toolExecutor.ts → ai_transactions`
-
-The current generic table contains fields such as:
-
-- id
-- user_id
-- title
-- amount
-- category
-- date
-- payment_method
-- notes
-- created_at
-
-It does not currently contain the complete Phase-5 contract shape.
-
-Therefore `ai_transactions` is treated as a **legacy/generic AI finance representation that must normalize to the same `Transaction` contract**, not as a second canonical contract.
+Phase 5.1 found that SMART AI writes `ai_transactions` through `backend/ai/toolExecutor.ts`.
 
 Conceptual mapping:
 
-| `ai_transactions` | Canonical `Transaction` |
+| `ai_transactions` | `Transaction` |
 |---|---|
 | `id` | `id` |
 | `amount` | `amount` |
 | `date` | `date` |
-| `category` | category/type normalization input |
+| `category` | normalization input for `categoryId` / `type` |
 | `notes` | `note` |
 | `created_at` | `createdAt` |
-| runtime/source metadata | `source = "smart_ai"` |
-| normalized AI category/type | `type` |
-| canonical category mapping | `categoryId` |
+| AI runtime source | `source = smart_ai` |
+| normalized type | `type` |
+| canonical category | `categoryId` |
 | canonical update timestamp | `updatedAt` |
 
-### Contract rule
+`ai_transactions` is therefore a persistence representation that must normalize to the same `Transaction` contract; it is not a second public Finance model.
 
-After Phase 5 migration, AI and UI must consume the **same Transaction contract** and must not expose separate finance semantics.
-
-The exact repository/API implementation and any required persistence migration are explicitly deferred to 5.3.
+No `ai_transactions` schema or writer is changed in 5.2.
 
 ---
 
-## 6. Mapping `ai_budgets` to the Same Contract
+## 6. `ai_budgets` → same Budget contract
 
-Phase 5.1 found:
+Current AI budget storage contains:
 
-`backend/ai/toolExecutor.ts → ai_budgets`
+- `user_id`
+- `monthly_limit`
+- `currency`
+- `updated_at`
 
-The current generic AI budget representation is:
-
-- user_id
-- monthly_limit
-- currency
-- updated_at
-
-The canonical contract requires:
+Canonical `Budget` requires:
 
 - `id`
 - `type`
@@ -175,63 +150,65 @@ The canonical contract requires:
 - `limit`
 - `spent`
 
-Therefore `ai_budgets` is also a representation that must normalize to the canonical `Budget` contract.
+Therefore `ai_budgets` is another persistence representation that must normalize into the same `Budget` contract.
 
-The current table does **not** yet contain the complete contract fields. In particular, type/month/id/spent semantics need to be resolved by the implementation layer.
+The exact type/month/spent and identity semantics are intentionally deferred to Phase 5.3, where the Repository/API layer will make the source-of-truth decision concrete.
 
-This is an explicit Phase 5.3 migration concern, not a Phase 5.2 schema change.
+No `ai_budgets` schema or writer is changed in 5.2.
 
 ---
 
-## 7. Legacy StorageAdapter Migration Boundary
+## 7. Legacy StorageAdapter → same contract
 
-Phase 4 established that `StorageAdapter` is the only implementation allowed to write directly to localStorage.
+Phase 4 guarantees that direct `localStorage.setItem` calls are centralized in `StorageAdapter`. Phase 5.2 does not modify that adapter.
 
-Phase 5.2 does **not** modify `storageAdapter.ts`.
-
-The intended migration boundary is:
+The migration boundary is:
 
 `StorageAdapter`
 → legacy reader/repository
-→ normalize each legacy record
-→ `Transaction | Budget | Income | Category`
-→ canonical Finance repository/API
+→ normalization
+→ `Transaction | Category | Budget | Income`
+→ canonical Finance Repository/API
 → canonical SQLite
 
-For the eight expense types, legacy keys map as follows:
+Eight expense keys map to the eight types:
 
-- `smart_time_house_expenses` → `house`
-- `smart_time_medical_expenses` → `medical`
-- `smart_time_personal_expenses` → `personal`
-- `smart_time_student_expenses` → `student`
-- `smart_time_vehicle_fuel` → `vehicle_fuel`
-- `smart_time_vehicle_maint` → `vehicle_maint`
-- `smart_time_vehicle_oil_filters` → `vehicle_oil`
-- `smart_time_work_expenses` → `work`
+| Legacy key | Canonical type |
+|---|---|
+| `smart_time_house_expenses` | `house` |
+| `smart_time_medical_expenses` | `medical` |
+| `smart_time_personal_expenses` | `personal` |
+| `smart_time_student_expenses` | `student` |
+| `smart_time_vehicle_fuel` | `vehicle_fuel` |
+| `smart_time_vehicle_maint` | `vehicle_maint` |
+| `smart_time_vehicle_oil_filters` | `vehicle_oil` |
+| `smart_time_work_expenses` | `work` |
 
-The migration must preserve IDs where safe, preserve dates/amounts/notes/category information, detect collisions/duplicates, and remain reversible/auditable until the later migration gate is passed.
+Legacy IDs should be preserved where safe. Migration must detect collisions/duplicates and remain auditable until the later migration gate is green.
 
-No migration is executed in 5.2.
+The generic `smart_time_expenses` source does not contain enough information to justify silently assigning one of the eight types in every case. Phase 5.3 must use an explicit deterministic rule or mark ambiguous records for review.
 
 ---
 
-## 8. Category Contract
+## 8. Category contract
 
-`Category` provides the shared identity used by `Transaction.categoryId`.
+`Category.type` is the domain type associated with the category.
 
-A category is explicitly associated with one `ExpenseType`:
+For a canonical transaction:
+
+`Transaction.categoryId` → `Category.id`
+
+and:
 
 `Category.type === Transaction.type`
 
-The contract keeps presentation fields (`name`, `color`, `icon`) separate from transaction persistence.
-
-Phase 5.3 will decide how existing legacy category values are normalized into stable category IDs.
+Legacy category labels will be normalized to stable category IDs in Phase 5.3.
 
 ---
 
-## 9. Budget Contract
+## 9. Budget contract
 
-A `Budget` is scoped by:
+`Budget` is scoped by:
 
 - expense type
 - month
@@ -241,71 +218,53 @@ and exposes:
 - limit
 - spent
 
-The contract therefore prevents the old ambiguity between a generic monthly budget and type-specific Finance budgets.
+This removes the ambiguity between a generic monthly budget and type-specific Finance budgets.
 
-The existing `smart_time_budget` and `ai_budgets` representations will be mapped into this contract during implementation.
+Existing `smart_time_budget` and `ai_budgets` data are mapped later; no budget data is migrated in 5.2.
 
 ---
 
-## 10. Income Contract
+## 10. Income contract
 
-`Income` remains separate from `Transaction`.
+`Income` is separate from `Transaction`.
 
 This preserves the Phase 5.1 distinction that monthly income, bank certificates, and car-trip income are Finance domains but are not among the eight expense types.
 
-The `Income` contract is intentionally minimal at this stage:
-
-- id
-- amount
-- date
-- source
-
-Detailed income/certificate normalization is an implementation concern for the later repository/API work.
+Detailed income/certificate normalization remains an implementation concern for Phase 5.3+.
 
 ---
 
-## 11. Reports Contract
+## 11. Reports contract
 
-`FinanceReports` provides one shared reporting shape:
+`FinanceReports` provides one stable report shape:
 
 - `byType`
 - `byMonth`
 - `totals`
 
-This establishes a common output contract for dashboards/reports without coupling the contract to a specific SQL query or UI component.
+`byType` and `byMonth` include both total amount and record count.
 
-The report implementation is deferred to 5.3+.
-
----
-
-## 12. Source-of-Truth Rules
-
-Phase 5 establishes these architectural rules:
-
-1. **One domain contract:** Finance consumers use the types in `src/types/finance.ts`.
-2. **One canonical persistence direction:** specialized `finance_*` SQLite is the target Finance persistence family.
-3. **AI and UI share the same contract:** `ai_transactions` / `ai_budgets` are normalized into the same contract rather than becoming a second Finance model.
-4. **Legacy localStorage is migration input, not the final source of truth.**
-5. **StorageAdapter remains unchanged:** it is a legacy persistence boundary during migration.
-6. **No implementation deletion before migration verification.**
-7. **No duplicate business semantics:** different storage representations must converge to the same contract.
-8. **All eight expense types are first-class contract values.**
+The report implementation is deferred to the Repository/API phase.
 
 ---
 
-## 13. Phase Boundary
+## 12. Source-of-truth rules
 
-### Included in 5.2
+1. Finance consumers use the contract in `src/types/finance.ts`.
+2. Specialized `finance_*` SQLite is the target Finance persistence family.
+3. AI and UI consume the same canonical contract.
+4. `ai_transactions` / `ai_budgets` are normalized representations, not a second public Finance model.
+5. Legacy localStorage is migration input, not the final Finance source.
+6. `StorageAdapter` remains unchanged.
+7. Existing implementations remain until migration and verification are complete.
+8. All eight expense types are first-class contract values.
+9. No migration is considered complete until identity, duplicate, and no-data-loss checks pass.
 
-- Canonical TypeScript Finance contract
-- Eight expense types
-- Mapping documentation
-- Source-of-truth rules
-- Legacy → contract direction
-- `finance_*` → contract direction
-- `ai_transactions` / `ai_budgets` → contract direction
+---
 
-### Explicitly excluded from 5.2
+## 13. Explicit Phase 5.2 non-goals
+
+Not included:
 
 - Expense API implementation
 - Repository implementation
@@ -313,29 +272,31 @@ Phase 5 establishes these architectural rules:
 - database schema migration
 - data migration execution
 - StorageAdapter modification
-- deletion of existing Expense implementations
+- deletion of Expense implementations
+- SMART AI tool-executor rewrite
 
-These begin only after the 5.2 contract is committed.
+These begin only after this contract boundary, in Phase 5.3+.
 
 ---
 
-## 14. Phase 5.2 Gate
+## 14. Phase 5.2 gate
 
 | Gate | Result |
 |---|---|
 | Canonical Finance contract exists | 🟢 |
-| Exactly 8 Phase-5 expense types defined | 🟢 |
-| Transaction contract defined | 🟢 |
-| Category contract defined | 🟢 |
-| Budget contract defined | 🟢 |
-| Income contract defined | 🟢 |
-| Reports contract defined | 🟢 |
-| finance_* mapping documented | 🟢 |
-| ai_transactions mapping documented | 🟢 |
-| ai_budgets mapping documented | 🟢 |
-| Legacy StorageAdapter migration boundary documented | 🟢 |
-| Expense API implementation changed | 🔴 No — deferred to 5.3 |
-| StorageAdapter changed | 🔴 No |
-| Expense implementations deleted | 🔴 No |
+| Exactly 8 expense types | 🟢 |
+| Transaction | 🟢 |
+| Category | 🟢 |
+| Budget | 🟢 |
+| Income | 🟢 |
+| FinanceReports | 🟢 |
+| FinanceContract aggregate surface | 🟢 |
+| `finance_*` mapping documented | 🟢 |
+| `ai_transactions` mapping documented | 🟢 |
+| `ai_budgets` mapping documented | 🟢 |
+| Legacy StorageAdapter mapping documented | 🟢 |
+| Repository/API implementation | 🔴 Deferred to 5.3 |
+| StorageAdapter modified | 🔴 No |
+| Expense implementation deleted | 🔴 No |
 
-**Phase 5.2 conclusion:** canonical Finance vocabulary is now fixed for the repository/API migration step.
+**Phase 5.2 conclusion:** canonical Finance vocabulary is fixed. Phase 5.3 is the first implementation step for Repository/API Unification.
