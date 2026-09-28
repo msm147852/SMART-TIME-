@@ -25,6 +25,7 @@ export async function askLocalSmartAi(input: {
   message: string;
   data: Record<string, unknown>;
   conversationHistory?: Array<{ sender: "user" | "model"; text: string }>;
+  memoryContext?: string;
 }): Promise<SmartAiResponse | null> {
   if (!LOCAL_URL) return null;
 
@@ -38,7 +39,8 @@ export async function askLocalSmartAi(input: {
         "لا تخترع أي رقم أو سجل أو حقيقة غير موجودة في البيانات.",
         "لا تكشف أسرارًا أو مفاتيح API أو كلمات مرور أو PIN.",
         "لا تنفذ أي تعديل على البيانات من نفسك؛ أي تعديل يحتاج تأكيد المستخدم.",
-        "تحدث بعربية مصرية طبيعية ومختصرة."
+        "تحدث بعربية مصرية طبيعية ومختصرة.",
+        "إذا وُجد سياق ذاكرة، استخدمه كمرجع تفضيلي فقط ولا تحوله إلى حقيقة جديدة دون دليل."
       ].join("\n")
     : [
         "You are SMART AI inside SMART TIME.",
@@ -46,7 +48,8 @@ export async function askLocalSmartAi(input: {
         "Never invent a number, record, or fact that is not present in the data.",
         "Never reveal secrets, API keys, passwords, or PINs.",
         "Never mutate data yourself; changes require explicit user confirmation.",
-        "Be concise and natural."
+        "Be concise and natural.",
+        "If memory context is supplied, use it as a preference/reference only and do not invent facts from it."
       ].join("\n");
 
   const body = {
@@ -59,6 +62,7 @@ export async function askLocalSmartAi(input: {
     chat_template_kwargs: { enable_thinking: false },
     messages: [
       { role: "system", content: system },
+      ...(input.memoryContext ? [{ role: "system", content: `Persistent SMART AI memory:\n${input.memoryContext.slice(0, 5000)}` }] : []),
       ...(input.conversationHistory || []).slice(-6).map((item) => ({
         role: item.sender === "user" ? "user" : "assistant",
         content: String(item.text || "").slice(0, 2000)
