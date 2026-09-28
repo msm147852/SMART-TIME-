@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { createCanonicalExpense, deleteCanonicalExpense, inferFinanceExpenseType, updateCanonicalExpense } from "./finance/financeRepository.js";
 import { db } from "../database.js";
 import type { SmartAiAction } from "./types.js";
 
@@ -19,52 +20,13 @@ function amount(value: unknown) {
 }
 function text(value: unknown, fallback = "") { return String(value ?? fallback).trim(); }
 
-// The existing SMART TIME SQLite database did not expose expense/budget/task tables
-// as first-class backend tables. We create them once, then all AI mutations use this DB.
-db.exec(`
-CREATE TABLE IF NOT EXISTS ai_transactions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  amount REAL NOT NULL,
-  category TEXT NOT NULL,
-  date TEXT NOT NULL,
-  payment_method TEXT NOT NULL DEFAULT 'cash',
-  notes TEXT,
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_ai_transactions_user_date ON ai_transactions(user_id, date);
-CREATE TABLE IF NOT EXISTS ai_budgets (
-  user_id TEXT PRIMARY KEY,
-  monthly_limit REAL NOT NULL,
-  currency TEXT NOT NULL DEFAULT 'EGP',
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS ai_tasks (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  completed INTEGER NOT NULL DEFAULT 0,
-  priority TEXT NOT NULL DEFAULT 'medium',
-  category TEXT NOT NULL DEFAULT 'general',
-  due_date TEXT,
-  due_time TEXT,
-  note TEXT,
-  created_at TEXT NOT NULL,
-  completed_at TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_ai_tasks_user ON ai_tasks(user_id, due_date);
-`);
-
 function readBudget(userId: string) {
   return db.prepare("SELECT user_id as userId, monthly_limit as monthlyLimit, currency, updated_at as updatedAt FROM ai_budgets WHERE user_id = ?").get(userId) as any || null;
 }
 
 function readTransaction(userId: string, transactionId: string) {
-  return db.prepare(`SELECT id, user_id as userId, title, amount, category, date, payment_method as paymentMethod, notes, created_at as createdAt
-    FROM ai_transactions WHERE id = ? AND user_id = ?`).get(transactionId, userId) as any || null;
+  return db.prepare("SELECT id, user_id as userId, title, amount, category, date, payment_method as paymentMethod, receipt_url as receiptUrl, notes, created_at as createdAt, updated_at as updatedAt FROM finance_expenses WHERE id = ? AND user_id = ?").get(transactionId, userId) as any || null;
 }
-
 function readTask(userId: string, taskId: string) {
   return db.prepare(`SELECT id, user_id as userId, title, completed, priority, category, due_date as dueDate, due_time as dueTime, note, created_at as createdAt, completed_at as completedAt
     FROM ai_tasks WHERE id = ? AND user_id = ?`).get(taskId, userId) as any || null;
@@ -80,7 +42,6 @@ function remainingBudget(userId: string) {
 export function addTransaction(userId: string, payload: Record<string, unknown>): VerifiedToolResult {
   const uid = text(userId);
   if (!uid) throw new Error("userId is required");
-  const transactionId = id("txn");
   const title = text(payload.title);
   if (!title) throw new Error("Transaction title is required");
   const value = amount(payload.amount);
@@ -88,33 +49,43 @@ export function addTransaction(userId: string, payload: Record<string, unknown>)
   const date = text(payload.date, now().slice(0, 10));
   const paymentMethod = text(payload.paymentMethod, "cash");
   const notes = text(payload.notes);
-
-  db.prepare(`INSERT INTO ai_transactions (id,user_id,title,amount,category,date,payment_method,notes,created_at)
-    VALUES (?,?,?,?,?,?,?,?,?)`).run(transactionId, uid, title, value, category, date, paymentMethod, notes || null, now());
-
-  const record = readTransaction(uid, transactionId);
-  if (!record) return { ok: false, operation: "addTransaction", record: {}, verification: {}, error: "Database read-back failed after insert" };
-  const remaining = remainingBudget(uid);
-  return {
-    ok: true,
-    operation: "addTransaction",
-    record,
-    verification: { persisted: true, transactionId, monthlyRemaining: remaining }
-  };
+  const created = createCanonicalExpense(uid, { id: text(payload.id) || undefined, type: inferFinanceExpenseType(category), title, amount: value, category, date, paymentMethod, receiptUrl: text(payload.receiptUrl) || undefined, notes: notes || null });
+  const record = readTransaction(uid, created.id);
+  if (!record) return { ok: false, operation: "addTransaction", record: {}, verification: {}, error: "Database read-back failed after canonical finance insert" };
+  return { ok: true, operation: "addTransaction", record, verification: { persisted: true, transactionId: created.id, monthlyRemaining: remainingBudget(uid) } };
 }
-
-export function updateBudget(userId: string, payload: Record<string, unknown>): VerifiedToolResult {
+export function updateTransaction(userId: string, payload: Record<string, unknown>): VerifiedToolResult {
   const uid = text(userId);
-  const limit = amount(payload.monthlyLimit);
-  const currency = text(payload.currency, "EGP");
-  const updatedAt = now();
-  db.prepare(`INSERT INTO ai_budgets (user_id,monthly_limit,currency,updated_at) VALUES (?,?,?,?)
-    ON CONFLICT(user_id) DO UPDATE SET monthly_limit=excluded.monthly_limit,currency=excluded.currency,updated_at=excluded.updated_at`).run(uid, limit, currency, updatedAt);
-  const record = readBudget(uid);
-  if (!record || Number(record.monthlyLimit) !== limit) return { ok: false, operation: "updateBudget", record: {}, verification: {}, error: "Database read-back failed after budget update" };
-  return { ok: true, operation: "updateBudget", record, verification: { persisted: true } };
+  const transactionId = text(payload.id);
+  if (!transactionId) throw new Error("Transaction id is required");
+  const current = readTransaction(uid, transactionId);
+  if (!current) throw new Error("Transaction not found for this user");
+  const patch: Record<string, unknown> = {};
+  for (const key of ["title", "amount", "category", "date", "paymentMethod", "receiptUrl", "notes"]) if (payload[key] !== undefined) patch[key] = payload[key];
+  if (patch.amount !== undefined) patch.amount = amount(patch.amount);
+  if (patch.title !== undefined && !text(patch.title)) throw new Error("Transaction title is required");
+  if (patch.category !== undefined) patch.category = text(patch.category, current.category);
+  if (patch.date !== undefined) patch.date = text(patch.date, current.date);
+  if (patch.paymentMethod !== undefined) patch.paymentMethod = text(patch.paymentMethod, current.paymentMethod);
+  if (patch.notes !== undefined) patch.notes = text(patch.notes) || null;
+  const record = updateCanonicalExpense(uid, transactionId, { ...patch, type: patch.category === undefined ? inferFinanceExpenseType(current.category) : inferFinanceExpenseType(patch.category) });
+  const verified = readTransaction(uid, transactionId);
+  if (!verified || verified.id !== record.id) return { ok: false, operation: "updateTransaction", record: {}, verification: {}, error: "Database read-back failed after canonical finance update" };
+  return { ok: true, operation: "updateTransaction", record: verified, verification: { persisted: true, transactionId } };
 }
-
+export function deleteTransaction(userId: string, transactionId: string): VerifiedToolResult {
+  const uid = text(userId);
+  const idValue = text(transactionId);
+  if (!idValue) throw new Error("Transaction id is required");
+  const current = readTransaction(uid, idValue);
+  if (!current) throw new Error("Transaction not found for this user");
+  deleteCanonicalExpense(uid, idValue);
+  if (readTransaction(uid, idValue)) return { ok: false, operation: "deleteTransaction", record: {}, verification: {}, error: "Database read-back failed after canonical finance delete" };
+  return { ok: true, operation: "deleteTransaction", record: current, verification: { persisted: true, deleted: true, transactionId: idValue } };
+}
+export function updateBudget(_userId: string, _payload: Record<string, unknown>): VerifiedToolResult {
+  throw new Error("Budget mutations are read-only in Phase 5.6; use the canonical finance budget boundary when available.");
+}
 export function addTask(userId: string, payload: Record<string, unknown>): VerifiedToolResult {
   const uid = text(userId);
   const taskId = id("task");

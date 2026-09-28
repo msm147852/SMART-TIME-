@@ -93,6 +93,6 @@ export class BackupRepository {
   }
 
   static clearAllData(): void {
-    StorageAdapter.clearAll(Object.values(STORAGE_KEYS));
+    for (const key of Object.values(STORAGE_KEYS)) StorageAdapter.removeItem(key);
   }
 }

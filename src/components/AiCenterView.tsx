@@ -8,19 +8,18 @@ import { loadSmartAiVoiceId, saveSmartAiVoiceId, speakSmartAi, stopSmartAiVoice,
 import { listVoiceDnaProfiles, readVoiceDnaSample, type SmartVoiceDnaProfile } from '../services/smartVoiceDnaService';
 import { getVoiceDnaStatus, synthesizeVoiceDna } from '../services/smartVoiceDnaClient';
 import type { SmartAiVoiceId } from '../types';
+import { StorageAdapter } from '../services/storageAdapter';
 
 interface AiCenterViewProps {
   language: Language;
   onOpenVoiceSearch: () => void;
   appContext: Parameters<typeof buildSmartAiContext>[0];
-  onApplyAction: (action: SmartAiAction) => string;
 }
 
 export const AiCenterView: React.FC<AiCenterViewProps> = ({
   language,
   onOpenVoiceSearch,
   appContext,
-  onApplyAction,
 }) => {
   const selectedModel: AiModelType = 'smart-time-core';
   const smartLanguage: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
@@ -29,6 +28,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [pendingAction, setPendingAction] = useState<SmartAiAction>(null);
+  const [pendingMessage, setPendingMessage] = useState('');
   const [actionStatus, setActionStatus] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<SmartAiVoiceId>(() => loadSmartAiVoiceId());
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
@@ -229,6 +229,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       setMessages(finalMessages);
       ChatRepository.saveAiChatHistory(finalMessages);
       setPendingAction(data.action || null);
+      setPendingMessage(data.action ? textToSend : '');
       setActionStatus(data.actionSummary || '');
     } catch (error) {
       console.error('SMART AI chat failed:', error);
@@ -259,18 +260,49 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const handleClearChat = () => {
     setMessages([]);
     setPendingAction(null);
+    setPendingMessage('');
     setActionStatus('');
     ChatRepository.clearAiChatHistory();
   };
 
-  const handleConfirmAction = () => {
-    if (!pendingAction) return;
+  const handleConfirmAction = async () => {
+    if (!pendingAction || !pendingMessage || isLoading) return;
+    setIsLoading(true);
+    setActionStatus(language === 'ar' ? 'جارٍ تنفيذ العملية والتحقق منها على الخادم...' : 'Executing and verifying the operation on the server...');
     try {
-      const result = onApplyAction(pendingAction);
-      setActionStatus(result);
+      const data = await askSmartAi({
+        message: pendingMessage,
+        language: smartLanguage,
+        confirmed: true,
+        conversationHistory: messages.slice(-8).map((m) => ({
+          sender: m.sender === 'user' ? 'user' : 'model',
+          text: m.text,
+        })),
+        appContext: buildSmartAiContext(appContext),
+      });
+
+      if (data.reply) {
+        const aiMessage: AiMessage = {
+          id: 'msg_ai_exec_' + Date.now(),
+          sender: 'ai',
+          text: data.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          model: (data.model as AiModelType) || selectedModel,
+          provider: (data.provider as any) || 'smart-ai',
+        };
+        const finalMessages = [...messages, aiMessage];
+        setMessages(finalMessages);
+        ChatRepository.saveAiChatHistory(finalMessages);
+        if (isVoiceEnabled) void speakWithSelectedVoice(data.reply);
+      }
+
+      setActionStatus(data.actionSummary || data.reply || (language === 'ar' ? 'تم تنفيذ العملية.' : 'Operation completed.'));
       setPendingAction(null);
+      setPendingMessage('');
     } catch (error: any) {
-      setActionStatus(error?.message || 'تعذر تنفيذ الإجراء.');
+      setActionStatus(error?.message || (language === 'ar' ? 'تعذر تنفيذ الإجراء.' : 'Could not execute the operation.'));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -299,7 +331,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
             {voiceDnaProfiles.length > 0 ? (
-              <select value={selectedVoiceDnaId || ''} onChange={(event) => { const id = event.target.value || null; setSelectedVoiceDnaId(id); try { if (id) localStorage.setItem("smart-time-selected-voice-dna", id); else localStorage.removeItem("smart-time-selected-voice-dna"); } catch {} }} className="max-w-[180px px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
+              <select value={selectedVoiceDnaId || ''} onChange={(event) => { const id = event.target.value || null; setSelectedVoiceDnaId(id); try { if (id) StorageAdapter.setItem("smart-time-selected-voice-dna", id); else localStorage.removeItem("smart-time-selected-voice-dna"); } catch {} }} className="max-w-[180px px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
                 <option value="">{language === 'ar' ? 'صوت SMART AI العادي' : 'SMART AI browser voice'}</option>
                 {voiceDnaProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>

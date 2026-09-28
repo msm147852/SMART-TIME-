@@ -2,6 +2,7 @@ import { apiUrl } from './apiConfig';
 import { authHeaders } from './authService';
 import {
   AiMessage,
+  CalendarEvent,
   DailyTask,
   EducationExpense,
   Expense,
@@ -96,6 +97,7 @@ export interface AskSmartAiRequest {
   model?: string;
   conversationHistory?: Array<{ sender: 'user' | 'model'; text: string }>;
   appContext: SmartAiContext;
+  confirmed?: boolean;
 }
 
 export function buildSmartAiContext(input: {
@@ -176,6 +178,98 @@ export function buildSmartAiContext(input: {
       distanceKm: t.distanceKm,
     })),
   };
+}
+
+export interface SmartAiState {
+  source: 'smart-ai-sqlite';
+  transactions: Expense[];
+  budget: { userId: string; monthlyLimit: number; currency: string; updatedAt: string } | null;
+  tasks: DailyTask[];
+  calendarEvents: CalendarEvent[];
+  fetchedAt: string;
+}
+
+function normalizeCanonicalTask(task: any): DailyTask {
+  return { ...task, completed: Boolean(task?.completed), reminderEnabled: task?.reminderEnabled ?? true };
+}
+
+async function smartAiMutation(path: string, method: string, body?: unknown) {
+  const res = await fetch(apiUrl(path), {
+    method,
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'تعذر تحديث بيانات SMART AI');
+  return data;
+}
+
+export async function createCanonicalTask(task: Omit<DailyTask, 'id' | 'createdAt'>): Promise<DailyTask> {
+  return normalizeCanonicalTask(await smartAiMutation('/api/ai/tasks', 'POST', task));
+}
+
+export async function updateCanonicalTask(task: DailyTask): Promise<DailyTask> {
+  return normalizeCanonicalTask(await smartAiMutation(`/api/ai/tasks/${encodeURIComponent(task.id)}`, 'PATCH', task));
+}
+
+export async function deleteCanonicalTask(id: string): Promise<void> {
+  await smartAiMutation(`/api/ai/tasks/${encodeURIComponent(id)}`, 'DELETE');
+}
+
+export async function importCanonicalTasks(tasks: DailyTask[]): Promise<{ imported: number }> {
+  return smartAiMutation('/api/ai/tasks/import', 'POST', { tasks }) as Promise<{ imported: number }>;
+}
+
+export interface PendingEventReminder {
+  id: string;
+  eventId: string;
+  userId: string;
+  title: string;
+  startAt: string;
+  timezone: string;
+  reminderMinutes: number;
+  scheduledFor: string;
+  queuedAt: string;
+}
+
+export async function fetchPendingEventReminders(limit = 50): Promise<PendingEventReminder[]> {
+  const data = await smartAiMutation(`/api/ai/reminders?limit=${Math.max(1, Math.min(100, Math.floor(limit)))}`, 'GET');
+  return Array.isArray(data?.reminders) ? data.reminders : [];
+}
+
+export async function acknowledgeEventReminder(id: string): Promise<void> {
+  await smartAiMutation(`/api/ai/reminders/${encodeURIComponent(id)}/ack`, 'POST', {});
+}
+
+export async function fetchCanonicalEvents(options: { from?: string; to?: string } = {}): Promise<CalendarEvent[]> {
+  const params = new URLSearchParams();
+  if (options.from) params.set('from', options.from);
+  if (options.to) params.set('to', options.to);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const data = await smartAiMutation(`/api/ai/events${suffix}`, 'GET');
+  return Array.isArray(data?.events) ? data.events : [];
+}
+
+export async function createCanonicalEvent(event: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>): Promise<CalendarEvent> {
+  return smartAiMutation('/api/ai/events', 'POST', event) as Promise<CalendarEvent>;
+}
+
+export async function updateCanonicalEvent(event: CalendarEvent): Promise<CalendarEvent> {
+  return smartAiMutation(`/api/ai/events/${encodeURIComponent(event.id)}`, 'PATCH', event) as Promise<CalendarEvent>;
+}
+
+export async function deleteCanonicalEvent(id: string): Promise<void> {
+  await smartAiMutation(`/api/ai/events/${encodeURIComponent(id)}`, 'DELETE');
+}
+
+export async function fetchSmartAiState(): Promise<SmartAiState> {
+  const res = await fetch(apiUrl('/api/ai/state'), {
+    method: 'GET',
+    headers: { ...authHeaders() },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'تعذر قراءة بيانات SMART AI');
+  return data as SmartAiState;
 }
 
 export async function askSmartAi(request: AskSmartAiRequest): Promise<SmartAiResponse> {

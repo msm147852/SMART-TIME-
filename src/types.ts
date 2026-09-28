@@ -8,6 +8,7 @@ export type CurrencyType = 'EGP' | 'SAR' | 'AED' | 'USD' | 'EUR' | string;
 export type AppView =
   | 'dashboard'
   | 'notes'
+  | 'calendar'
   | 'calculator'
   | 'expenses'
   | 'trips'
@@ -172,6 +173,29 @@ export interface CalculatorHistoryItem {
 // ---------------------------
 export type TaskPriority = 'high' | 'medium' | 'low';
 export type TaskCategory = 'work' | 'personal' | 'finance' | 'health' | 'education' | 'general';
+
+export type EventCategory = 'work' | 'personal' | 'finance' | 'health' | 'education' | 'general';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  startAt: string;
+  endAt?: string;
+  timezone: string;
+  location?: string;
+  category: EventCategory;
+  allDay: boolean;
+  reminderEnabled: boolean;
+  reminderMinutes?: number;
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval?: number;
+    until?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface DailyTask {
   id: string;

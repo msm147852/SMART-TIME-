@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   MoreVertical,
   Clock,
+  CalendarDays,
   LogOut,
 } from 'lucide-react';
 import { Language, ThemeMode, UserProfile, AppNotification, DailyTask, Note } from '../types';
@@ -283,6 +284,18 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                 >
                   <Mic className="w-4 h-4 text-accent-500" />
                   <span>{isAr ? 'البحث الصوتي' : 'Voice Search'}</span>
+                </button>
+
+                {/* Calendar */}
+                <button
+                  onClick={() => {
+                    onNavigate('calendar');
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <CalendarDays className="w-4 h-4 text-accent-500" />
+                  <span>{isAr ? 'التقويم الذكي' : 'Smart Calendar'}</span>
                 </button>
 
                 {/* Language options */}

@@ -1,4 +1,5 @@
 import { buildSmartTimeData } from "./appContext.js";
+import { buildSmartContext, calendarContextForModel, conversationMessagesForModel, memoryContextForModel } from "./smart-ai-tool/contextMemory.js";
 import { askLocalSmartAi, isLocalSmartAiConfigured } from "./localInference.js";
 import { executeToolAction, type VerifiedToolResult } from "./toolExecutor.js";
 import type { SmartAiAction, SmartAiRequest, SmartAiResponse } from "./types.js";
@@ -140,9 +141,32 @@ export async function runOpenMindBrain(request: SmartAiRequest): Promise<SmartAi
   }
 
   const data = buildSmartTimeData(request.appContext || {}, message);
+  const timezone = request.timezone || String(request.appContext?.profile && typeof request.appContext.profile === "object"
+    ? (request.appContext.profile as Record<string, unknown>).timezone || "Africa/Cairo"
+    : "Africa/Cairo");
+  const runtimeNow = new Date();
+  const smartContext = request.userId
+    ? buildSmartContext({
+        userId: request.userId,
+        conversationId: request.conversationId,
+        currentDate: runtimeNow.toLocaleDateString("en-CA", { timeZone: timezone }),
+        timezone,
+        activeTaskId: request.activeTaskId,
+        activeFileIds: request.activeFileIds,
+        maxMessages: 20,
+        maxMemories: 12,
+      })
+    : null;
+  const modelHistory = smartContext
+    ? conversationMessagesForModel(smartContext, 8)
+    : (Array.isArray(request.conversationHistory) ? request.conversationHistory.slice(-8) : []);
+  const memoryContext = smartContext
+    ? [memoryContextForModel(smartContext.memories, 12), calendarContextForModel(smartContext.upcomingEvents, 12)].filter(Boolean).join("\n")
+    : "";
   if (isLocalSmartAiConfigured()) {
     try {
-      const local = await askLocalSmartAi({ language, message: `${NO_INVENTION}\nIntent: ${plan.intent}\nPlan: ${plan.steps.join(" -> ")}\nApp data: ${JSON.stringify(data)}\nUser: ${message}`, data, conversationHistory: Array.isArray(request.conversationHistory) ? request.conversationHistory.slice(-8) : [] });
+      const local = await askLocalSmartAi({ language, message: `${NO_INVENTION}\nIntent: ${plan.intent}\nPlan: ${plan.steps.join(" -> ")}\nApp data: ${JSON.stringify(data)}\nUser: ${message}`, data, conversationHistory: modelHistory,
+        memoryContext });
       if (local?.reply) return { ...local, requiresConfirmation: plan.requiresConfirmation, plan };
     } catch (error) { console.warn("OPEN MIND local model unavailable:", (error as Error)?.message); }
   }

@@ -1,46 +1,33 @@
-export class StorageAdapter {
-  static getItem<T>(key: string, defaultValue: T): T {
-    if (typeof window === 'undefined') return defaultValue;
-    try {
-      const item = localStorage.getItem(key);
-      if (item === null) return defaultValue;
-      return JSON.parse(item) as T;
-    } catch (e) {
-      console.warn(`[StorageAdapter] Failed to parse key "${key}":`, e);
-      return defaultValue;
-    }
-  }
+import { STORAGE_KEYS } from './storageKeys';
 
-  static setItem<T>(key: string, value: T): boolean {
-    if (typeof window === 'undefined') return false;
+export const StorageAdapter = {
+  setItem<T>(key: string, value: T): boolean {
     try {
-      const serialized = JSON.stringify(value);
+      const serialized = typeof value === 'string' ? value : JSON.stringify(value);
       localStorage.setItem(key, serialized);
-      // Verify immediately so a save action never fails silently.
-      return localStorage.getItem(key) === serialized;
-    } catch (e) {
-      console.error(`[StorageAdapter] Failed to save key "${key}":`, e);
+      return true;
+    } catch {
       return false;
     }
-  }
+  },
 
-  static removeItem(key: string): void {
-    if (typeof window === 'undefined') return;
+  getItem<T>(key: string, fallback: T | null = null): T | null {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return fallback;
+      try {
+        return JSON.parse(raw) as T;
+      } catch {
+        return raw as T;
+      }
+    } catch {
+      return fallback;
+    }
+  },
+
+  removeItem(key: string): void {
     try {
       localStorage.removeItem(key);
-    } catch (e) {
-      console.error(`[StorageAdapter] Failed to remove key "${key}":`, e);
-    }
-  }
-
-  static clearAll(keys: readonly string[] | string[]): void {
-    if (typeof window === 'undefined') return;
-    keys.forEach((key) => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {
-        console.error(`[StorageAdapter] Failed to clear key "${key}":`, e);
-      }
-    });
-  }
-}
+    } catch {}
+  },
+};

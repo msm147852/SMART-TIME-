@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { SMART_AI_CANONICAL_SCHEMA_SQL } from './database/canonicalSchema.js';
 
 const dataDir = path.join(process.cwd(), 'data');
 fs.mkdirSync(dataDir, { recursive: true });
@@ -127,6 +128,8 @@ CREATE TABLE IF NOT EXISTS ride_quotes (
   raw_json TEXT,
   created_at TEXT NOT NULL
 );
+
+
 CREATE TABLE IF NOT EXISTS voice_dna_profiles (
   id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL,
@@ -200,6 +203,9 @@ CREATE TABLE IF NOT EXISTS voice_dna_shares (
   UNIQUE(profile_id, recipient_user_id)
 );
 `);
+
+// Canonical AI / finance schema is owned by backend/database/canonicalSchema.ts.
+db.exec(SMART_AI_CANONICAL_SCHEMA_SQL);
 
 try { db.exec('ALTER TABLE users ADD COLUMN username TEXT'); } catch {}
 try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL'); } catch {}

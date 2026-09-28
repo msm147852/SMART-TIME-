@@ -1,8 +1,7 @@
 import { checkPermission } from "./permissions.js";
-import { web_search } from "./webSearch.js";
-import { solve_emotional, solve_social, solve_economic } from "./problemSolver.js";
-import { generate_excel_report, generate_word_report, generate_pdf_report, generate_chart, draw_plan } from "./reportGenerator.js";
+import { buildSmartContext } from "./contextMemory.js";
 import { detectProblemType } from "./empathyEngine.js";
+import { executeV3Tool } from "./toolRuntime.js";
 import { v3ToolRegistry } from "./toolRegistry.js";
 import type { V3ToolName } from "./types.js";
 
@@ -21,21 +20,75 @@ export function classifyV3(message: string): V3ToolName | null {
   return null;
 }
 
-export async function smartAiBrainV3(userId: string, message: string, language: "ar" | "en" = "ar", data: Record<string, unknown> = {}) {
+export async function smartAiBrainV3(
+  userId: string,
+  message: string,
+  language: "ar" | "en" = "ar",
+  data: Record<string, unknown> = {},
+  runtime: {
+    currentDate?: string;
+    timezone?: string;
+    conversationId?: string;
+    activeTaskId?: string;
+    activeFileIds?: string[];
+  } = {},
+) {
   const toolName = classifyV3(message);
   if (!toolName) return null;
+
   const definition = v3ToolRegistry[toolName];
+
   if (definition.permission && !(await checkPermission(userId, definition.permission as any))) {
-    return { toolName, requiresPermission: true, reply: language === "ar" ? `محتاج إذن للوصول لـ ${definition.permission} علشان أنفذ الطلب. فعّل الإذن من إعدادات SMART AI.` : `Permission for ${definition.permission} is required.` };
+    return {
+      toolName,
+      requiresPermission: true,
+      reply:
+        language === "ar"
+          ? `محتاج إذن للوصول لـ ${definition.permission} علشان أنفذ الطلب. فعّل الإذن من إعدادات SMART AI.`
+          : `Permission for ${definition.permission} is required.`,
+    };
   }
-  if (toolName === "web_search") return { toolName, result: await web_search(message, language), reply: "" };
-  if (toolName === "solve_emotional_problem") return { toolName, result: await solve_emotional(userId, message), reply: "" };
-  if (toolName === "solve_social_problem") return { toolName, result: await solve_social(userId, message), reply: "" };
-  if (toolName === "solve_economic_problem") return { toolName, result: await solve_economic(userId, message), reply: "" };
-  if (toolName === "generate_excel_report") return { toolName, result: await generate_excel_report(data), reply: "" };
-  if (toolName === "generate_word_report") return { toolName, result: await generate_word_report(data), reply: "" };
-  if (toolName === "generate_pdf_report") return { toolName, result: await generate_pdf_report(data), reply: "" };
-  if (toolName === "generate_chart") return { toolName, result: generate_chart(data.expenses || []), reply: "" };
-  if (toolName === "draw_plan") return { toolName, result: draw_plan(message), reply: "" };
-  return null;
+
+  const args =
+    toolName === "generate_excel_report" ||
+    toolName === "generate_word_report" ||
+    toolName === "generate_pdf_report"
+      ? { data }
+      : toolName === "generate_chart"
+        ? { expenses: data.expenses || [] }
+        : { message };
+
+  const currentDate = runtime.currentDate ?? new Date().toISOString().slice(0, 10);
+  const timezone = runtime.timezone ?? "UTC";
+  const context = buildSmartContext({
+    userId,
+    conversationId: runtime.conversationId,
+    currentDate,
+    timezone,
+    activeTaskId: runtime.activeTaskId,
+    activeFileIds: runtime.activeFileIds,
+  });
+
+  const execution = await executeV3Tool(
+    {
+      userId,
+      language,
+      currentDate,
+      timezone,
+      conversationId: runtime.conversationId,
+      activeTaskId: runtime.activeTaskId,
+      activeFileIds: runtime.activeFileIds,
+      canonicalData: data,
+    },
+    toolName,
+    args,
+  );
+
+  return {
+    toolName,
+    result: execution.result,
+    execution,
+    context,
+    reply: execution.verified ? "" : execution.error || "",
+  };
 }

@@ -42,6 +42,8 @@ import {
   getCardIconSizeClass,
 } from '../utils/cardDesignHelper';
 import { CardCustomizerModal } from './CardCustomizerModal';
+import { STORAGE_KEYS } from '../services/storageKeys';
+import { StorageAdapter } from '../services/storageAdapter';
 import { Organic3DDashboard } from './Organic3DDashboard';
 import { DashboardSkeletonLoader } from './DashboardSkeletonLoader';
 
@@ -684,7 +686,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Layout mode: 'organic' (عرض انسيابي ثلاثي الأبعاد) | 'grid' (شبكة 3D) | 'detailed' (بطاقات تفصيلية)
   const [layoutMode, setLayoutMode] = useState<'organic' | 'grid' | 'detailed'>(() => {
     try {
-      const saved = localStorage.getItem('smart_time_dashboard_layout');
+      const saved = localStorage.getItem(STORAGE_KEYS.DASHBOARD_LAYOUT);
       if (saved === 'organic' || saved === 'grid' || saved === 'detailed') {
         return saved;
       }
@@ -712,7 +714,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Load section order and favorites from localStorage
   const [sections, setSections] = useState<SectionCard[]>(() => {
     try {
-      const saved = localStorage.getItem('smart_time_dashboard_sections_v2');
+      const saved = localStorage.getItem(STORAGE_KEYS.DASHBOARD_SECTIONS_V2);
       if (saved) {
         const parsed = JSON.parse(saved);
         const ordered: SectionCard[] = [];
@@ -739,15 +741,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem('smart_time_dashboard_layout', layoutMode);
+      StorageAdapter.setItem(STORAGE_KEYS.DASHBOARD_LAYOUT, layoutMode);
     } catch (e) {}
   }, [layoutMode]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        'smart_time_dashboard_sections_v2',
-        JSON.stringify(sections.map((s) => ({ id: s.id, isFavorite: s.isFavorite })))
+      StorageAdapter.setItem(
+        STORAGE_KEYS.DASHBOARD_SECTIONS_V2,
+        sections.map((s) => ({ id: s.id, isFavorite: s.isFavorite }))
       );
     } catch (e) {}
   }, [sections]);

@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { formatMoney } from '../../services/financeCalculations';
 import { Language, UserProfile } from '../../types';
+import { STORAGE_KEYS } from '../../services/storageKeys';
+import { StorageAdapter } from '../../services/storageAdapter';
 
 interface SectionsMenuScreenProps {
   language: Language;
@@ -88,7 +90,7 @@ export const SectionsMenuScreen: React.FC<SectionsMenuScreenProps> = ({
   // Section order state loaded from localStorage
   const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(() => {
     try {
-      const saved = localStorage.getItem('smart_time_expenses_sections_order');
+      const saved = localStorage.getItem(STORAGE_KEYS.EXPENSES_SECTIONS_ORDER);
       if (saved) {
         const parsed: SectionKey[] = JSON.parse(saved);
         const valid = parsed.filter((k) => DEFAULT_SECTIONS_ORDER.includes(k));
@@ -103,7 +105,7 @@ export const SectionsMenuScreen: React.FC<SectionsMenuScreenProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem('smart_time_expenses_sections_order', JSON.stringify(sectionOrder));
+      StorageAdapter.setItem(STORAGE_KEYS.EXPENSES_SECTIONS_ORDER, sectionOrder);
     } catch (e) {}
   }, [sectionOrder]);
 

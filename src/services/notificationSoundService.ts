@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from './storageKeys';
+import { StorageAdapter } from './storageAdapter';
 const PRESETS = {
   soft: { nameAr: 'هادئ', nameEn: 'Soft', freq: 660, duration: 0.18 },
   chime: { nameAr: 'رنين', nameEn: 'Chime', freq: 880, duration: 0.24 },
@@ -8,17 +10,17 @@ const PRESETS = {
 export type NotificationSoundId = keyof typeof PRESETS | 'custom' | 'off';
 export interface NotificationSoundSettings { id: NotificationSoundId; customDataUrl?: string; volume: number; }
 
-const KEY = 'smart_time_notification_sound';
+const KEY = STORAGE_KEYS.NOTIFICATION_SOUND;
 const DEFAULT: NotificationSoundSettings = { id: 'soft', volume: 0.65 };
 
 export const NotificationSoundService = {
   presets: PRESETS,
   getSettings(): NotificationSoundSettings {
     if (typeof window === 'undefined') return DEFAULT;
-    try { return { ...DEFAULT, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch { return DEFAULT; }
+    try { return StorageAdapter.getItem<NotificationSoundSettings>(KEY, DEFAULT) ?? DEFAULT; } catch { return DEFAULT; }
   },
   saveSettings(settings: NotificationSoundSettings) {
-    if (typeof window !== 'undefined') localStorage.setItem(KEY, JSON.stringify(settings));
+    StorageAdapter.setItem(KEY, settings);
   },
   async play(settings = this.getSettings()) {
     if (typeof window === 'undefined' || settings.id === 'off') return;

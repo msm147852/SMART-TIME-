@@ -8,29 +8,20 @@ export class ExpensesRepository {
     return StorageAdapter.getItem<Expense[]>(STORAGE_KEYS.EXPENSES, DEFAULT_EXPENSES);
   }
 
-  static saveExpenses(expenses: Expense[]): void {
-    StorageAdapter.setItem(STORAGE_KEYS.EXPENSES, expenses);
+  static saveExpenses(_expenses: Expense[]): never {
+    throw new Error("Legacy expense writes are disabled; use FinanceRepository or the canonical Finance API.");
   }
 
-  static addExpense(expense: Expense): Expense[] {
-    const list = this.getExpenses();
-    const updated = [expense, ...list];
-    this.saveExpenses(updated);
-    return updated;
+  static addExpense(_expense: Expense): never {
+    throw new Error("Legacy expense writes are disabled; use FinanceRepository or the canonical Finance API.");
   }
 
-  static updateExpense(expense: Expense): Expense[] {
-    const list = this.getExpenses();
-    const updated = list.map((e) => (e.id === expense.id ? expense : e));
-    this.saveExpenses(updated);
-    return updated;
+  static updateExpense(_expense: Expense): never {
+    throw new Error("Legacy expense writes are disabled; use FinanceRepository or the canonical Finance API.");
   }
 
-  static deleteExpense(id: string): Expense[] {
-    const list = this.getExpenses();
-    const updated = list.filter((e) => e.id !== id);
-    this.saveExpenses(updated);
-    return updated;
+  static deleteExpense(_id: string): never {
+    throw new Error("Legacy expense writes are disabled; use FinanceRepository or the canonical Finance API.");
   }
 
   static getBudget(): BudgetSummary {

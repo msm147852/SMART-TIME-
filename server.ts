@@ -10,6 +10,12 @@ import { getServiceStatuses, seedServiceStatuses, setServiceStatus } from "./bac
 import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
+import { executeToolAction } from "./backend/ai/toolExecutor.js";
+import { createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from "./backend/ai/calendar/eventExecutor.js";
+import { getFinanceOverview } from "./backend/ai/finance/financeProjection.js";
+import { getAiCanonicalState } from "./backend/ai/finance/aiCanonicalProjection.js";
+import { createCanonicalExpense, updateCanonicalExpense, deleteCanonicalExpense, migrateLegacyExpensesToCanonical, reconcileAiTransactionsToCanonical, ensureFinanceMutationSchema } from "./backend/ai/finance/financeRepository.js";
+import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 
@@ -420,6 +426,8 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
       ? req.body.conversationHistory.slice(-8)
       : [];
     const appContext = req.body?.appContext;
+    const confirmed = req.body?.confirmed === true;
+    const timezone = String(req.body?.timezone || (appContext?.profile && typeof appContext.profile === "object" ? appContext.profile.timezone || "Africa/Cairo" : "Africa/Cairo"));
 
     if (!message) return res.status(400).json({ error: "Message is required" });
     if (!appContext || typeof appContext !== "object") {
@@ -431,6 +439,12 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
       language,
       conversationHistory,
       appContext: appContext as Record<string, unknown>,
+      userId: String(user.id),
+      timezone,
+      conversationId: typeof req.body?.conversationId === "string" ? req.body.conversationId : undefined,
+      activeTaskId: typeof req.body?.activeTaskId === "string" ? req.body.activeTaskId : undefined,
+      activeFileIds: Array.isArray(req.body?.activeFileIds) ? req.body.activeFileIds.map(String) : undefined,
+      confirmed,
     });
 
     return res.json(response);
@@ -446,6 +460,262 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
 
 app.post("/api/ai/chat", handleAiChat);
 app.post("/api/gemini/chat", handleAiChat);
+
+app.get("/api/ai/state", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+  try {
+    const canonicalFinance = getAiCanonicalState(String(user.id));
+    const transactions = canonicalFinance.transactions;
+    const budget = canonicalFinance.budget;
+
+    const calendarEvents = listCalendarEvents(String(user.id));
+    const rawTasks = db.prepare(`
+      SELECT id, title, completed, priority, category,
+             due_date as dueDate, due_time as dueTime,
+             note, created_at as createdAt,
+             completed_at as completedAt
+      FROM ai_tasks
+      WHERE user_id = ?
+      ORDER BY COALESCE(due_date, '9999-12-31'), COALESCE(due_time, '23:59'), created_at DESC
+    `).all(user.id) as any[];
+
+    const tasks = rawTasks.map((task) => ({
+      ...task,
+      completed: Boolean(task.completed),
+      reminderEnabled: true,
+    }));
+
+    return res.json({
+      source: "smart-ai-sqlite",
+      userId: user.id,
+      transactions,
+      budget,
+      tasks,
+      calendarEvents,
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || "تعذر قراءة حالة SMART AI." });
+  }
+});
+
+
+app.post("/api/finance/expenses", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const record = createCanonicalExpense(String(user.id), req.body || {});
+    return res.status(201).json({ source: "smart-time-finance-sqlite", record });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر إضافة المصروف." });
+  }
+});
+
+app.patch("/api/finance/expenses/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const record = updateCanonicalExpense(String(user.id), String(req.params.id), req.body || {});
+    return res.json({ source: "smart-time-finance-sqlite", record });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تحديث المصروف." });
+  }
+});
+
+app.delete("/api/finance/expenses/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    deleteCanonicalExpense(String(user.id), String(req.params.id));
+    return res.json({ source: "smart-time-finance-sqlite", deleted: true, id: String(req.params.id) });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر حذف المصروف." });
+  }
+});
+
+app.post("/api/finance/migrate", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    ensureFinanceMutationSchema();
+    const legacyItems = Array.isArray(req.body?.expenses) ? req.body.expenses : [];
+    const legacy = migrateLegacyExpensesToCanonical(String(user.id), legacyItems);
+    const ai = req.body?.reconcileAiTransactions === false
+      ? null
+      : reconcileAiTransactionsToCanonical(String(user.id));
+    return res.json({
+      source: "smart-time-finance-sqlite",
+      legacy,
+      ai,
+      verificationPassed: Boolean(legacy.verificationPassed && (ai === null || ai.verificationPassed)),
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تنفيذ ترحيل البيانات المالية." });
+  }
+});
+
+app.get("/api/finance/overview", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    return res.json(getFinanceOverview(String(user.id)));
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || "تعذر قراءة بيانات التمويل." });
+  }
+});
+
+app.get("/api/ai/events", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const events = listCalendarEvents(String(user.id), {
+      from: typeof req.query.from === "string" ? req.query.from : undefined,
+      to: typeof req.query.to === "string" ? req.query.to : undefined,
+    });
+    return res.json({ source: "smart-ai-sqlite", events, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر قراءة أحداث التقويم." });
+  }
+});
+
+app.get("/api/ai/reminders", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    queueDueEventReminders();
+    const limit = Number(req.query.limit || 50);
+    return res.json({
+      source: "smart-ai-sqlite",
+      reminders: listPendingEventReminders(String(user.id), Number.isFinite(limit) ? limit : 50),
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر قراءة تذكيرات الأحداث." });
+  }
+});
+
+app.post("/api/ai/reminders/:id/ack", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const acknowledged = acknowledgeEventReminder(String(user.id), req.params.id);
+    if (!acknowledged) return res.status(404).json({ error: "التذكير غير موجود أو تم تأكيده بالفعل." });
+    return res.json({ acknowledged: true, id: req.params.id });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تأكيد التذكير." });
+  }
+});
+
+app.post("/api/ai/events", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const event = createCalendarEvent(String(user.id), req.body || {});
+    return res.status(201).json(event);
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر إنشاء الحدث." });
+  }
+});
+
+app.patch("/api/ai/events/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const event = updateCalendarEvent(String(user.id), req.params.id, req.body || {});
+    return res.json(event);
+  } catch (error: any) {
+    const message = error?.message || "تعذر تحديث الحدث.";
+    return res.status(message.includes("not found") ? 404 : 400).json({ error: message });
+  }
+});
+
+app.delete("/api/ai/events/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    deleteCalendarEvent(String(user.id), req.params.id);
+    return res.status(204).send();
+  } catch (error: any) {
+    const message = error?.message || "تعذر حذف الحدث.";
+    return res.status(message.includes("not found") ? 404 : 400).json({ error: message });
+  }
+});
+
+app.post("/api/ai/tasks", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const result = executeToolAction(String(user.id), {
+      type: "add_daily_task",
+      payload: req.body || {},
+    } as any);
+    if (!result.ok) return res.status(500).json({ error: result.error || "تعذر إنشاء المهمة." });
+    return res.status(201).json(result.record);
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر إنشاء المهمة." });
+  }
+});
+
+app.patch("/api/ai/tasks/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const result = executeToolAction(String(user.id), {
+      type: "update_daily_task",
+      payload: { ...(req.body || {}), id: req.params.id },
+    } as any);
+    if (!result.ok) return res.status(500).json({ error: result.error || "تعذر تحديث المهمة." });
+    return res.json(result.record);
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تحديث المهمة." });
+  }
+});
+
+app.delete("/api/ai/tasks/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const row = db.prepare("SELECT id FROM ai_tasks WHERE id = ? AND user_id = ?").get(req.params.id, user.id) as any;
+    if (!row) return res.status(404).json({ error: "المهمة غير موجودة." });
+    db.prepare("DELETE FROM ai_tasks WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    const verify = db.prepare("SELECT id FROM ai_tasks WHERE id = ? AND user_id = ?").get(req.params.id, user.id);
+    if (verify) return res.status(500).json({ error: "فشل التحقق من حذف المهمة." });
+    return res.status(204).send();
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر حذف المهمة." });
+  }
+});
+
+app.post("/api/ai/tasks/import", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
+  try {
+    const insert = db.prepare(`INSERT OR IGNORE INTO ai_tasks
+      (id,user_id,title,completed,priority,category,due_date,due_time,note,created_at,completed_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+    let imported = 0;
+    for (const task of tasks) {
+      const id = String(task?.id || "").trim();
+      const title = String(task?.title || "").trim();
+      if (!id || !title) continue;
+      insert.run(
+        id, String(user.id), title, task?.completed ? 1 : 0,
+        String(task?.priority || "medium"), String(task?.category || "general"),
+        String(task?.dueDate || "") || null, String(task?.dueTime || "") || null,
+        String(task?.note || "") || null, String(task?.createdAt || new Date().toISOString()),
+        task?.completedAt ? String(task.completedAt) : null
+      );
+      imported += 1;
+    }
+    return res.json({ imported });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر استيراد المهام." });
+  }
+});
 
 app.get("/api/ai/status", (req, res) => {
   const user = authUser(req);
@@ -1784,6 +2054,16 @@ async function startServer() {
 
   const httpServer = http.createServer(app);
   setupChatWebSocket(httpServer);
+
+  queueDueEventReminders();
+  const reminderScheduler = setInterval(() => {
+    try {
+      queueDueEventReminders();
+    } catch (error) {
+      console.error("[SMART AI] reminder scheduler error:", error);
+    }
+  }, 15_000);
+  reminderScheduler.unref?.();
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     setServiceStatus("backend", "LIVE", "express", `Listening on port ${PORT}`);

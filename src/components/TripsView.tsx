@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StorageAdapter } from '../services/storageAdapter';
 import {
   Navigation,
   MapPin,
@@ -226,7 +227,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
   const handleSavePlace = (key: SavedPlaceKey) => {
     const current = key === 'home' ? pickupLocation : dropoffLocation;
     try {
-      localStorage.setItem(
+      StorageAdapter.setItem(
         key === 'home' ? 'smart_time_trip_home' : 'smart_time_trip_work',
         JSON.stringify(current)
       );
