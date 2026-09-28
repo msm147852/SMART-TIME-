@@ -27,7 +27,7 @@ const EXPENSE_TYPES: Array<{ value: StudentExpenseRecord['subCategory']; label: 
 ];
 
 export const EducationExpensesSection: React.FC<EducationExpensesSectionProps> = ({
-  language, currency, selectedMonth, onBack, students, onSaveStudents, expenses, onSaveExpenses,
+  language, currency, selectedMonth, onBack, students, onSaveStudents, expenses: legacyExpenses, onSaveExpenses,
 }) => {
   const isAr = language === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
