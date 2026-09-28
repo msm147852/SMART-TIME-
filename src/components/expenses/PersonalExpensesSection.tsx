@@ -6,12 +6,12 @@ import { financeService } from '../../services/financeService';
 import { SpecializedExpense } from './HouseExpensesSection';
 
 export interface AssociationRecord { id:string; name:string; value:number; memberCount:number; installment:number; roleNumber:number; payoutDate:string; startDate:string; notes?:string; }
-interface Props { language:Language; currency:string; selectedMonth:string; onBack:()=>void; expenses:SpecializedExpense[]; onSaveExpenses:(list:SpecializedExpense[])=>void; associations?:AssociationRecord[]; onSaveAssociations?:(list:AssociationRecord[])=>void; }
+interface Props { language:Language; currency:string; selectedMonth:string; onBack:()=>void; associations?:AssociationRecord[]; onSaveAssociations?:(list:AssociationRecord[])=>void; }
 const today=()=>new Date().toISOString().slice(0,10);
 const monthDiff=(a:string,b:string)=>{const x=new Date(a+'T12:00:00'),y=new Date(b+'-01T12:00:00'); return (y.getFullYear()-x.getFullYear())*12+y.getMonth()-x.getMonth();};
 const installmentForDate=(a:AssociationRecord,date:string)=>{if(!a.startDate||date<a.startDate)return 0; const n=monthDiff(a.startDate,date)+1; return Math.max(0,Math.min(a.memberCount,n));};
 const installmentDate=(start:string,offset:number)=>{const d=new Date(start+'T12:00:00'); const target=new Date(d.getFullYear(),d.getMonth()+offset,d.getDate()); return target.toISOString().slice(0,10);};
-export const PersonalExpensesSection:React.FC<Props>=({language,currency,selectedMonth,onBack,expenses: legacyExpenses,onSaveExpenses,associations=[],onSaveAssociations=(_list:AssociationRecord[])=>{}})=>{
+export const PersonalExpensesSection:React.FC<Props>=({language,currency,selectedMonth,onBack,associations=[],onSaveAssociations=(_list:AssociationRecord[])=>{}})=>{
  const [expenses,setExpenses]=useState<SpecializedExpense[]>([]);
  const loadCanonicalExpenses=async()=>{const rows=await financeService.getExpenses({type:'personal'});setExpenses(rows.map(x=>({id:String(x.id),section:'personal',type:String(x.title||x.category||'إنفاق شخصي'),amount:Number(x.amount)||0,date:String(x.date||'').slice(0,10),notes:x.notes?String(x.notes):undefined})));};
  useEffect(()=>{void loadCanonicalExpenses();},[]);
