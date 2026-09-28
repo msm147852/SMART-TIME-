@@ -2,8 +2,8 @@ import { db } from "../../database.js";
 import { expandRecurringEvents } from "./recurrenceEngine.js";
 
 export interface PendingEventReminder {
-  id: string;
-  eventId: string;
+undefinedid: string;
+undefinedeventId: string;
   userId: string;
   title: string;
   startAt: string;
@@ -55,7 +55,8 @@ export function queueDueEventReminders(now = new Date()): number {
 
   let queued = 0;
   const queuedAt = nowIso();
-  const transaction = db.transaction(() => {
+  db.exec("BEGIN");
+  try {
     for (const row of rows) {
       const startMs = new Date(String(row.startAt)).getTime();
       const minutes = Number(row.reminderMinutes);
@@ -67,7 +68,7 @@ export function queueDueEventReminders(now = new Date()): number {
       const scheduledFor = new Date(scheduledMs).toISOString();
       const reminderId = `rem_${row.id}_${scheduledMs}`;
       const result = insert.run(reminderId, row.id, row.userId, scheduledFor, queuedAt);
-      queued += result.changes;
+      queued += Number(result.changes);
     }
 
     for (const occurrences of recurringByUser.values()) {
@@ -81,11 +82,14 @@ export function queueDueEventReminders(now = new Date()): number {
         const scheduledFor = new Date(scheduledMs).toISOString();
         const reminderId = `rem_${occurrence.eventId}_${scheduledMs}`;
         const result = insert.run(reminderId, occurrence.eventId, occurrence.userId, scheduledFor, queuedAt);
-        queued += result.changes;
+        queued += Number(result.changes);
       }
     }
-  });
-  transaction();
+    db.exec("COMMIT");
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch { /* preserve original error */ }
+    throw error;
+  }
   return queued;
 }
 
