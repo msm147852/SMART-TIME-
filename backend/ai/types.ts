@@ -13,6 +13,10 @@ export interface SmartAiRequest {
   conversationHistory?: Array<{ sender: "user" | "model"; text: string }>;
   appContext: Record<string, unknown>;
   userId?: string;
+  conversationId?: string;
+  timezone?: string;
+  activeTaskId?: string;
+  activeFileIds?: string[];
   confirmed?: boolean;
 }
 
