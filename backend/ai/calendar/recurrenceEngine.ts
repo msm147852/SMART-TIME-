@@ -26,14 +26,40 @@ function parseRecurrence(value: unknown): Recurrence | null {
   }
 }
 
-function addOccurrence(date: Date, recurrence: Recurrence): Date {
-  const next = new Date(date);
-  if (recurrence.frequency === "daily") next.setUTCDate(next.getUTCDate() + recurrence.interval);
-  else if (recurrence.frequency === "weekly") next.setUTCDate(next.getUTCDate() + recurrence.interval * 7);
-  else next.setUTCMonth(next.getUTCMonth() + recurrence.interval);
-  return next;
+function zonedParts(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"), second: get("second") };
 }
 
+function timezoneOffsetMs(date: Date, timezone: string): number {
+  const p = zonedParts(date, timezone);
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - date.getTime();
+}
+
+function fromZonedParts(parts: ReturnType<typeof zonedParts>, timezone: string): Date {
+  let guess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second));
+  for (let i = 0; i < 4; i++) {
+    guess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - timezoneOffsetMs(guess, timezone));
+  }
+  return guess;
+}
+
+function addOccurrence(date: Date, recurrence: Recurrence, timezone: string): Date {
+  const local = zonedParts(date, timezone);
+  if (recurrence.frequency === "daily") local.day += recurrence.interval;
+  else if (recurrence.frequency === "weekly") local.day += recurrence.interval * 7;
+  else local.month += recurrence.interval;
+
+  const normalized = new Date(Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second));
+  return fromZonedParts(zonedParts(normalized, "UTC"), timezone);
+}
 function durationMs(start: string, end?: string): number | null {
   if (!end) return null;
   const value = new Date(end).getTime() - new Date(start).getTime();
@@ -71,7 +97,7 @@ export function expandRecurringEvents(
 
     let cursor = new Date(originalStart);
     let guard = 0;
-    while (cursor < from && guard++ < 10000) cursor = addOccurrence(cursor, recurrence);
+    while (cursor < from && guard++ < 10000) cursor = addOccurrence(cursor, recurrence, String(row.timezone));
     while (cursor <= to && occurrences.length < maxOccurrences) {
       if (!recurrence.until || cursor <= new Date(recurrence.until)) {
         occurrences.push({
@@ -85,7 +111,7 @@ export function expandRecurringEvents(
           ...(row.reminderMinutes === null || row.reminderMinutes === undefined ? {} : { reminderMinutes: Number(row.reminderMinutes) }),
         });
       }
-      cursor = addOccurrence(cursor, recurrence);
+      cursor = addOccurrence(cursor, recurrence, String(row.timezone));
       guard++;
       if (guard > 10000) break;
     }
