@@ -53,9 +53,19 @@ function fromZonedParts(parts: ReturnType<typeof zonedParts>, timezone: string):
 
 function addOccurrence(date: Date, recurrence: Recurrence, timezone: string): Date {
   const local = zonedParts(date, timezone);
-  if (recurrence.frequency === "daily") local.day += recurrence.interval;
-  else if (recurrence.frequency === "weekly") local.day += recurrence.interval * 7;
-  else local.month += recurrence.interval;
+  if (recurrence.frequency === "daily") {
+    local.day += recurrence.interval;
+  } else if (recurrence.frequency === "weekly") {
+    local.day += recurrence.interval * 7;
+  } else {
+    const targetMonthIndex = local.month - 1 + recurrence.interval;
+    const targetYear = local.year + Math.floor(targetMonthIndex / 12);
+    const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    local.year = targetYear;
+    local.month = targetMonth + 1;
+    local.day = Math.min(local.day, lastDay);
+  }
 
   const normalized = new Date(Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second));
   return fromZonedParts(zonedParts(normalized, "UTC"), timezone);
