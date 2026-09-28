@@ -22,6 +22,17 @@ export interface SmartMemoryRecord {
   relevance?: number;
 }
 
+export interface SmartContextEvent {
+  id: string;
+  title: string;
+  startAt: string;
+  endAt?: string;
+  timezone: string;
+  category: string;
+  location?: string;
+  reminderEnabled: boolean;
+}
+
 export interface SmartContextMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
@@ -50,6 +61,7 @@ export interface SmartContextBundle {
   };
   messages: SmartContextMessage[];
   memories: SmartMemoryRecord[];
+  upcomingEvents: SmartContextEvent[];
 }
 
 db.exec(`
@@ -181,6 +193,19 @@ export function memoryContextForModel(
     .join("\n");
 }
 
+export function calendarContextForModel(
+  events: SmartContextEvent[],
+  limit = 12,
+): string {
+  return events.slice(0, normalizeLimit(limit, 12, 20))
+    .map((event) => {
+      const location = event.location ? ` @ ${event.location}` : "";
+      const end = event.endAt ? ` -> ${event.endAt}` : "";
+      return `[${event.category}] ${event.title}: ${event.startAt}${end} (${event.timezone})${location}`;
+    })
+    .join("\n");
+}
+
 export function buildSmartContext(input: SmartContextInput): SmartContextBundle {
   const maxMessages = normalizeLimit(input.maxMessages, 20, 100);
   const maxMemories = normalizeLimit(input.maxMemories, 12, 50);
@@ -199,6 +224,23 @@ export function buildSmartContext(input: SmartContextInput): SmartContextBundle 
     : [];
 
   const memories = listRelevantMemories(input.userId, maxMemories);
+  const upcomingEvents = (db.prepare(`
+    SELECT id, title, start_at as startAt, end_at as endAt, timezone,
+           category, location, reminder_enabled as reminderEnabled
+    FROM ai_events
+    WHERE user_id=? AND start_at>=?
+    ORDER BY start_at ASC
+    LIMIT 30
+  `).all(input.userId, new Date().toISOString()) as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id),
+    title: String(row.title),
+    startAt: String(row.startAt),
+    ...(row.endAt ? { endAt: String(row.endAt) } : {}),
+    timezone: String(row.timezone),
+    category: String(row.category),
+    ...(row.location ? { location: String(row.location) } : {}),
+    reminderEnabled: Boolean(row.reminderEnabled),
+  }));
 
   const summary = input.conversationId
     ? getConversationSummary(input.userId, input.conversationId)
@@ -222,6 +264,7 @@ export function buildSmartContext(input: SmartContextInput): SmartContextBundle 
     },
     messages,
     memories,
+    upcomingEvents,
   };
 }
 
