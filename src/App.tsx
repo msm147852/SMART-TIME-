@@ -67,6 +67,7 @@ import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
 import { startTrialSession } from './services/authService';
+import { fetchSmartAiState } from './services/aiService';
 
 // Icons
 import {
@@ -150,6 +151,43 @@ export default function App() {
       })
       .finally(() => setAuthChecked(true));
   }, []);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    void fetchSmartAiState()
+      .then((state) => {
+        if (state.transactions.length > 0) {
+          setExpenses((current) => {
+            const byId = new Map(current.map((item) => [item.id, item]));
+            for (const transaction of state.transactions) byId.set(transaction.id, transaction);
+            return Array.from(byId.values()).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+          });
+        }
+
+        if (state.tasks.length > 0) {
+          setDailyTasks((current) => {
+            const byId = new Map(current.map((item) => [item.id, item]));
+            for (const task of state.tasks) byId.set(task.id, task);
+            return Array.from(byId.values());
+          });
+        }
+
+        if (state.budget) {
+          const totalExpenses = state.transactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+          const totalBudget = Number(state.budget.monthlyLimit || 0);
+          const remaining = Math.round((totalBudget - totalExpenses) * 100) / 100;
+          setBudget({
+            totalBudget,
+            totalExpenses,
+            remaining,
+            percentUsed: totalBudget > 0 ? Math.min(100, Math.max(0, (totalExpenses / totalBudget) * 100)) : 0,
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn('SMART AI canonical state sync unavailable:', error);
+      });
+  }, [authChecked]);
 
   const handleNavigateSafe = (nextView: AppView) => handleNavigate(nextView);
 
