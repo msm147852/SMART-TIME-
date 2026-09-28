@@ -187,6 +187,33 @@ export interface SmartAiState {
   fetchedAt: string;
 }
 
+async function smartAiMutation(path: string, method: string, body?: unknown) {
+  const res = await fetch(apiUrl(path), {
+    method,
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'تعذر تحديث بيانات SMART AI');
+  return data;
+}
+
+export async function createCanonicalTask(task: Omit<DailyTask, 'id' | 'createdAt'>): Promise<DailyTask> {
+  return smartAiMutation('/api/ai/tasks', 'POST', task) as Promise<DailyTask>;
+}
+
+export async function updateCanonicalTask(task: DailyTask): Promise<DailyTask> {
+  return smartAiMutation(`/api/ai/tasks/${encodeURIComponent(task.id)}`, 'PATCH', task) as Promise<DailyTask>;
+}
+
+export async function deleteCanonicalTask(id: string): Promise<void> {
+  await smartAiMutation(`/api/ai/tasks/${encodeURIComponent(id)}`, 'DELETE');
+}
+
+export async function importCanonicalTasks(tasks: DailyTask[]): Promise<{ imported: number }> {
+  return smartAiMutation('/api/ai/tasks/import', 'POST', { tasks }) as Promise<{ imported: number }>;
+}
+
 export async function fetchSmartAiState(): Promise<SmartAiState> {
   const res = await fetch(apiUrl('/api/ai/state'), {
     method: 'GET',
