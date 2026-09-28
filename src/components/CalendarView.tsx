@@ -110,6 +110,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ language, timezone =
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
 
   const loadEvents = async (date: Date) => {
     setLoading(true);
@@ -192,6 +193,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ language, timezone =
     }
   };
 
+  const enableNotifications = async () => {
+    if (typeof Notification === 'undefined') return;
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+  };
+
   const monthTitle = cursor.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' });
   const dayNames = isAr ? ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -205,9 +212,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ language, timezone =
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">{timezone}</p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-1.5 rounded-xl bg-accent-500 text-slate-950 px-3 py-2 text-xs font-black shadow-sm active:scale-95">
-          <Plus className="w-4 h-4" /> {t.add}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
+            <button onClick={() => void enableNotifications()} className="rounded-xl border border-slate-200 dark:border-slate-700 px-2.5 py-2 text-[10px] font-black hover:bg-slate-100 dark:hover:bg-slate-800">
+              <Bell className="w-3.5 h-3.5 inline-block me-1 text-accent-500" />{isAr ? 'تفعيل التنبيهات' : 'Enable alerts'}
+            </button>
+          )}
+          <button onClick={openNew} className="flex items-center gap-1.5 rounded-xl bg-accent-500 text-slate-950 px-3 py-2 text-xs font-black shadow-sm active:scale-95">
+            <Plus className="w-4 h-4" /> {t.add}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3 shadow-sm">
