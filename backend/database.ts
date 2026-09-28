@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { SMART_AI_CANONICAL_SCHEMA_SQL } from './database/canonicalSchema.js';
 
 const dataDir = path.join(process.cwd(), 'data');
 fs.mkdirSync(dataDir, { recursive: true });
