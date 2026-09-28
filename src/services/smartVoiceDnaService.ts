@@ -1,4 +1,5 @@
 import type { SmartVoiceDnaConsentMode, SmartVoiceDnaRelationship, SmartVoiceDnaDialect, SmartVoiceDnaSpeakingStyle } from "../types";
+import { StorageAdapter } from './storageAdapter';
 
 export interface SmartVoiceDnaProfile {
   id: string;
@@ -241,7 +242,7 @@ export async function setDefaultVoiceDnaProfile(profileId: string): Promise<void
   }
 
   try {
-    localStorage.setItem(DEFAULT_PROFILE_KEY, profileId);
+    StorageAdapter.setItem(DEFAULT_PROFILE_KEY, profileId);
   } catch {
     // Local preference storage may be unavailable.
   }
