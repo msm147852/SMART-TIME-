@@ -20,7 +20,7 @@ export function createExpenseImportHandler() {
       if (conflicts.length) return res.status(409).json({ results, conflicts: conflicts.length });
       const importedIds = results.filter((item) => item.status === "inserted").map((item) => item.id);
       const overview = getFinanceOverview(user.id);
-      const verifiedIds = new Set(overview.expenses.map((item) => String(item.id ?? "")));
+      const verifiedIds = new Set(overview.expenses.map((item) => String((item as any).id ?? "")));
       const verified = importedIds.filter((id) => verifiedIds.has(id));
       return res.json({
         source: "smart-time-finance-sqlite",
