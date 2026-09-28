@@ -12,6 +12,7 @@ import { estimateProviderPrice, type RideProvider, type RideCategory } from "./s
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 import { executeToolAction } from "./backend/ai/toolExecutor.js";
 import { createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from "./backend/ai/calendar/eventExecutor.js";
+import { getFinanceOverview } from "./backend/ai/finance/financeProjection.js";
 import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
@@ -512,6 +513,16 @@ app.get("/api/ai/state", (req, res) => {
   }
 });
 
+
+app.get("/api/finance/overview", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    return res.json(getFinanceOverview(String(user.id)));
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || "تعذر قراءة بيانات التمويل." });
+  }
+});
 
 app.get("/api/ai/events", (req, res) => {
   const user = authUser(req);
