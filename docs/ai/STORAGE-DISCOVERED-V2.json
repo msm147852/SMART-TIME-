@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "scanned_at": "2026-09-28T20:04:08.021Z",
+  "scanned_at": "2026-09-28T20:04:33.314Z",
   "scope": {
     "root": "src",
     "extensions": [
@@ -59,7 +59,7 @@
     ]
   },
   "scan": {
-    "files_scanned": 113,
+    "files_scanned": 114,
     "total_discovered_keys": 64,
     "hidden_discovered_keys": 31,
     "hidden_keys": [
