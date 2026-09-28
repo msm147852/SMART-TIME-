@@ -106,7 +106,7 @@ export function listPendingEventReminders(userId: string, limit = 50): PendingEv
     WHERE r.user_id = ? AND r.delivered_at IS NULL
     ORDER BY r.scheduled_for ASC
     LIMIT ?
-  `).all(userId, safeLimit) as PendingEventReminder[];
+  `).all(userId, safeLimit) as unknown as PendingEventReminder[];
 }
 
 export function acknowledgeEventReminder(userId: string, reminderId: string): boolean {
