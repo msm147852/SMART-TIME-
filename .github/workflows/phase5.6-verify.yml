@@ -2,7 +2,7 @@ name: Phase 5.6 - Verify Duplicate Write Removal
 
 on:
   push:
-    branches: [feat/v3-next]
+    branches: [feat/v3-next, feat/v6-finance-ui]
 
 jobs:
   verify:

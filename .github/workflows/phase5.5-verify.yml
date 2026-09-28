@@ -2,7 +2,7 @@ name: Phase 5.5 - AI Canonical Finance Verification
 
 on:
   push:
-    branches: [feat/v3-next]
+    branches: [feat/v3-next, feat/v6-finance-ui]
 
 jobs:
   verify:
