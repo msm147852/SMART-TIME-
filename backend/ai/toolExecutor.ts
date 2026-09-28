@@ -103,6 +103,46 @@ export function addTransaction(userId: string, payload: Record<string, unknown>)
   };
 }
 
+export function updateTransaction(userId: string, payload: Record<string, unknown>): VerifiedToolResult {
+  const uid = text(userId);
+  const transactionId = text(payload.id);
+  if (!transactionId) throw new Error("Transaction id is required");
+  const current = readTransaction(uid, transactionId);
+  if (!current) throw new Error("Transaction not found for this user");
+
+  const title = payload.title === undefined ? current.title : text(payload.title);
+  if (!title) throw new Error("Transaction title is required");
+  const value = payload.amount === undefined ? Number(current.amount) : amount(payload.amount);
+  const category = payload.category === undefined ? current.category : text(payload.category, "other");
+  const date = payload.date === undefined ? current.date : text(payload.date);
+  const paymentMethod = payload.paymentMethod === undefined ? current.paymentMethod : text(payload.paymentMethod, "cash");
+  const notes = payload.notes === undefined ? current.notes : (text(payload.notes) || null);
+
+  db.prepare(`UPDATE ai_transactions
+    SET title=?, amount=?, category=?, date=?, payment_method=?, notes=?
+    WHERE id=? AND user_id=?`)
+    .run(title, value, category, date, paymentMethod, notes, transactionId, uid);
+
+  const record = readTransaction(uid, transactionId);
+  if (!record || record.title !== title || Number(record.amount) !== value || record.date !== date) {
+    return { ok: false, operation: "updateTransaction", record: {}, verification: {}, error: "Database read-back failed after transaction update" };
+  }
+  return { ok: true, operation: "updateTransaction", record, verification: { persisted: true, transactionId } };
+}
+
+export function deleteTransaction(userId: string, transactionId: string): VerifiedToolResult {
+  const uid = text(userId);
+  const idValue = text(transactionId);
+  if (!idValue) throw new Error("Transaction id is required");
+  const current = readTransaction(uid, idValue);
+  if (!current) throw new Error("Transaction not found for this user");
+
+  db.prepare("DELETE FROM ai_transactions WHERE id = ? AND user_id = ?").run(idValue, uid);
+  const verify = readTransaction(uid, idValue);
+  if (verify) return { ok: false, operation: "deleteTransaction", record: {}, verification: {}, error: "Database read-back failed after transaction delete" };
+  return { ok: true, operation: "deleteTransaction", record: current, verification: { persisted: true, deleted: true, transactionId: idValue } };
+}
+
 export function updateBudget(userId: string, payload: Record<string, unknown>): VerifiedToolResult {
   const uid = text(userId);
   const limit = amount(payload.monthlyLimit);
@@ -151,6 +191,7 @@ export function updateTask(userId: string, payload: Record<string, unknown>): Ve
 export function executeToolAction(userId: string, action: SmartAiAction): VerifiedToolResult {
   if (!action) throw new Error("No executable action supplied");
   switch (action.type) {
+    case "add_expense": return addTransaction(userId, action.payload);
     case "add_expense": return addTransaction(userId, action.payload);
     case "update_budget": return updateBudget(userId, action.payload);
     case "add_daily_task": return addTask(userId, action.payload);
