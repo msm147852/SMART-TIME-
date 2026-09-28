@@ -33,7 +33,7 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  expenses,
+  expenses: legacyExpenses,
   onSaveExpenses,
 }) => {
   const isAr = language === 'ar';
