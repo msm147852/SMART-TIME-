@@ -8,6 +8,7 @@ import { loadSmartAiVoiceId, saveSmartAiVoiceId, speakSmartAi, stopSmartAiVoice,
 import { listVoiceDnaProfiles, readVoiceDnaSample, type SmartVoiceDnaProfile } from '../services/smartVoiceDnaService';
 import { getVoiceDnaStatus, synthesizeVoiceDna } from '../services/smartVoiceDnaClient';
 import type { SmartAiVoiceId } from '../types';
+import { StorageAdapter } from '../services/storageAdapter';
 
 interface AiCenterViewProps {
   language: Language;
@@ -330,7 +331,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
             {voiceDnaProfiles.length > 0 ? (
-              <select value={selectedVoiceDnaId || ''} onChange={(event) => { const id = event.target.value || null; setSelectedVoiceDnaId(id); try { if (id) localStorage.setItem("smart-time-selected-voice-dna", id); else localStorage.removeItem("smart-time-selected-voice-dna"); } catch {} }} className="max-w-[180px px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
+              <select value={selectedVoiceDnaId || ''} onChange={(event) => { const id = event.target.value || null; setSelectedVoiceDnaId(id); try { if (id) StorageAdapter.setItem("smart-time-selected-voice-dna", id); else localStorage.removeItem("smart-time-selected-voice-dna"); } catch {} }} className="max-w-[180px px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs font-bold text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800/60 outline-none">
                 <option value="">{language === 'ar' ? 'صوت SMART AI العادي' : 'SMART AI browser voice'}</option>
                 {voiceDnaProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
