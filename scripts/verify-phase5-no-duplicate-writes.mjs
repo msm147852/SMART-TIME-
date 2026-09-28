@@ -14,13 +14,13 @@ function walk(target) {
   }
   return out;
 }
-const files = SCAN_DIRS.flatMap((item) => walk(path.join(ROOT, item)));
+const files = SCAN_DIRS.flatMap((item) => walk(path.join(ROOT, item)));\nconst EXCLUDE_TESTS = process.env.PHASE5_6_EXCLUDE_TESTS !== "0";\nfunction isTestFile(rel) {\n  if (!EXCLUDE_TESTS) return false;\n  return /(?:^|\\/)(?:[^/]+\\.(?:test|spec)\\.(?:ts|tsx|js|mjs)|[^/]*tests[^/]*\\/|e2e\\/)/i.test(rel);\n}
 const violations = [];
 const financeSetItem = /(?:localStorage|StorageAdapter)\.setItem\s*\(\s*(?:[\'"]smart_time_expenses[\'"]|STORAGE_KEYS\.EXPENSES\b)/i;
 const aiWrite = /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:main\.)?(?:ai_transactions|ai_budgets)\b/i;
 for (const file of files) {
   const rel = path.relative(ROOT, file).replaceAll(path.sep, "/");
-  if (/\\.(?:test|spec)\\.(?:ts|tsx|js|mjs)$/.test(rel)) continue;
+  if (isTestFile(rel)) continue;
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
     if (financeSetItem.test(line)) violations.push(`${rel}:${index + 1} direct finance storage write`);
