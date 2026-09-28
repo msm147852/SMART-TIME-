@@ -2,6 +2,7 @@ import { apiUrl } from './apiConfig';
 import { authHeaders } from './authService';
 import {
   AiMessage,
+  CalendarEvent,
   DailyTask,
   EducationExpense,
   Expense,
@@ -184,6 +185,7 @@ export interface SmartAiState {
   transactions: Expense[];
   budget: { userId: string; monthlyLimit: number; currency: string; updatedAt: string } | null;
   tasks: DailyTask[];
+  calendarEvents: CalendarEvent[];
   fetchedAt: string;
 }
 
@@ -216,6 +218,27 @@ export async function deleteCanonicalTask(id: string): Promise<void> {
 
 export async function importCanonicalTasks(tasks: DailyTask[]): Promise<{ imported: number }> {
   return smartAiMutation('/api/ai/tasks/import', 'POST', { tasks }) as Promise<{ imported: number }>;
+}
+
+export async function fetchCanonicalEvents(options: { from?: string; to?: string } = {}): Promise<CalendarEvent[]> {
+  const params = new URLSearchParams();
+  if (options.from) params.set('from', options.from);
+  if (options.to) params.set('to', options.to);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const data = await smartAiMutation(`/api/ai/events${suffix}`, 'GET');
+  return Array.isArray(data?.events) ? data.events : [];
+}
+
+export async function createCanonicalEvent(event: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>): Promise<CalendarEvent> {
+  return smartAiMutation('/api/ai/events', 'POST', event) as Promise<CalendarEvent>;
+}
+
+export async function updateCanonicalEvent(event: CalendarEvent): Promise<CalendarEvent> {
+  return smartAiMutation(`/api/ai/events/${encodeURIComponent(event.id)}`, 'PATCH', event) as Promise<CalendarEvent>;
+}
+
+export async function deleteCanonicalEvent(id: string): Promise<void> {
+  await smartAiMutation(`/api/ai/events/${encodeURIComponent(id)}`, 'DELETE');
 }
 
 export async function fetchSmartAiState(): Promise<SmartAiState> {
