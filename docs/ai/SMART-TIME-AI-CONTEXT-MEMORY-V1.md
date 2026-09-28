@@ -31,6 +31,16 @@ The model is not authoritative for execution, permissions, dates, or database st
 - `backend/ai/localInference.ts`
 - `backend/ai/types.ts`
 
-## Next gate
+## Current canonicalization status
 
-Consolidate task/event mutations behind one backend source of truth and make the UI consume verified backend state rather than maintaining a competing AI-local task store.
+- Tasks are canonical in SQLite `ai_tasks`, with verified backend CRUD and one-time import support.
+- Expenses/budget have verified SQLite executors; HTTP exposure remains a separate integration step.
+- Calendar events are modeled separately in SQLite `ai_events`; events must not be conflated with tasks.
+- Reminder behavior is represented as explicit event/task fields and must be enforced by runtime scheduling rather than by model text.
+
+## Next gates
+
+1. Expose verified calendar event CRUD through authenticated backend routes.
+2. Add canonical frontend event hydration and migration without reintroducing a competing localStorage source of truth.
+3. Add reminder scheduling/runtime delivery with timezone-aware temporal validation.
+4. Finish the expense/budget HTTP integration and then run a repository-wide source-of-truth audit.
