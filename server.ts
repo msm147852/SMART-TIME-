@@ -11,6 +11,7 @@ import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 import { executeToolAction } from "./backend/ai/toolExecutor.js";
+import { createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from "./backend/ai/calendar/eventExecutor.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 
@@ -479,6 +480,7 @@ app.get("/api/ai/state", (req, res) => {
       WHERE user_id = ?
     `).get(user.id) || null;
 
+    const calendarEvents = listCalendarEvents(String(user.id));
     const rawTasks = db.prepare(`
       SELECT id, title, completed, priority, category,
              due_date as dueDate, due_time as dueTime,
@@ -501,10 +503,61 @@ app.get("/api/ai/state", (req, res) => {
       transactions,
       budget,
       tasks,
+      calendarEvents,
       fetchedAt: new Date().toISOString(),
     });
   } catch (error: any) {
     return res.status(500).json({ error: error?.message || "تعذر قراءة حالة SMART AI." });
+  }
+});
+
+
+app.get("/api/ai/events", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const events = listCalendarEvents(String(user.id), {
+      from: typeof req.query.from === "string" ? req.query.from : undefined,
+      to: typeof req.query.to === "string" ? req.query.to : undefined,
+    });
+    return res.json({ source: "smart-ai-sqlite", events, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر قراءة أحداث التقويم." });
+  }
+});
+
+app.post("/api/ai/events", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const event = createCalendarEvent(String(user.id), req.body || {});
+    return res.status(201).json(event);
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر إنشاء الحدث." });
+  }
+});
+
+app.patch("/api/ai/events/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const event = updateCalendarEvent(String(user.id), req.params.id, req.body || {});
+    return res.json(event);
+  } catch (error: any) {
+    const message = error?.message || "تعذر تحديث الحدث.";
+    return res.status(message.includes("not found") ? 404 : 400).json({ error: message });
+  }
+});
+
+app.delete("/api/ai/events/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    deleteCalendarEvent(String(user.id), req.params.id);
+    return res.status(204).send();
+  } catch (error: any) {
+    const message = error?.message || "تعذر حذف الحدث.";
+    return res.status(message.includes("not found") ? 404 : 400).json({ error: message });
   }
 });
 
