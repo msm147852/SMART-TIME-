@@ -19,7 +19,8 @@
     "score:smart-ai": "node scripts/score-smart-ai-eval.mjs",
     "verify:canonical-schema": "node scripts/verify-canonical-schema.mjs",
     "verify:phase2-storage-schema": "node scripts/verify-phase2-storage-schema.mjs",
-    "verify:phase3-storage-keys": "node scripts/verify-phase3-storage-keys.mjs"
+    "verify:phase3-storage-keys": "node scripts/verify-phase3-storage-keys.mjs",
+    "verify:phase4-no-direct-storage": "node scripts/verify-phase4-no-direct-storage.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
