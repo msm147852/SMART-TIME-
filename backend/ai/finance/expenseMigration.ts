@@ -19,7 +19,9 @@ export function importExpensesForUser(userId: string, items: ExpenseImportInput[
   const now = new Date().toISOString();
   const results: ExpenseImportResult[] = [];
   const insert = db.prepare("INSERT INTO finance_expenses (id,user_id,title,amount,currency,category,date,payment_method,receipt_url,notes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-  const tx = db.transaction((records: ExpenseImportInput[]) => {
+  db.exec("BEGIN");
+  try {
+    const records = items;
     for (const item of records) {
       validateExpense(item);
       const id = text(item.id, 200);
@@ -30,7 +32,10 @@ export function importExpensesForUser(userId: string, items: ExpenseImportInput[
       insert.run(id,userId,text(item.title,300),Number(item.amount),"EGP",text(item.category,100),text(item.date,100),text(item.paymentMethod,50),text(item.receiptUrl,2000)||null,text(item.notes,1000)||null,text(item.createdAt,100)||now,now);
       results.push({ id, status: "inserted", reason: "imported into canonical SQLite finance store" });
     }
-  });
-  tx(items);
+    db.exec("COMMIT");
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch { /* preserve original error */ }
+    throw error;
+  }
   return results;
 }
