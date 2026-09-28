@@ -62,10 +62,10 @@ async function financeMutation(path: string, method: string, body?: unknown): Pr
 
 export async function createCanonicalFinanceExpense(input: CanonicalExpenseInput): Promise<Record<string, unknown>> {
   const payload = await financeMutation("/api/finance/expenses", "POST", {
+    ...input,
     title: input.title || input.category || input.type,
     category: input.category || input.type,
     paymentMethod: input.paymentMethod || "unknown",
-    ...input,
   });
   return payload.record as Record<string, unknown>;
 }
