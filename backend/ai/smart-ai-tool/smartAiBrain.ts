@@ -1,4 +1,5 @@
 import { checkPermission } from "./permissions.js";
+import { buildSmartContext } from "./contextMemory.js";
 import { detectProblemType } from "./empathyEngine.js";
 import { executeV3Tool } from "./toolRuntime.js";
 import { v3ToolRegistry } from "./toolRegistry.js";
@@ -24,6 +25,13 @@ export async function smartAiBrainV3(
   message: string,
   language: "ar" | "en" = "ar",
   data: Record<string, unknown> = {},
+  runtime: {
+    currentDate?: string;
+    timezone?: string;
+    conversationId?: string;
+    activeTaskId?: string;
+    activeFileIds?: string[];
+  } = {},
 ) {
   const toolName = classifyV3(message);
   if (!toolName) return null;
@@ -50,8 +58,28 @@ export async function smartAiBrainV3(
         ? { expenses: data.expenses || [] }
         : { message };
 
+  const currentDate = runtime.currentDate ?? new Date().toISOString().slice(0, 10);
+  const timezone = runtime.timezone ?? "UTC";
+  const context = buildSmartContext({
+    userId,
+    conversationId: runtime.conversationId,
+    currentDate,
+    timezone,
+    activeTaskId: runtime.activeTaskId,
+    activeFileIds: runtime.activeFileIds,
+  });
+
   const execution = await executeV3Tool(
-    { userId, language, canonicalData: data },
+    {
+      userId,
+      language,
+      currentDate,
+      timezone,
+      conversationId: runtime.conversationId,
+      activeTaskId: runtime.activeTaskId,
+      activeFileIds: runtime.activeFileIds,
+      canonicalData: data,
+    },
     toolName,
     args,
   );
@@ -60,6 +88,7 @@ export async function smartAiBrainV3(
     toolName,
     result: execution.result,
     execution,
+    context,
     reply: execution.verified ? "" : execution.error || "",
   };
 }
