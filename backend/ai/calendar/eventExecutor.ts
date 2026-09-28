@@ -140,7 +140,7 @@ function normalizePayload(payload: Record<string, unknown>, current?: CalendarEv
     throw new Error("timezone must be a valid IANA timezone");
   }
 
-  const category = payload.category === undefined && current ? current.category : text(payload.category, "general");
+  const category = payload.category === undefined && current ? current.category : text(payload.category) || "general";
   if (!EVENT_CATEGORIES.has(category)) throw new Error("category is invalid");
 
   const reminderEnabled = payload.reminderEnabled === undefined && current
