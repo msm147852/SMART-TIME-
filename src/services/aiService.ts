@@ -179,6 +179,24 @@ export function buildSmartAiContext(input: {
   };
 }
 
+export interface SmartAiState {
+  source: 'smart-ai-sqlite';
+  transactions: Expense[];
+  budget: { userId: string; monthlyLimit: number; currency: string; updatedAt: string } | null;
+  tasks: DailyTask[];
+  fetchedAt: string;
+}
+
+export async function fetchSmartAiState(): Promise<SmartAiState> {
+  const res = await fetch(apiUrl('/api/ai/state'), {
+    method: 'GET',
+    headers: { ...authHeaders() },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'تعذر قراءة بيانات SMART AI');
+  return data as SmartAiState;
+}
+
 export async function askSmartAi(request: AskSmartAiRequest): Promise<SmartAiResponse> {
   const res = await fetch(apiUrl('/api/ai/chat'), {
     method: 'POST',
