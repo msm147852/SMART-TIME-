@@ -192,7 +192,6 @@ export function executeToolAction(userId: string, action: SmartAiAction): Verifi
   if (!action) throw new Error("No executable action supplied");
   switch (action.type) {
     case "add_expense": return addTransaction(userId, action.payload);
-    case "add_expense": return addTransaction(userId, action.payload);
     case "update_budget": return updateBudget(userId, action.payload);
     case "add_daily_task": return addTask(userId, action.payload);
     case "update_daily_task": return updateTask(userId, action.payload);
