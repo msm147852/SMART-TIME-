@@ -1,0 +1,22 @@
+name: Phase 2 - Verify Central Schema
+
+on:
+  push:
+    branches: [feat/v3-next]
+  pull_request:
+    branches: [feat/v3-next]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci || npm install
+      - run: npm run verify:canonical-schema
+      - run: npm run build
+      - run: npm run lint
