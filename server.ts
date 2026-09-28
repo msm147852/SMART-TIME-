@@ -478,7 +478,7 @@ app.get("/api/ai/state", (req, res) => {
       WHERE user_id = ?
     `).get(user.id) || null;
 
-    const tasks = db.prepare(`
+    const rawTasks = db.prepare(`
       SELECT id, title, completed, priority, category,
              due_date as dueDate, due_time as dueTime,
              note, created_at as createdAt,
@@ -486,7 +486,13 @@ app.get("/api/ai/state", (req, res) => {
       FROM ai_tasks
       WHERE user_id = ?
       ORDER BY COALESCE(due_date, '9999-12-31'), COALESCE(due_time, '23:59'), created_at DESC
-    `).all(user.id);
+    `).all(user.id) as any[];
+
+    const tasks = rawTasks.map((task) => ({
+      ...task,
+      completed: Boolean(task.completed),
+      reminderEnabled: true,
+    }));
 
     return res.json({
       source: "smart-ai-sqlite",
