@@ -184,45 +184,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   });
 
   // --- 3. PERSISTENCE WRAPPERS ---
-  const handleSaveHouse = (list: SpecializedExpense[]) => {
-    setHouseList(list);
-    StorageAdapter.setItem('smart_time_house_expenses', list);
-  };
-
-  const handleSaveMedical = (list: MedicalExpenseRecord[]) => {
-    setMedicalList(list);
-    StorageAdapter.setItem('smart_time_medical_expenses', list);
-  };
-
-  const handleSaveWork = (list: SpecializedExpense[]) => {
-    setWorkList(list);
-    StorageAdapter.setItem('smart_time_work_expenses', list);
-  };
-
-  const handleSavePersonal = (list: SpecializedExpense[]) => {
-    setPersonalList(list);
-    StorageAdapter.setItem('smart_time_personal_expenses', list);
-  };
-
   const handleSaveAssociations = (list: AssociationRecord[]) => {
     setAssociationsList(list);
     StorageAdapter.setItem('smart_time_personal_associations', list);
-  };
-
-  const handleSaveFuel = (list: VehicleFuelRecord[]) => {
-    setFuelList(list);
-    StorageAdapter.setItem('smart_time_vehicle_fuel', list);
-  };
-
-  const handleSaveMaint = (list: VehicleMaintenanceRecord[]) => {
-    setMaintList(list);
-    StorageAdapter.setItem('smart_time_vehicle_maint', list);
-  };
-
-
-  const handleSaveOilFilter = (list: VehicleOilFilterRecord[]) => {
-    setOilFilterList(list);
-    StorageAdapter.setItem('smart_time_vehicle_oil_filters', list);
   };
 
   const handleSaveAccidents = (list: VehicleAccidentRecord[]) => {
@@ -233,11 +197,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   const handleSaveStudents = (list: StudentProfile[]) => {
     setStudents(list);
     StorageAdapter.setItem('smart_time_students', list);
-  };
-
-  const handleSaveStudentExpenses = (list: StudentExpenseRecord[]) => {
-    setStudentExpensesList(list);
-    StorageAdapter.setItem('smart_time_student_expenses', list);
   };
 
   const handleSaveIncome = (list: MonthlyIncome[]) => {
@@ -557,10 +516,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           currency={currency}
           selectedMonth={selectedMonth}
           onBack={() => setCurrentScreen('sections_menu')}
-          expenses={houseList}
-          onSaveExpenses={handleSaveHouse}
-          medicalExpenses={medicalList}
-          onSaveMedicalExpenses={handleSaveMedical}
         />
       )}
 
@@ -571,8 +526,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           currency={currency}
           selectedMonth={selectedMonth}
           onBack={() => setCurrentScreen('sections_menu')}
-          expenses={workList}
-          onSaveExpenses={handleSaveWork}
         />
       )}
 
@@ -583,8 +536,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           currency={currency}
           selectedMonth={selectedMonth}
           onBack={() => setCurrentScreen('sections_menu')}
-          expenses={personalList}
-          onSaveExpenses={handleSavePersonal}
           associations={associationsList}
           onSaveAssociations={handleSaveAssociations}
         />
@@ -597,12 +548,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           currency={currency}
           selectedMonth={selectedMonth}
           onBack={() => setCurrentScreen('sections_menu')}
-          fuelList={fuelList}
-          onSaveFuel={handleSaveFuel}
-          maintList={maintList}
-          onSaveMaint={handleSaveMaint}
-          oilFilterList={oilFilterList}
-          onSaveOilFilter={handleSaveOilFilter}
           accidentList={accidentList}
           onSaveAccidents={handleSaveAccidents}
         />
@@ -617,8 +562,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           onBack={() => setCurrentScreen('sections_menu')}
           students={students}
           onSaveStudents={handleSaveStudents}
-          expenses={studentExpensesList}
-          onSaveExpenses={handleSaveStudentExpenses}
         />
       )}
 
