@@ -24,6 +24,8 @@ import {
 import { UserProfile } from '../types';
 import { fetchLiveNews, fetchLiveSports, LiveNewsArticle, LiveSportsMatch } from '../services/liveDataService';
 import { apiUrl } from '../services/apiConfig';
+import { STORAGE_KEYS } from '../services/storageKeys';
+import { StorageAdapter } from '../services/storageAdapter';
 
 interface SportsViewProps {
   user: UserProfile;
@@ -130,7 +132,7 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
   const [liveMatches, setLiveMatches] = useState<LiveSportsMatch[]>([]);
   const [sportsLoading, setSportsLoading] = useState(false);
   const [workouts, setWorkouts] = useState<WorkoutLog[]>(() =>
-    readStorage('smart_time_workout_logs', [
+    readStorage(STORAGE_KEYS.WORKOUT_LOGS, [
       { id: 'seed-1', title: 'جري خفيف صباحي', category: 'كارديو', duration: 30, calories: 280, date: 'اليوم' },
       { id: 'seed-2', title: 'تمارين حديد (أرجل وبطن)', category: 'قوة', duration: 45, calories: 350, date: 'أمس' },
     ])
@@ -143,20 +145,20 @@ export const SportsView: React.FC<SportsViewProps> = ({ user }) => {
   // Reorder mode for Sports Home Cards
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [cardOrder, setCardOrder] = useState<string[]>(() =>
-    readStorage('smart_time_sports_cards_order', initialHomeCards.map((c) => c.id))
+    readStorage(STORAGE_KEYS.SPORTS_CARDS_ORDER, initialHomeCards.map((c) => c.id))
   );
 
   useEffect(() => {
-    window.localStorage.setItem('my_favorite_workouts', JSON.stringify(favorites));
+    StorageAdapter.setItem('my_favorite_workouts', favorites);
   }, [favorites]);
   useEffect(() => {
-    window.localStorage.setItem('my_completed_workouts', JSON.stringify(completed));
+    StorageAdapter.setItem('my_completed_workouts', completed);
   }, [completed]);
   useEffect(() => {
-    window.localStorage.setItem('smart_time_workout_logs', JSON.stringify(workouts));
+    StorageAdapter.setItem(STORAGE_KEYS.WORKOUT_LOGS, workouts);
   }, [workouts]);
   useEffect(() => {
-    window.localStorage.setItem('smart_time_sports_cards_order', JSON.stringify(cardOrder));
+    StorageAdapter.setItem(STORAGE_KEYS.SPORTS_CARDS_ORDER, cardOrder);
   }, [cardOrder]);
 
   const orderedCards = useMemo(() => {
