@@ -420,6 +420,8 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
       ? req.body.conversationHistory.slice(-8)
       : [];
     const appContext = req.body?.appContext;
+    const confirmed = req.body?.confirmed === true;
+    const timezone = String(req.body?.timezone || (appContext?.profile && typeof appContext.profile === "object" ? appContext.profile.timezone || "Africa/Cairo" : "Africa/Cairo"));
 
     if (!message) return res.status(400).json({ error: "Message is required" });
     if (!appContext || typeof appContext !== "object") {
@@ -431,6 +433,12 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
       language,
       conversationHistory,
       appContext: appContext as Record<string, unknown>,
+      userId: String(user.id),
+      timezone,
+      conversationId: typeof req.body?.conversationId === "string" ? req.body.conversationId : undefined,
+      activeTaskId: typeof req.body?.activeTaskId === "string" ? req.body.activeTaskId : undefined,
+      activeFileIds: Array.isArray(req.body?.activeFileIds) ? req.body.activeFileIds.map(String) : undefined,
+      confirmed,
     });
 
     return res.json(response);
