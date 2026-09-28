@@ -7,6 +7,8 @@ on:
       - "tools/**"
       - "package.json"
       - "tsconfig.json"
+      - "src/services/storageSchema.ts"
+      - "docs/ai/STORAGE-SCHEMA-PHASE2.md"
       - ".github/workflows/open-mind-ci.yml"
 
 jobs:
