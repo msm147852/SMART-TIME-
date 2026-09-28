@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
 import { Language } from '../../types';
+import { financeService } from '../../services/financeService';
 import { SpecializedExpense } from './HouseExpensesSection';
 
 interface WorkExpensesSectionProps {
@@ -36,6 +37,12 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
   onSaveExpenses,
 }) => {
   const isAr = language === 'ar';
+  const [canonicalExpenses, setCanonicalExpenses] = useState<SpecializedExpense[]>([]);
+  const loadCanonicalExpenses = async () => {
+    const rows = await financeService.getExpenses({ type: 'work' });
+    setCanonicalExpenses(rows.map((x) => ({ id: String(x.id), section: 'work', type: String(x.title || x.category || 'مصروف عمل'), amount: Number(x.amount) || 0, date: String(x.date || '').slice(0, 10), notes: x.notes ? String(x.notes) : undefined })));
+  };
+  useEffect(() => { void loadCanonicalExpenses(); }, []);
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,10 +70,10 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
     'أخرى (مخصص)',
   ];
 
-  const currentMonthExpenses = expenses.filter((e) => isDateInMonth(e.date, selectedMonth));
+  const currentMonthExpenses = canonicalExpenses.filter((e) => isDateInMonth(e.date, selectedMonth));
   const monthTotal = currentMonthExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-  const filteredList = expenses.filter((item) => {
+  const filteredList = canonicalExpenses.filter((item) => {
     const matchesSearch =
       item.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.customType && item.customType.toLowerCase().includes(searchQuery.toLowerCase())) ||
