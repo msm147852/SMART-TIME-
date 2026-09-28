@@ -29,11 +29,11 @@ import type {
 import { STORAGE_KEYS } from './storageKeys';
 
 export type HiddenSchemaStorageKey =
-  | 'smart_time_dashboard_layout'
-  | 'smart_time_dashboard_sections_v2'
-  | 'smart_time_workout_logs'
-  | 'smart_time_sports_cards_order'
-  | 'smart_time_expenses_sections_order';
+  | typeof STORAGE_KEYS.DASHBOARD_LAYOUT
+  | typeof STORAGE_KEYS.DASHBOARD_SECTIONS_V2
+  | typeof STORAGE_KEYS.WORKOUT_LOGS
+  | typeof STORAGE_KEYS.SPORTS_CARDS_ORDER
+  | typeof STORAGE_KEYS.EXPENSES_SECTIONS_ORDER;
 
 export type StorageSchemaKey =
   | (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS]
@@ -92,11 +92,11 @@ export type StorageSchemaValueMap = {
   [STORAGE_KEYS.ATHKAR_ITEMS]: AthkarItem[];
   [STORAGE_KEYS.AI_CHAT_HISTORY]: AiMessage[];
   [STORAGE_KEYS.NOTIFICATION_SOUND]: boolean;
-  smart_time_dashboard_layout: DashboardLayoutMode;
-  smart_time_dashboard_sections_v2: DashboardSectionPreference[];
-  smart_time_workout_logs: WorkoutLogRecord[];
-  smart_time_sports_cards_order: string[];
-  smart_time_expenses_sections_order: ExpenseSectionKey[];
+  [STORAGE_KEYS.DASHBOARD_LAYOUT]: DashboardLayoutMode;
+  [STORAGE_KEYS.DASHBOARD_SECTIONS_V2]: DashboardSectionPreference[];
+  [STORAGE_KEYS.WORKOUT_LOGS]: WorkoutLogRecord[];
+  [STORAGE_KEYS.SPORTS_CARDS_ORDER]: string[];
+  [STORAGE_KEYS.EXPENSES_SECTIONS_ORDER]: ExpenseSectionKey[];
 };
 
 export type StorageSchemaEntry<K extends StorageSchemaKey = StorageSchemaKey> = {
@@ -295,28 +295,28 @@ const schema = {
     description: 'Notification sound enabled/disabled flag.',
     validate: isBoolean,
   },
-  smart_time_dashboard_layout: {
-    key: 'smart_time_dashboard_layout',
+  [STORAGE_KEYS.DASHBOARD_LAYOUT]: {
+    key: STORAGE_KEYS.DASHBOARD_LAYOUT,
     description: 'Dashboard layout mode persisted by DashboardView.',
     validate: isDashboardLayout,
   },
-  smart_time_dashboard_sections_v2: {
-    key: 'smart_time_dashboard_sections_v2',
+  [STORAGE_KEYS.DASHBOARD_SECTIONS_V2]: {
+    key: STORAGE_KEYS.DASHBOARD_SECTIONS_V2,
     description: 'Dashboard section ordering/favorite preferences.',
     validate: isDashboardSectionArray,
   },
-  smart_time_workout_logs: {
-    key: 'smart_time_workout_logs',
+  [STORAGE_KEYS.WORKOUT_LOGS]: {
+    key: STORAGE_KEYS.WORKOUT_LOGS,
     description: 'Workout log collection persisted by SportsView.',
     validate: isWorkoutLogArray,
   },
-  smart_time_sports_cards_order: {
-    key: 'smart_time_sports_cards_order',
+  [STORAGE_KEYS.SPORTS_CARDS_ORDER]: {
+    key: STORAGE_KEYS.SPORTS_CARDS_ORDER,
     description: 'Sports home card ordering.',
     validate: isStringArray,
   },
-  smart_time_expenses_sections_order: {
-    key: 'smart_time_expenses_sections_order',
+  [STORAGE_KEYS.EXPENSES_SECTIONS_ORDER]: {
+    key: STORAGE_KEYS.EXPENSES_SECTIONS_ORDER,
     description: 'Expenses section ordering.',
     validate: isExpenseSectionArray,
   },
