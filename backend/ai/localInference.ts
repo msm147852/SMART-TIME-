@@ -168,7 +168,7 @@ export async function* streamLocalSmartAi(input: {
     chat_template_kwargs: { enable_thinking: false },
     messages: [
       { role: "system", content: system },
-      ...(input.memoryContext ? [{ role: "system", content: `Persistent SMART AI memory:\n${input.memoryContext.slice(0, 5000)}` }] : []),
+      ...(persistentMemory ? [{ role: "system", content: `Persistent SMART AI memory:\n${persistentMemory.slice(0, 5000)}` }] : []),
       ...(input.conversationHistory || []).slice(-6).map((item) => ({
         role: item.sender === "user" ? "user" : "assistant",
         content: String(item.text || "").slice(0, 2000)
