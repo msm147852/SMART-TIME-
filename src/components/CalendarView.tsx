@@ -128,7 +128,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ language, timezone =
     }
   };
 
-  useEffect(() => { void loadEvents(cursor); }, [cursor.toISOString().slice(0, 7)]);
+  useEffect(() => {
+    setSelectedDate((current) => {
+      if (current.getFullYear() === cursor.getFullYear() && current.getMonth() === cursor.getMonth()) return current;
+      return new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    });
+    void loadEvents(cursor);
+  }, [cursor.getFullYear(), cursor.getMonth()]);
 
   const days = useMemo(() => {
     const first = monthStart(cursor);
@@ -241,7 +247,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ language, timezone =
             const selected = key === localDateKey(selectedDate);
             const hasEvents = events.some((event) => localDateKey(new Date(event.startAt)) === key);
             return (
-              <button key={key} onClick={() => setSelectedDate(day)} className={`min-h-9 rounded-xl flex flex-col items-center justify-center text-[11px] font-bold ${selected ? 'bg-accent-500 text-slate-950' : inMonth ? 'text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800' : 'text-slate-300 dark:text-slate-700'}`}>
+              <button key={key} onClick={() => { setSelectedDate(day); if (day.getMonth() !== cursor.getMonth()) setCursor(new Date(day.getFullYear(), day.getMonth(), 1)); }} className={`min-h-9 rounded-xl flex flex-col items-center justify-center text-[11px] font-bold ${selected ? 'bg-accent-500 text-slate-950' : inMonth ? 'text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800' : 'text-slate-300 dark:text-slate-700'}`}>
                 <span>{day.getDate()}</span>
                 {hasEvents && <span className={`w-1 h-1 rounded-full mt-0.5 ${selected ? 'bg-slate-950' : 'bg-accent-500'}`} />}
               </button>
