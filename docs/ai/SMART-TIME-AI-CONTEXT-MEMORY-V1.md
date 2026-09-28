@@ -44,3 +44,31 @@ The model is not authoritative for execution, permissions, dates, or database st
 2. Add canonical frontend event hydration and migration without reintroducing a competing localStorage source of truth.
 3. Add reminder scheduling/runtime delivery with timezone-aware temporal validation.
 4. Finish the expense/budget HTTP integration and then run a repository-wide source-of-truth audit.
+
+
+## Canonical Calendar Runtime Status
+
+The calendar foundation is now backed by the authenticated SQLite `ai_events` store.
+
+Implemented in `feat/v3-next`:
+- verified event create/update/delete/list executor with per-user ownership checks;
+- ISO timestamp validation and IANA timezone validation;
+- event category, reminder, and recurrence payload validation;
+- authenticated REST endpoints under `/api/ai/events`;
+- canonical event state included in `/api/ai/state`;
+- client API helpers for canonical event CRUD;
+- durable one-time reminder queue in `ai_event_reminders`;
+- authenticated pending-reminder and acknowledgement endpoints;
+- a backend reminder poller running every 15 seconds.
+
+Reminder scheduler boundary:
+- the durable scheduler currently materializes **non-recurring** event reminders;
+- recurring-event occurrence expansion is intentionally a separate gate so recurrence semantics are not guessed or executed by model text;
+- client notification delivery/OS notification integration remains a frontend gate.
+
+Next context/memory gates:
+1. connect an actual calendar UI/state layer to the canonical event API;
+2. finish recurring reminder occurrence generation with timezone-aware rules;
+3. wire browser/device notification delivery and acknowledgement;
+4. complete expense/budget canonical HTTP mutation paths;
+5. run repository-wide source-of-truth audit.
