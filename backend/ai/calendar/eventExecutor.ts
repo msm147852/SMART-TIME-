@@ -134,6 +134,11 @@ function normalizePayload(payload: Record<string, unknown>, current?: CalendarEv
 
   const timezone = payload.timezone === undefined && current ? current.timezone : text(payload.timezone);
   if (!timezone) throw new Error("timezone is required");
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+  } catch {
+    throw new Error("timezone must be a valid IANA timezone");
+  }
 
   const category = payload.category === undefined && current ? current.category : text(payload.category, "general");
   if (!EVENT_CATEGORIES.has(category)) throw new Error("category is invalid");
