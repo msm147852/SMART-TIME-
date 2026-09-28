@@ -1,6 +1,7 @@
 import { UserRepository } from './repositories/userRepository';
 import { UserProfile } from '../types';
 import { apiUrl } from './apiConfig';
+import { StorageAdapter } from './storageAdapter';
 
 export interface AuthUser {
   id: string;
@@ -19,14 +20,14 @@ export interface AuthSession {
 const SESSION_KEY = 'smart_time_auth_session';
 const DEVICE_ID_KEY = 'smart_time_device_id';
 export function getDeviceId(): string {
-  try { const existing=localStorage.getItem(DEVICE_ID_KEY); if(existing && existing.length>=16) return existing; const id=typeof crypto!=='undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`; localStorage.setItem(DEVICE_ID_KEY,id); return id; } catch { return `ephemeral-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; } }
+  try { const existing=localStorage.getItem(DEVICE_ID_KEY); if(existing && existing.length>=16) return existing; const id=typeof crypto!=='undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`; StorageAdapter.setItem(DEVICE_ID_KEY,id); return id; } catch { return `ephemeral-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; } }
 const api = (path: string, options: RequestInit = {}) => fetch(apiUrl(path), {
   ...options,
   headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
 });
 
 function saveSession(session: AuthSession) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  StorageAdapter.setItem(SESSION_KEY, JSON.stringify(session));
 }
 export function getStoredSession(): AuthSession | null {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
