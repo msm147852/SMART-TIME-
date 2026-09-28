@@ -96,6 +96,7 @@ export interface AskSmartAiRequest {
   model?: string;
   conversationHistory?: Array<{ sender: 'user' | 'model'; text: string }>;
   appContext: SmartAiContext;
+  confirmed?: boolean;
 }
 
 export function buildSmartAiContext(input: {
