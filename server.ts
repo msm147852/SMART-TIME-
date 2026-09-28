@@ -10,6 +10,7 @@ import { getServiceStatuses, seedServiceStatuses, setServiceStatus } from "./bac
 import { chatRouter, setupChatWebSocket } from "./backend/chatServer.js";
 import { estimateProviderPrice, type RideProvider, type RideCategory } from "./src/services/ridePriceEstimator.js";
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
+import { executeToolAction } from "./backend/ai/toolExecutor.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 
@@ -504,6 +505,79 @@ app.get("/api/ai/state", (req, res) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: error?.message || "تعذر قراءة حالة SMART AI." });
+  }
+});
+
+app.post("/api/ai/tasks", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const result = executeToolAction(String(user.id), {
+      type: "add_daily_task",
+      payload: req.body || {},
+    } as any);
+    if (!result.ok) return res.status(500).json({ error: result.error || "تعذر إنشاء المهمة." });
+    return res.status(201).json(result.record);
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر إنشاء المهمة." });
+  }
+});
+
+app.patch("/api/ai/tasks/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const result = executeToolAction(String(user.id), {
+      type: "update_daily_task",
+      payload: { ...(req.body || {}), id: req.params.id },
+    } as any);
+    if (!result.ok) return res.status(500).json({ error: result.error || "تعذر تحديث المهمة." });
+    return res.json(result.record);
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تحديث المهمة." });
+  }
+});
+
+app.delete("/api/ai/tasks/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const row = db.prepare("SELECT id FROM ai_tasks WHERE id = ? AND user_id = ?").get(req.params.id, user.id) as any;
+    if (!row) return res.status(404).json({ error: "المهمة غير موجودة." });
+    db.prepare("DELETE FROM ai_tasks WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    const verify = db.prepare("SELECT id FROM ai_tasks WHERE id = ? AND user_id = ?").get(req.params.id, user.id);
+    if (verify) return res.status(500).json({ error: "فشل التحقق من حذف المهمة." });
+    return res.status(204).send();
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر حذف المهمة." });
+  }
+});
+
+app.post("/api/ai/tasks/import", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
+  try {
+    const insert = db.prepare(`INSERT OR IGNORE INTO ai_tasks
+      (id,user_id,title,completed,priority,category,due_date,due_time,note,created_at,completed_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+    let imported = 0;
+    for (const task of tasks) {
+      const id = String(task?.id || "").trim();
+      const title = String(task?.title || "").trim();
+      if (!id || !title) continue;
+      insert.run(
+        id, String(user.id), title, task?.completed ? 1 : 0,
+        String(task?.priority || "medium"), String(task?.category || "general"),
+        String(task?.dueDate || "") || null, String(task?.dueTime || "") || null,
+        String(task?.note || "") || null, String(task?.createdAt || new Date().toISOString()),
+        task?.completedAt ? String(task.completedAt) : null
+      );
+      imported += 1;
+    }
+    return res.json({ imported });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر استيراد المهام." });
   }
 });
 
