@@ -12,6 +12,7 @@ import { estimateProviderPrice, type RideProvider, type RideCategory } from "./s
 import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 import { executeToolAction } from "./backend/ai/toolExecutor.js";
 import { createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from "./backend/ai/calendar/eventExecutor.js";
+import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 
@@ -523,6 +524,34 @@ app.get("/api/ai/events", (req, res) => {
     return res.json({ source: "smart-ai-sqlite", events, fetchedAt: new Date().toISOString() });
   } catch (error: any) {
     return res.status(400).json({ error: error?.message || "تعذر قراءة أحداث التقويم." });
+  }
+});
+
+app.get("/api/ai/reminders", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    queueDueEventReminders();
+    const limit = Number(req.query.limit || 50);
+    return res.json({
+      source: "smart-ai-sqlite",
+      reminders: listPendingEventReminders(String(user.id), Number.isFinite(limit) ? limit : 50),
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر قراءة تذكيرات الأحداث." });
+  }
+});
+
+app.post("/api/ai/reminders/:id/ack", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const acknowledged = acknowledgeEventReminder(String(user.id), req.params.id);
+    if (!acknowledged) return res.status(404).json({ error: "التذكير غير موجود أو تم تأكيده بالفعل." });
+    return res.json({ acknowledged: true, id: req.params.id });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تأكيد التذكير." });
   }
 });
 
@@ -1971,6 +2000,16 @@ async function startServer() {
 
   const httpServer = http.createServer(app);
   setupChatWebSocket(httpServer);
+
+  queueDueEventReminders();
+  const reminderScheduler = setInterval(() => {
+    try {
+      queueDueEventReminders();
+    } catch (error) {
+      console.error("[SMART AI] reminder scheduler error:", error);
+    }
+  }, 15_000);
+  reminderScheduler.unref?.();
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     setServiceStatus("backend", "LIVE", "express", `Listening on port ${PORT}`);
