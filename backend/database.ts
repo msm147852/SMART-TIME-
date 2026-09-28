@@ -127,128 +127,7 @@ CREATE TABLE IF NOT EXISTS ride_quotes (
   raw_json TEXT,
   created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS ai_events (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT,
-  start_at TEXT NOT NULL,
-  end_at TEXT,
-  timezone TEXT NOT NULL,
-  location TEXT,
-  category TEXT NOT NULL DEFAULT 'general',
-  all_day INTEGER NOT NULL DEFAULT 0,
-  reminder_enabled INTEGER NOT NULL DEFAULT 0,
-  reminder_minutes INTEGER,
-  recurrence_json TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_ai_events_user_start ON ai_events(user_id, start_at);
-CREATE INDEX IF NOT EXISTS idx_ai_events_user_end ON ai_events(user_id, end_at);
-CREATE INDEX IF NOT EXISTS idx_ai_events_reminders ON ai_events(user_id, reminder_enabled, start_at);
 
--- Specialized finance canonical tables. These are deliberately separate from ai_transactions.
-CREATE TABLE IF NOT EXISTS finance_expenses (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  amount REAL NOT NULL,
-  currency TEXT NOT NULL DEFAULT 'EGP',
-  category TEXT NOT NULL,
-  date TEXT NOT NULL,
-  payment_method TEXT NOT NULL,
-  receipt_url TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_finance_expenses_user_date ON finance_expenses(user_id, date);
-
-CREATE TABLE IF NOT EXISTS finance_monthly_income (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  month TEXT NOT NULL,
-  salary REAL NOT NULL DEFAULT 0,
-  bonuses REAL NOT NULL DEFAULT 0,
-  other_income REAL NOT NULL DEFAULT 0,
-  other_income_note TEXT,
-  sources_json TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(user_id, month)
-);
-CREATE INDEX IF NOT EXISTS idx_finance_income_user_month ON finance_monthly_income(user_id, month);
-
-CREATE TABLE IF NOT EXISTS finance_bank_certificates (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  bank_name TEXT NOT NULL,
-  certificate_number TEXT,
-  duration TEXT NOT NULL,
-  amount REAL NOT NULL,
-  annual_rate REAL,
-  annual_profit REAL,
-  periodic_profit REAL,
-  monthly_equivalent_profit REAL,
-  return_type TEXT,
-  issue_date TEXT NOT NULL,
-  maturity_date TEXT NOT NULL,
-  profit_date TEXT NOT NULL,
-  profit_amount REAL NOT NULL,
-  profit_frequency TEXT NOT NULL,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_finance_certificates_user_maturity ON finance_bank_certificates(user_id, maturity_date);
-
-CREATE TABLE IF NOT EXISTS finance_fuel_records (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  vehicle_id TEXT NOT NULL,
-  liters REAL NOT NULL,
-  price_per_liter REAL NOT NULL,
-  total_cost REAL NOT NULL,
-  mileage REAL NOT NULL,
-  date TEXT NOT NULL,
-  station_name TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_finance_fuel_user_vehicle_date ON finance_fuel_records(user_id, vehicle_id, date);
-
-CREATE TABLE IF NOT EXISTS finance_maintenance_records (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  vehicle_id TEXT NOT NULL,
-  system_type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  cost REAL NOT NULL,
-  current_mileage REAL NOT NULL,
-  next_mileage_due REAL NOT NULL,
-  date TEXT NOT NULL,
-  service_center TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_finance_maintenance_user_vehicle_date ON finance_maintenance_records(user_id, vehicle_id, date);
-
-CREATE TABLE IF NOT EXISTS finance_education_expenses (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  student_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  amount REAL NOT NULL,
-  category TEXT NOT NULL,
-  date TEXT NOT NULL,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_finance_education_user_student_date ON finance_education_expenses(user_id, student_id, date);
 
 CREATE TABLE IF NOT EXISTS voice_dna_profiles (
   id TEXT PRIMARY KEY,
@@ -323,6 +202,9 @@ CREATE TABLE IF NOT EXISTS voice_dna_shares (
   UNIQUE(profile_id, recipient_user_id)
 );
 `);
+
+// Canonical AI / finance schema is owned by backend/database/canonicalSchema.ts.
+db.exec(SMART_AI_CANONICAL_SCHEMA_SQL);
 
 try { db.exec('ALTER TABLE users ADD COLUMN username TEXT'); } catch {}
 try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL'); } catch {}
