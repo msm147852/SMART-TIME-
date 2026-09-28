@@ -43,6 +43,7 @@ import {
 } from '../utils/cardDesignHelper';
 import { CardCustomizerModal } from './CardCustomizerModal';
 import { STORAGE_KEYS } from '../services/storageKeys';
+import { StorageAdapter } from '../services/storageAdapter';
 import { Organic3DDashboard } from './Organic3DDashboard';
 import { DashboardSkeletonLoader } from './DashboardSkeletonLoader';
 
@@ -740,15 +741,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.DASHBOARD_LAYOUT, layoutMode);
+      StorageAdapter.setItem(STORAGE_KEYS.DASHBOARD_LAYOUT, layoutMode);
     } catch (e) {}
   }, [layoutMode]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(
+      StorageAdapter.setItem(
         STORAGE_KEYS.DASHBOARD_SECTIONS_V2,
-        JSON.stringify(sections.map((s) => ({ id: s.id, isFavorite: s.isFavorite })))
+        sections.map((s) => ({ id: s.id, isFavorite: s.isFavorite }))
       );
     } catch (e) {}
   }, [sections]);
