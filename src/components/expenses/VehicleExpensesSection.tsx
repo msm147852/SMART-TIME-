@@ -62,12 +62,6 @@ interface VehicleExpensesSectionProps {
   currency: string;
   selectedMonth: string;
   onBack: () => void;
-  fuelList: VehicleFuelRecord[];
-  onSaveFuel: (list: VehicleFuelRecord[]) => void;
-  maintList: VehicleMaintenanceRecord[];
-  onSaveMaint: (list: VehicleMaintenanceRecord[]) => void;
-  oilFilterList: VehicleOilFilterRecord[];
-  onSaveOilFilter: (list: VehicleOilFilterRecord[]) => void;
   accidentList?: VehicleAccidentRecord[];
   onSaveAccidents?: (list: VehicleAccidentRecord[]) => void;
   onOpenCamera?: (mode: 'accident' | 'odometer') => void;
