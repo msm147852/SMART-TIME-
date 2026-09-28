@@ -13,14 +13,12 @@ interface AiCenterViewProps {
   language: Language;
   onOpenVoiceSearch: () => void;
   appContext: Parameters<typeof buildSmartAiContext>[0];
-  onApplyAction: (action: SmartAiAction) => string;
 }
 
 export const AiCenterView: React.FC<AiCenterViewProps> = ({
   language,
   onOpenVoiceSearch,
   appContext,
-  onApplyAction,
 }) => {
   const selectedModel: AiModelType = 'smart-time-core';
   const smartLanguage: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
