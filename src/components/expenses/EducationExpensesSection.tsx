@@ -11,8 +11,6 @@ interface EducationExpensesSectionProps {
   onBack: () => void;
   students: StudentProfile[];
   onSaveStudents: (list: StudentProfile[]) => void;
-  expenses: StudentExpenseRecord[];
-  onSaveExpenses: (list: StudentExpenseRecord[]) => void;
 }
 
 type Screen = 'menu' | 'student';
@@ -27,7 +25,7 @@ const EXPENSE_TYPES: Array<{ value: StudentExpenseRecord['subCategory']; label: 
 ];
 
 export const EducationExpensesSection: React.FC<EducationExpensesSectionProps> = ({
-  language, currency, selectedMonth, onBack, students, onSaveStudents, expenses: legacyExpenses, onSaveExpenses,
+  language, currency, selectedMonth, onBack, students, onSaveStudents,
 }) => {
   const isAr = language === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
