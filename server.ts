@@ -13,6 +13,7 @@ import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 import { executeToolAction } from "./backend/ai/toolExecutor.js";
 import { createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from "./backend/ai/calendar/eventExecutor.js";
 import { getFinanceOverview } from "./backend/ai/finance/financeProjection.js";
+import { getAiCanonicalState } from "./backend/ai/finance/aiCanonicalProjection.js";
 import { createCanonicalExpense, updateCanonicalExpense, deleteCanonicalExpense, migrateLegacyExpensesToCanonical, reconcileAiTransactionsToCanonical, ensureFinanceMutationSchema } from "./backend/ai/finance/financeRepository.js";
 import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
@@ -465,23 +466,9 @@ app.get("/api/ai/state", (req, res) => {
   if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
 
   try {
-    const transactions = db.prepare(`
-      SELECT id, title, amount, category, date,
-             payment_method as paymentMethod,
-             notes, created_at as createdAt
-      FROM ai_transactions
-      WHERE user_id = ?
-      ORDER BY date DESC, created_at DESC
-    `).all(user.id);
-
-    const budget = db.prepare(`
-      SELECT user_id as userId,
-             monthly_limit as monthlyLimit,
-             currency,
-             updated_at as updatedAt
-      FROM ai_budgets
-      WHERE user_id = ?
-    `).get(user.id) || null;
+    const canonicalFinance = getAiCanonicalState(String(user.id));
+    const transactions = canonicalFinance.transactions;
+    const budget = canonicalFinance.budget;
 
     const calendarEvents = listCalendarEvents(String(user.id));
     const rawTasks = db.prepare(`
