@@ -1,3 +1,4 @@
+import { StorageAdapter } from './storageAdapter';
 export type SmartAiPermissionStatus = "granted" | "denied" | "prompt";
 export type SmartAiPermissionsMirror = Record<string, SmartAiPermissionStatus>;
 
@@ -18,7 +19,7 @@ export function writeSmartAiPermissionsMirror(
 ): void {
   if (typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(permissions));
+    StorageAdapter.setItem(STORAGE_KEY, JSON.stringify(permissions));
   } catch {
     // Mirror is best-effort and must never block the application.
   }
