@@ -13,6 +13,7 @@ import { askSmartAiCore } from "./backend/ai/smartAiCore.js";
 import { executeToolAction } from "./backend/ai/toolExecutor.js";
 import { createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from "./backend/ai/calendar/eventExecutor.js";
 import { getFinanceOverview } from "./backend/ai/finance/financeProjection.js";
+import { createCanonicalExpense, updateCanonicalExpense, deleteCanonicalExpense, migrateLegacyExpensesToCanonical, reconcileAiTransactionsToCanonical, ensureFinanceMutationSchema } from "./backend/ai/finance/financeRepository.js";
 import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
@@ -513,6 +514,61 @@ app.get("/api/ai/state", (req, res) => {
   }
 });
 
+
+app.post("/api/finance/expenses", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const record = createCanonicalExpense(String(user.id), req.body || {});
+    return res.status(201).json({ source: "smart-time-finance-sqlite", record });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر إضافة المصروف." });
+  }
+});
+
+app.patch("/api/finance/expenses/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    const record = updateCanonicalExpense(String(user.id), String(req.params.id), req.body || {});
+    return res.json({ source: "smart-time-finance-sqlite", record });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تحديث المصروف." });
+  }
+});
+
+app.delete("/api/finance/expenses/:id", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    deleteCanonicalExpense(String(user.id), String(req.params.id));
+    return res.json({ source: "smart-time-finance-sqlite", deleted: true, id: String(req.params.id) });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر حذف المصروف." });
+  }
+});
+
+app.post("/api/finance/migrate", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+  try {
+    ensureFinanceMutationSchema();
+    const legacyItems = Array.isArray(req.body?.expenses) ? req.body.expenses : [];
+    const legacy = migrateLegacyExpensesToCanonical(String(user.id), legacyItems);
+    const ai = req.body?.reconcileAiTransactions === false
+      ? null
+      : reconcileAiTransactionsToCanonical(String(user.id));
+    return res.json({
+      source: "smart-time-finance-sqlite",
+      legacy,
+      ai,
+      verificationPassed: Boolean(legacy.verificationPassed && (ai === null || ai.verificationPassed)),
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "تعذر تنفيذ ترحيل البيانات المالية." });
+  }
+});
 
 app.get("/api/finance/overview", (req, res) => {
   const user = authUser(req);
