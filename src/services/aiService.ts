@@ -187,6 +187,10 @@ export interface SmartAiState {
   fetchedAt: string;
 }
 
+function normalizeCanonicalTask(task: any): DailyTask {
+  return { ...task, completed: Boolean(task?.completed), reminderEnabled: task?.reminderEnabled ?? true };
+}
+
 async function smartAiMutation(path: string, method: string, body?: unknown) {
   const res = await fetch(apiUrl(path), {
     method,
@@ -199,11 +203,11 @@ async function smartAiMutation(path: string, method: string, body?: unknown) {
 }
 
 export async function createCanonicalTask(task: Omit<DailyTask, 'id' | 'createdAt'>): Promise<DailyTask> {
-  return smartAiMutation('/api/ai/tasks', 'POST', task) as Promise<DailyTask>;
+  return normalizeCanonicalTask(await smartAiMutation('/api/ai/tasks', 'POST', task));
 }
 
 export async function updateCanonicalTask(task: DailyTask): Promise<DailyTask> {
-  return smartAiMutation(`/api/ai/tasks/${encodeURIComponent(task.id)}`, 'PATCH', task) as Promise<DailyTask>;
+  return normalizeCanonicalTask(await smartAiMutation(`/api/ai/tasks/${encodeURIComponent(task.id)}`, 'PATCH', task));
 }
 
 export async function deleteCanonicalTask(id: string): Promise<void> {
