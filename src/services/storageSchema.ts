@@ -102,7 +102,7 @@ export type StorageSchemaValueMap = {
 export type StorageSchemaEntry<K extends StorageSchemaKey = StorageSchemaKey> = {
   key: K;
   description: string;
-  validate: (value: unknown) => value is StorageSchemaValueMap[K];
+  validate: (value: unknown) => boolean;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -122,7 +122,7 @@ const isObjectArray = (value: unknown): value is Record<string, unknown>[] =>
 const hasStringId = (value: unknown): value is { id: string } =>
   isRecord(value) && isString(value.id);
 
-const hasStringIdArray = isArrayOf(hasStringId);
+const isStringArray = isArrayOf(isString);
 
 const isDashboardLayout = (value: unknown): value is DashboardLayoutMode =>
   value === 'organic' || value === 'grid' || value === 'detailed';
@@ -313,7 +313,7 @@ const schema = {
   smart_time_sports_cards_order: {
     key: 'smart_time_sports_cards_order',
     description: 'Sports home card ordering.',
-    validate: hasStringIdArray,
+    validate: isStringArray,
   },
   smart_time_expenses_sections_order: {
     key: 'smart_time_expenses_sections_order',
