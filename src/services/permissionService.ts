@@ -1,3 +1,4 @@
+import { StorageAdapter } from './storageAdapter';
 /**
  * Permission Service for SMART TIME Super App
  * Handles Phone & Device Permissions, Call Logs, Contacts, and Web Device APIs.
@@ -338,7 +339,7 @@ export class PermissionService {
     });
 
     try {
-      localStorage.setItem(STORAGE_KEY_PERMISSIONS, JSON.stringify(map));
+      StorageAdapter.setItem(STORAGE_KEY_PERMISSIONS, JSON.stringify(map));
     } catch (e) {
       console.warn('Failed to save permission state to localStorage', e);
     }
@@ -370,7 +371,7 @@ export class PermissionService {
     });
 
     try {
-      localStorage.setItem(STORAGE_KEY_PERMISSIONS, JSON.stringify(map));
+      StorageAdapter.setItem(STORAGE_KEY_PERMISSIONS, JSON.stringify(map));
     } catch (e) {
       console.warn(e);
     }
@@ -553,7 +554,7 @@ export class PermissionService {
 
   static saveCallLogs(logs: CallLogEntry[]): void {
     try {
-      localStorage.setItem(STORAGE_KEY_CALL_LOGS, JSON.stringify(logs));
+      StorageAdapter.setItem(STORAGE_KEY_CALL_LOGS, JSON.stringify(logs));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('smart_time_call_logs_changed', { detail: logs }));
       }
@@ -622,7 +623,7 @@ export class PermissionService {
 
   static saveContacts(contacts: PhoneContact[]): void {
     try {
-      localStorage.setItem(STORAGE_KEY_CONTACTS, JSON.stringify(contacts));
+      StorageAdapter.setItem(STORAGE_KEY_CONTACTS, JSON.stringify(contacts));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('smart_time_contacts_changed', { detail: contacts }));
       }
@@ -730,7 +731,7 @@ export class PermissionService {
         details,
       };
       const updated = [newLog, ...current].slice(0, 50); // Keep last 50
-      localStorage.setItem(STORAGE_KEY_AUDIT_LOGS, JSON.stringify(updated));
+      StorageAdapter.setItem(STORAGE_KEY_AUDIT_LOGS, JSON.stringify(updated));
     } catch (e) {
       console.warn(e);
     }
