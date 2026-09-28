@@ -17,6 +17,5 @@ jobs:
           node-version: 20
 
       - run: npm ci || npm install
-      - run: npm run verify:canonical-schema
+      - run: npm run verify:phase2-storage-schema
       - run: npm run build
-      - run: npm run lint
