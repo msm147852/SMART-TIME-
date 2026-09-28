@@ -13,19 +13,7 @@ export interface PendingEventReminder {
   queuedAt: string;
 }
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS ai_event_reminders (
-  id TEXT PRIMARY KEY,
-  event_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  scheduled_for TEXT NOT NULL,
-  queued_at TEXT NOT NULL,
-  delivered_at TEXT,
-  UNIQUE(event_id, scheduled_for)
-);
-CREATE INDEX IF NOT EXISTS idx_ai_event_reminders_user_pending
-  ON ai_event_reminders(user_id, delivered_at, scheduled_for);
-`);
+
 
 function nowIso() {
   return new Date().toISOString();
