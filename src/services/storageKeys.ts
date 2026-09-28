@@ -33,4 +33,11 @@ export const STORAGE_KEYS = {
   SPORTS_CARDS_ORDER: 'smart_time_sports_cards_order',
   EXPENSES_SECTIONS_ORDER: 'smart_time_expenses_sections_order',
 } as const;
-\nexport const STORAGE_KEY_MIGRATIONS = {\n  smart_time_dashboard_layout: STORAGE_KEYS.DASHBOARD_LAYOUT,\n  smart_time_dashboard_sections_v2: STORAGE_KEYS.DASHBOARD_SECTIONS_V2,\n  smart_time_workout_logs: STORAGE_KEYS.WORKOUT_LOGS,\n  smart_time_sports_cards_order: STORAGE_KEYS.SPORTS_CARDS_ORDER,\n  smart_time_expenses_sections_order: STORAGE_KEYS.EXPENSES_SECTIONS_ORDER,\n} as const;\n
+
+export const STORAGE_KEY_MIGRATIONS = {
+  smart_time_dashboard_layout: STORAGE_KEYS.DASHBOARD_LAYOUT,
+  smart_time_dashboard_sections_v2: STORAGE_KEYS.DASHBOARD_SECTIONS_V2,
+  smart_time_workout_logs: STORAGE_KEYS.WORKOUT_LOGS,
+  smart_time_sports_cards_order: STORAGE_KEYS.SPORTS_CARDS_ORDER,
+  smart_time_expenses_sections_order: STORAGE_KEYS.EXPENSES_SECTIONS_ORDER,
+} as const;
