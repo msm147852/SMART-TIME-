@@ -1,4 +1,5 @@
 import { db } from "../../database.js";
+import { expandRecurringEvents } from "./recurrenceEngine.js";
 
 export interface PendingEventReminder {
   id: string;
@@ -43,6 +44,21 @@ export function queueDueEventReminders(now = new Date()): number {
       AND recurrence_json IS NULL
   `).all() as any[];
 
+  const recurringByUser = new Map<string, ReturnType<typeof expandRecurringEvents>>();
+  const recurringUsers = db.prepare(`
+    SELECT DISTINCT user_id as userId
+    FROM ai_events
+    WHERE reminder_enabled = 1 AND reminder_minutes IS NOT NULL AND recurrence_json IS NOT NULL
+  `).all() as Array<{ userId: string }>;
+  for (const { userId } of recurringUsers) {
+    recurringByUser.set(userId, expandRecurringEvents(
+      userId,
+      new Date(nowMs - 24 * 60 * 60 * 1000),
+      new Date(nowMs + 90 * 24 * 60 * 60 * 1000),
+      1000,
+    ));
+  }
+
   const insert = db.prepare(`
     INSERT OR IGNORE INTO ai_event_reminders
       (id,event_id,user_id,scheduled_for,queued_at)
@@ -64,6 +80,21 @@ export function queueDueEventReminders(now = new Date()): number {
       const reminderId = `rem_${row.id}_${scheduledMs}`;
       const result = insert.run(reminderId, row.id, row.userId, scheduledFor, queuedAt);
       queued += result.changes;
+    }
+
+    for (const occurrences of recurringByUser.values()) {
+      for (const occurrence of occurrences) {
+        const startMs = new Date(occurrence.occurrenceStart).getTime();
+        const minutes = Number(occurrence.reminderMinutes);
+        if (!Number.isFinite(startMs) || !Number.isInteger(minutes) || minutes < 0) continue;
+        const scheduledMs = startMs - minutes * 60_000;
+        if (scheduledMs > nowMs) continue;
+
+        const scheduledFor = new Date(scheduledMs).toISOString();
+        const reminderId = `rem_${occurrence.eventId}_${scheduledMs}`;
+        const result = insert.run(reminderId, occurrence.eventId, occurrence.userId, scheduledFor, queuedAt);
+        queued += result.changes;
+      }
     }
   });
   transaction();
