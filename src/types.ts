@@ -8,6 +8,7 @@ export type CurrencyType = 'EGP' | 'SAR' | 'AED' | 'USD' | 'EUR' | string;
 export type AppView =
   | 'dashboard'
   | 'notes'
+  | 'calendar'
   | 'calculator'
   | 'expenses'
   | 'trips'
