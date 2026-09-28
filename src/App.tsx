@@ -170,7 +170,7 @@ export default function App() {
             notification.onclick = () => {
               window.focus();
               notification.close();
-              handleNavigateSafe('calendar');
+              setCurrentView('calendar');
             };
           }
           await acknowledgeEventReminder(reminder.id);
