@@ -136,6 +136,7 @@ export async function* streamLocalSmartAi(input: {
   message: string;
   data: Record<string, unknown>;
   conversationHistory?: Array<{ sender: "user" | "model"; text: string }>;
+  memoryContext?: string;
 }): AsyncGenerator<LocalSmartAiStreamEvent> {
   if (!LOCAL_URL) return;
 
@@ -159,6 +160,8 @@ export async function* streamLocalSmartAi(input: {
         "Never mutate data yourself; changes require explicit user confirmation.",
         "Be concise and natural."
       ].join("\n");
+
+  const persistentMemory = input.memoryContext;
 
   const body = {
     model: LOCAL_MODEL,
