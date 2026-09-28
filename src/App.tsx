@@ -66,6 +66,7 @@ import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
+import { CalendarView } from './components/CalendarView';
 import { startTrialSession } from './services/authService';
 import { createCanonicalTask, deleteCanonicalTask, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
@@ -500,6 +501,10 @@ export default function App() {
                 VaultRepository.saveRecords(updated);
               }}
             />
+          )}
+
+          {currentView === 'calendar' && (
+            <CalendarView language={language} timezone={Intl.DateTimeFormat().resolvedOptions().timeZone} />
           )}
 
           {currentView === 'ai' && (
