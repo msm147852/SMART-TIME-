@@ -464,8 +464,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     return list.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
   }, [houseList, medicalList, personalList, fuelList, maintList, studentExpensesList, students, isAr]);
 
-  // Universal Add Expense Handler
-  const handleUniversalAddExpense = (data: {
+  // Phase 6 canonical mutation path.
+  const handleUniversalAddExpense = async (data: {
     section: 'house' | 'work' | 'personal' | 'vehicle' | 'education';
     category: string;
     amount: number;
@@ -473,72 +473,25 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     paymentMethod: string;
     notes?: string;
   }) => {
-    if (data.section === 'house') {
-      const newItem: SpecializedExpense = {
-        id: `h_${Date.now()}`,
-        section: 'house',
-        type: data.category,
-        amount: data.amount,
-        paymentType: 'supply',
-        date: data.date,
-        notes: data.notes,
-      };
-      handleSaveHouse([newItem, ...houseList]);
-    } else if (data.section === 'work') {
-      const newItem: SpecializedExpense = {
-        id: `w_${Date.now()}`,
-        section: 'work',
-        type: data.category,
-        amount: data.amount,
-        date: data.date,
-        notes: data.notes,
-      };
-      handleSaveWork([newItem, ...workList]);
-    } else if (data.section === 'personal') {
-      const newItem: SpecializedExpense = {
-        id: `p_${Date.now()}`,
-        section: 'work',
-        type: data.category,
-        amount: data.amount,
-        date: data.date,
-        notes: data.notes,
-      };
-      handleSavePersonal([newItem, ...personalList]);
-    } else if (data.section === 'vehicle') {
-      if (data.category.includes('وقود') || data.category.includes('بنزين') || data.category.includes('سولار')) {
-        const newFuel: VehicleFuelRecord = {
-          id: `f_${Date.now()}`,
-          fuelType: data.category,
-          price: data.amount,
-          odometer: 0,
-          dateTime: `${data.date}T12:00`,
-        };
-        handleSaveFuel([newFuel, ...fuelList]);
-      } else {
-        const newMaint: VehicleMaintenanceRecord = {
-          id: `m_${Date.now()}`,
-          maintenanceType: data.category,
-          description: data.notes || data.category,
-          supplyName: data.category,
-          supplyPrice: data.amount,
-          laborDescription: '',
-          laborPrice: 0,
-          total: data.amount,
-          date: data.date,
-        };
-        handleSaveMaint([newMaint, ...maintList]);
-      }
-    } else if (data.section === 'education') {
-      const stdId = students[0]?.id || 'std_salma';
-      const newExp: StudentExpenseRecord = {
-        id: `se_${Date.now()}`,
-        studentId: stdId,
-        subCategory: 'lessons',
-        title: data.category,
-        amount: data.amount,
-        date: data.date,
-      };
-      handleSaveStudentExpenses([newExp, ...studentExpensesList]);
+    const type: ExpenseType =
+      data.section === 'house' ? 'house' :
+      data.section === 'work' ? 'work' :
+      data.section === 'personal' ? 'personal' :
+      data.section === 'education' ? 'student' :
+      (data.category.includes('وقود') || data.category.includes('بنزين') || data.category.includes('سولار'))
+        ? 'vehicle_fuel' : 'vehicle_maint';
+
+    const input: CanonicalExpenseInput = {
+      type, title: data.category, amount: data.amount, category: data.category,
+      date: data.date, paymentMethod: data.paymentMethod, notes: data.notes ?? null,
+    };
+
+    try {
+      await createCanonicalFinanceExpense(input);
+      await refreshCanonicalFinance();
+      setIsAddExpenseModalOpen(false);
+    } catch (error) {
+      setCanonicalFinanceError(error instanceof Error ? error.message : 'تعذر حفظ المصروف الموحد.');
     }
   };
 
