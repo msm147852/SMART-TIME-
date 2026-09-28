@@ -195,7 +195,7 @@ export default function App() {
         if (state.transactions.length > 0) {
           setExpenses((current) => {
             const byId = new Map(current.map((item) => [item.id, item]));
-            for (const transaction of state.transactions) byId.set(transaction.id, transaction);
+            for (const transaction of state.transactions as Expense[]) byId.set(transaction.id, transaction);
             return Array.from(byId.values()).sort((a, b) => String(b.date).localeCompare(String(a.date)));
           });
         }
