@@ -68,7 +68,7 @@ import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
 import { CalendarView } from './components/CalendarView';
 import { startTrialSession } from './services/authService';
-import { createCanonicalTask, deleteCanonicalTask, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
+import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
 // Icons
 import {
@@ -152,6 +152,41 @@ export default function App() {
       })
       .finally(() => setAuthChecked(true));
   }, []);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    let stopped = false;
+
+    const deliverDueReminders = async () => {
+      try {
+        const reminders = await fetchPendingEventReminders(25);
+        if (stopped || reminders.length === 0) return;
+        for (const reminder of reminders) {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const notification = new Notification(reminder.title, {
+              body: reminder.location ? `${reminder.timezone} · ${reminder.location}` : `SMART TIME · ${reminder.timezone}`,
+              tag: reminder.id,
+            });
+            notification.onclick = () => {
+              window.focus();
+              notification.close();
+              handleNavigateSafe('calendar');
+            };
+          }
+          await acknowledgeEventReminder(reminder.id);
+        }
+      } catch (error) {
+        console.debug('SMART AI reminder delivery unavailable:', error);
+      }
+    };
+
+    void deliverDueReminders();
+    const timer = window.setInterval(() => { void deliverDueReminders(); }, 15_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [authChecked]);
 
   useEffect(() => {
     if (!authChecked) return;
