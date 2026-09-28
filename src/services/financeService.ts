@@ -22,7 +22,7 @@ export async function fetchCanonicalFinanceOverview(): Promise<FinanceOverview> 
 }
 
 
-import type { ExpenseType } from "../types/finance";
+import type { ExpenseType } from "../contracts/financeContract";
 
 export interface CanonicalExpenseInput {
   id?: string;
@@ -37,7 +37,7 @@ export interface CanonicalExpenseInput {
   createdAt?: string;
 }
 
-async function financeMutation(path: string, method: string, body?: unknown): Promise<any> {
+interface FinanceMutationPayload {\n  source?: string;\n  record?: Record<string, unknown>;\n  deleted?: boolean;\n  id?: string;\n  [key: string]: unknown;\n}\n\nasync function financeMutation(path: string, method: string, body?: unknown): Promise<FinanceMutationPayload> {
   const response = await fetch(path, {
     method,
     credentials: "include",
@@ -63,6 +63,6 @@ export async function deleteCanonicalFinanceExpense(id: string): Promise<void> {
   await financeMutation(`/api/finance/expenses/${encodeURIComponent(id)}`, "DELETE");
 }
 
-export async function reconcileCanonicalFinance(expenses: Array<CanonicalExpenseInput>): Promise<any> {
+export async function reconcileCanonicalFinance(expenses: Array<CanonicalExpenseInput>): Promise<FinanceMutationPayload> {
   return financeMutation("/api/finance/migrate", "POST", { expenses, reconcileAiTransactions: true });
 }
