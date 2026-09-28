@@ -156,42 +156,25 @@ function mergeById(items: Transaction[]): Transaction[] {
 
 export class FinanceRepository {
   static async getSnapshot(): Promise<FinanceRepositorySnapshot> {
-    const [finance, smartAiResponse] = await Promise.all([
-      fetchCanonicalFinanceOverview(),
-      fetch("/api/ai/state", { credentials: "include", headers: { Accept: "application/json" } }),
-    ]);
-    const smartAi = await smartAiResponse.json().catch(() => ({}));
-    if (!smartAiResponse.ok) throw new Error(String(smartAi?.error || "تعذر قراءة حالة SMART AI."));
+    const finance = await fetchCanonicalFinanceOverview();
     return {
       finance,
       smartAi: {
-        transactions: Array.isArray(smartAi?.transactions) ? smartAi.transactions : [],
-        budget: smartAi?.budget && typeof smartAi.budget === "object" ? smartAi.budget : null,
+        transactions: [],
+        budget: null,
       },
     };
   }
 
   static async getTransactions(type?: ExpenseType): Promise<Transaction[]> {
-    const snapshot = await this.getSnapshot();
-    const legacyExpenses = StorageAdapter.getItem<Expense[]>(STORAGE_KEYS.EXPENSES, []);
-    const legacyFuel = StorageAdapter.getItem<FuelRecord[]>(STORAGE_KEYS.FUEL_RECORDS, []);
-    const legacyMaintenance = StorageAdapter.getItem<MaintenanceRecord[]>(STORAGE_KEYS.MAINTENANCE_RECORDS, []);
-    const legacyEducation = StorageAdapter.getItem<EducationExpense[]>(STORAGE_KEYS.EDUCATION_EXPENSES, []);
-    const finance = [
-      ...snapshot.finance.expenses.map(mapFinanceExpenseToTransaction),
-      ...snapshot.finance.fuelRecords.map(mapFuelToTransaction),
-      ...snapshot.finance.maintenanceRecords.map(mapMaintenanceToTransaction),
-      ...snapshot.finance.educationExpenses.map(mapEducationToTransaction),
+    const finance = await fetchCanonicalFinanceOverview();
+    const transactions = [
+      ...finance.expenses.map(mapFinanceExpenseToTransaction),
+      ...finance.fuelRecords.map(mapFuelToTransaction),
+      ...finance.maintenanceRecords.map(mapMaintenanceToTransaction),
+      ...finance.educationExpenses.map(mapEducationToTransaction),
     ];
-    const ai = snapshot.smartAi.transactions.map(mapAiTransactionToTransaction);
-    const legacy = [
-      ...legacyExpenses.map(mapLegacyExpenseToTransaction),
-      ...legacyFuel.map(mapLegacyFuelToTransaction),
-      ...legacyMaintenance.map(mapLegacyMaintenanceToTransaction),
-      ...legacyEducation.map(mapLegacyEducationToTransaction),
-    ];
-    const merged = mergeById([...finance, ...ai, ...legacy]);
-    return type ? merged.filter((item) => item.type === type) : merged;
+    return type ? transactions.filter((item) => item.type === type) : transactions;
   }
 
   static async getCategories(): Promise<Category[]> {
@@ -209,13 +192,19 @@ export class FinanceRepository {
 
   static async getBudgets(): Promise<Budget[]> {
     const snapshot = await this.getSnapshot();
-    if (!snapshot.smartAi.budget) return [];
-    const monthlyLimit = number(snapshot.smartAi.budget.monthlyLimit ?? snapshot.smartAi.budget.monthly_limit);
     const month = new Date().toISOString().slice(0, 7);
     const transactions = await this.getTransactions();
+    const monthlyBudget = snapshot.smartAi.budget;
+    if (!monthlyBudget) return [];
+    const monthlyLimit = number(monthlyBudget.monthlyLimit ?? monthlyBudget.monthly_limit);
     return EXPENSE_TYPES.map((type) => ({
-      id: canonicalId("ai-budget", type), type, month, limit: monthlyLimit,
-      spent: transactions.filter((item) => item.type === type && item.date.startsWith(month)).reduce((sum, item) => sum + item.amount, 0),
+      id: canonicalId("ai-budget", type),
+      type,
+      month,
+      limit: monthlyLimit,
+      spent: transactions
+        .filter((item) => item.type === type && item.date.startsWith(month))
+        .reduce((sum, item) => sum + item.amount, 0),
     }));
   }
 
