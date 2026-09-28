@@ -50,9 +50,9 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  expenses,
+  expenses: legacyExpenses,
   onSaveExpenses,
-  medicalExpenses,
+  medicalExpenses: legacyMedicalExpenses,
   onSaveMedicalExpenses,
 }) => {
   const isAr = language === 'ar';
