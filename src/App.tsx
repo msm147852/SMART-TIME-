@@ -155,7 +155,7 @@ export default function App() {
   useEffect(() => {
     if (!authChecked) return;
     void fetchSmartAiState()
-      .then((state) => {
+      .then(async (state) => {
         if (state.transactions.length > 0) {
           setExpenses((current) => {
             const byId = new Map(current.map((item) => [item.id, item]));
