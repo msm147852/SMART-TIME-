@@ -1,0 +1,35 @@
+name: Phase 3 - Verify StorageKeys Registry
+
+on:
+  push:
+    branches:
+      - feat/v3-next
+    paths:
+      - "src/services/storageKeys.ts"
+      - "src/services/storageSchema.ts"
+      - "scripts/verify-phase3-storage-keys.mjs"
+      - "package.json"
+      - ".github/workflows/phase3-verify.yml"
+  pull_request:
+    branches:
+      - feat/v3-next
+    paths:
+      - "src/services/storageKeys.ts"
+      - "src/services/storageSchema.ts"
+      - "scripts/verify-phase3-storage-keys.mjs"
+      - "package.json"
+      - ".github/workflows/phase3-verify.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run verify:phase3-storage-keys
+      - run: npm run build
