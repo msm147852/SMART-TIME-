@@ -455,6 +455,52 @@ const handleAiChat = async (req: express.Request, res: express.Response) => {
 app.post("/api/ai/chat", handleAiChat);
 app.post("/api/gemini/chat", handleAiChat);
 
+app.get("/api/ai/state", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
+
+  try {
+    const transactions = db.prepare(`
+      SELECT id, title, amount, category, date,
+             payment_method as paymentMethod,
+             notes, created_at as createdAt
+      FROM ai_transactions
+      WHERE user_id = ?
+      ORDER BY date DESC, created_at DESC
+    `).all(user.id);
+
+    const budget = db.prepare(`
+      SELECT user_id as userId,
+             monthly_limit as monthlyLimit,
+             currency,
+             updated_at as updatedAt
+      FROM ai_budgets
+      WHERE user_id = ?
+    `).get(user.id) || null;
+
+    const tasks = db.prepare(`
+      SELECT id, title, completed, priority, category,
+             due_date as dueDate, due_time as dueTime,
+             note, created_at as createdAt,
+             completed_at as completedAt
+      FROM ai_tasks
+      WHERE user_id = ?
+      ORDER BY COALESCE(due_date, '9999-12-31'), COALESCE(due_time, '23:59'), created_at DESC
+    `).all(user.id);
+
+    return res.json({
+      source: "smart-ai-sqlite",
+      userId: user.id,
+      transactions,
+      budget,
+      tasks,
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || "تعذر قراءة حالة SMART AI." });
+  }
+});
+
 app.get("/api/ai/status", (req, res) => {
   const user = authUser(req);
   if (!user) return res.status(401).json({ error: "يجب تسجيل الدخول." });
