@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Language, Expense, VehicleAccidentRecord, StudentProfile, StudentExpenseRecord, MedicalExpenseRecord, MonthlyIncome, BankCertificate } from '../types';
-import { StorageAdapter, VehiclesRepository, ExpensesRepository } from '../services';
+import { StorageAdapter, VehiclesRepository, ExpensesRepository, fetchCanonicalFinanceOverview, createCanonicalFinanceExpense } from '../services';
+import type { FinanceOverview, CanonicalExpenseInput } from '../services/financeService';
+import type { ExpenseType } from '../contracts/financeContract';
 import { isDateInMonth, getCertificatesProfitForMonth, getPrimaryIncomeForMonth } from '../services/financeCalculations';
 import { FinancialDashboard } from './expenses/FinancialDashboard';
 import { SectionsMenuScreen } from './expenses/SectionsMenuScreen';
@@ -45,6 +47,13 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
   // Universal Add Expense Modal
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
+  const [canonicalOverview, setCanonicalOverview] = useState<FinanceOverview | null>(null);
+  const [canonicalFinanceError, setCanonicalFinanceError] = useState<string | null>(null);
+  const refreshCanonicalFinance = async () => {
+    try { setCanonicalFinanceError(null); setCanonicalOverview(await fetchCanonicalFinanceOverview()); }
+    catch (error) { setCanonicalFinanceError(error instanceof Error ? error.message : 'تعذر قراءة البيانات المالية الموحدة.'); }
+  };
+  useEffect(() => { void refreshCanonicalFinance(); }, []);
 
   // --- 2. DATA STATES (PERSISTED) ---
 
@@ -345,8 +354,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     return { installments, earned };
   }, [associationsList, selectedMonth]);
 
-  // Grand Total Expenses for the month. Association installments are expenses; association payout is earned income.
-  const monthlyExpenses = homeAndMedicalTotal + personalTotal + associationFinancials.installments + vehicleTotal + educationTotal;
+  const canonicalMonthlyExpenses = useMemo(() => canonicalOverview?.expenses.filter((expense) => isDateInMonth(String(expense.date ?? ''), selectedMonth)).reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0) ?? null, [canonicalOverview, selectedMonth]);
+  const monthlyExpenses = canonicalMonthlyExpenses ?? (homeAndMedicalTotal + personalTotal + associationFinancials.installments + vehicleTotal + educationTotal);
 
   // Primary Income from Salary & Extra streams
   const primaryIncome = useMemo(
