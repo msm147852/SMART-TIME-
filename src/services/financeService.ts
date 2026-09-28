@@ -24,7 +24,7 @@ export async function fetchCanonicalFinanceOverview(): Promise<FinanceOverview> 
 
 import type { ExpenseType } from "../contracts/financeContract";
 
-export interface CanonicalExpenseInput {
+export interface CanonicalExpenseQuery { type?: ExpenseType | ExpenseType[]; from?: string; to?: string; }\n\nexport interface CanonicalExpenseInput {
   id?: string;
   type: ExpenseType;
   title: string;
@@ -59,7 +59,7 @@ export async function updateCanonicalFinanceExpense(id: string, patch: Partial<C
   return payload.record as Record<string, unknown>;
 }
 
-export async function deleteCanonicalFinanceExpense(id: string): Promise<void> {
+export const financeService = { fetchCanonicalFinanceOverview, createCanonicalFinanceExpense, addExpense, getAllExpenses, getExpenses, updateCanonicalFinanceExpense, deleteCanonicalFinanceExpense };\n\nexport async function deleteCanonicalFinanceExpense(id: string): Promise<void> {
   await financeMutation(`/api/finance/expenses/${encodeURIComponent(id)}`, "DELETE");
 }
 
