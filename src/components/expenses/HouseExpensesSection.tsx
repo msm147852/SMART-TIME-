@@ -39,10 +39,6 @@ interface HouseExpensesSectionProps {
   currency: string;
   selectedMonth: string;
   onBack: () => void;
-  expenses: SpecializedExpense[];
-  onSaveExpenses: (list: SpecializedExpense[]) => void;
-  medicalExpenses: MedicalExpenseRecord[];
-  onSaveMedicalExpenses: (list: MedicalExpenseRecord[]) => void;
 }
 
 export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
@@ -50,10 +46,6 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  expenses: legacyExpenses,
-  onSaveExpenses,
-  medicalExpenses: legacyMedicalExpenses,
-  onSaveMedicalExpenses,
 }) => {
   const isAr = language === 'ar';
   const [expenses, setExpenses] = useState<SpecializedExpense[]>([]);
