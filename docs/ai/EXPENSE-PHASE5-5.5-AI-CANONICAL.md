@@ -35,3 +35,10 @@ The legacy ai_transactions table remains available for compatibility and verific
 - /api/ai/state no longer directly SELECTs ai_transactions.
 - financeRepository no longer merges ai_transactions into canonical transaction truth.
 - Phase 2/3/4 and 5.4 files remain intact.
+
+## Gate evidence
+- Phase 5.5 verification workflow #1: SUCCESS on commit f2140d930b8ec704ec9c10e3ab66087a0930afcf.
+- Phase 5.4 workflow #11: SUCCESS on the same commit.
+- Phase 2 workflow #76: SUCCESS on the same commit.
+- Phase 3 workflow #50: SUCCESS on the same commit.
+- Phase 4 workflow #35: SUCCESS on the same commit.
