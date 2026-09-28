@@ -77,3 +77,7 @@ Phase 2 implementation currently registers:
 
 Next gate:
 - Phase 3 — StorageKeys Registry Expansion
+
+
+## Closure Gate
+The dedicated Phase 2 workflow executes the Phase 2 schema gate and production build only. Repository-wide TypeScript lint remains a separate existing gate and is not used to declare Phase 2 closed.
