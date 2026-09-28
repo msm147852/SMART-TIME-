@@ -1,3 +1,4 @@
+import { StorageAdapter } from './storageAdapter';
 export type SmartAiVoiceId = "male" | "female" | "youth" | "child";
 
 export type SmartAiVoiceProvider = "browser-tts" | "voice-dna-local";
@@ -57,7 +58,7 @@ export function loadSmartAiVoiceId(): SmartAiVoiceId {
 
 export function saveSmartAiVoiceId(id: SmartAiVoiceId): void {
   try {
-    localStorage.setItem(STORAGE_KEY, id);
+    StorageAdapter.setItem(STORAGE_KEY, id);
   } catch {
     // Storage may be unavailable in private browsing/webviews.
   }
