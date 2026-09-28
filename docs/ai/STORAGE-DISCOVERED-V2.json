@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "scanned_at": "2026-09-28T12:41:48.410Z",
+  "scanned_at": "2026-09-28T14:33:44.304Z",
   "scope": {
     "root": "src",
     "extensions": [
@@ -54,7 +54,7 @@
     ]
   },
   "scan": {
-    "files_scanned": 110,
+    "files_scanned": 111,
     "total_discovered_keys": 64,
     "hidden_discovered_keys": 36,
     "hidden_keys": [
@@ -128,6 +128,11 @@
           "file": "src/components/DashboardView.tsx",
           "access": "string-reference",
           "evidence": "smart_time-literal"
+        },
+        {
+          "file": "src/services/storageSchema.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
         }
       ],
       "smart_time_dashboard_sections_v2": [
@@ -143,6 +148,11 @@
         },
         {
           "file": "src/components/DashboardView.tsx",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        },
+        {
+          "file": "src/services/storageSchema.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -256,6 +266,11 @@
           "file": "src/components/SportsView.tsx",
           "access": "string-reference",
           "evidence": "smart_time-literal"
+        },
+        {
+          "file": "src/services/storageSchema.ts",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
         }
       ],
       "smart_time_sports_cards_order": [
@@ -266,6 +281,11 @@
         },
         {
           "file": "src/components/SportsView.tsx",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        },
+        {
+          "file": "src/services/storageSchema.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
@@ -314,6 +334,11 @@
         },
         {
           "file": "src/components/expenses/SectionsMenuScreen.tsx",
+          "access": "string-reference",
+          "evidence": "smart_time-literal"
+        },
+        {
+          "file": "src/services/storageSchema.ts",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }
