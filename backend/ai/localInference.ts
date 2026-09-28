@@ -54,6 +54,9 @@ export async function askLocalSmartAi(input: LocalAiRequest): Promise<SmartAiRes
         "If memory context is supplied, use it as a preference/reference only and do not invent facts from it."
       ].join("\n");
 
+  // Keep the optional persistent-memory field explicitly typed at the request boundary.
+  const persistentMemory = input.memoryContext;
+
   const body = {
     model: LOCAL_MODEL,
     stream: false,
@@ -64,7 +67,7 @@ export async function askLocalSmartAi(input: LocalAiRequest): Promise<SmartAiRes
     chat_template_kwargs: { enable_thinking: false },
     messages: [
       { role: "system", content: system },
-      ...(input.memoryContext ? [{ role: "system", content: `Persistent SMART AI memory:\n${input.memoryContext.slice(0, 5000)}` }] : []),
+      ...(persistentMemory ? [{ role: "system", content: `Persistent SMART AI memory:\n${persistentMemory.slice(0, 5000)}` }] : []),
       ...(input.conversationHistory || []).slice(-6).map((item) => ({
         role: item.sender === "user" ? "user" : "assistant",
         content: String(item.text || "").slice(0, 2000)
