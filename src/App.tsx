@@ -164,7 +164,7 @@ export default function App() {
         for (const reminder of reminders) {
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             const notification = new Notification(reminder.title, {
-              body: reminder.location ? `${reminder.timezone} · ${reminder.location}` : `SMART TIME · ${reminder.timezone}`,
+              body: `SMART TIME · ${reminder.timezone}`,
               tag: reminder.id,
             });
             notification.onclick = () => {
