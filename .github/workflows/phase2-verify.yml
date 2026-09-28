@@ -16,6 +16,6 @@ jobs:
         with:
           node-version: 20
 
-      - run: npm ci || npm install
+      - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run verify:phase2-storage-schema
       - run: npm run build
