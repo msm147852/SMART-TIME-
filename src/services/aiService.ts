@@ -220,6 +220,27 @@ export async function importCanonicalTasks(tasks: DailyTask[]): Promise<{ import
   return smartAiMutation('/api/ai/tasks/import', 'POST', { tasks }) as Promise<{ imported: number }>;
 }
 
+export interface PendingEventReminder {
+  id: string;
+  eventId: string;
+  userId: string;
+  title: string;
+  startAt: string;
+  timezone: string;
+  reminderMinutes: number;
+  scheduledFor: string;
+  queuedAt: string;
+}
+
+export async function fetchPendingEventReminders(limit = 50): Promise<PendingEventReminder[]> {
+  const data = await smartAiMutation(`/api/ai/reminders?limit=${Math.max(1, Math.min(100, Math.floor(limit)))}`, 'GET');
+  return Array.isArray(data?.reminders) ? data.reminders : [];
+}
+
+export async function acknowledgeEventReminder(id: string): Promise<void> {
+  await smartAiMutation(`/api/ai/reminders/${encodeURIComponent(id)}/ack`, 'POST', {});
+}
+
 export async function fetchCanonicalEvents(options: { from?: string; to?: string } = {}): Promise<CalendarEvent[]> {
   const params = new URLSearchParams();
   if (options.from) params.set('from', options.from);
