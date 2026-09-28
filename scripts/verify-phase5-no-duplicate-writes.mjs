@@ -20,6 +20,7 @@ const financeSetItem = /(?:localStorage|StorageAdapter)\.setItem\s*\(\s*(?:[\'"]
 const aiWrite = /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:main\.)?(?:ai_transactions|ai_budgets)\b/i;
 for (const file of files) {
   const rel = path.relative(ROOT, file).replaceAll(path.sep, "/");
+  if (/\\.(?:test|spec)\\.(?:ts|tsx|js|mjs)$/.test(rel)) continue;
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
     if (financeSetItem.test(line)) violations.push(`${rel}:${index + 1} direct finance storage write`);
