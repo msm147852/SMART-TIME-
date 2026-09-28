@@ -127,6 +127,27 @@ CREATE TABLE IF NOT EXISTS ride_quotes (
   raw_json TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ai_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  start_at TEXT NOT NULL,
+  end_at TEXT,
+  timezone TEXT NOT NULL,
+  location TEXT,
+  category TEXT NOT NULL DEFAULT 'general',
+  all_day INTEGER NOT NULL DEFAULT 0,
+  reminder_enabled INTEGER NOT NULL DEFAULT 0,
+  reminder_minutes INTEGER,
+  recurrence_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_events_user_start ON ai_events(user_id, start_at);
+CREATE INDEX IF NOT EXISTS idx_ai_events_user_end ON ai_events(user_id, end_at);
+CREATE INDEX IF NOT EXISTS idx_ai_events_reminders ON ai_events(user_id, reminder_enabled, start_at);
+
 CREATE TABLE IF NOT EXISTS voice_dna_profiles (
   id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL,
