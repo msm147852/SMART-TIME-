@@ -102,7 +102,7 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) { window.alert(isAr ? 'من فضلك أدخل مبلغًا صحيحًا أكبر من صفر.' : 'Please enter a valid amount greater than zero.'); return; }
@@ -117,21 +117,27 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    let updated: SpecializedExpense[];
-    if (editingId) {
-      updated = expenses.map((e) => (e.id === editingId ? newItem : e));
-    } else {
-      updated = [newItem, ...expenses];
+    try {
+      if (editingId) {
+        await financeService.updateCanonicalFinanceExpense(editingId, { type: 'work', title: newItem.type, category: newItem.type, amount: newItem.amount, date: newItem.date, notes: newItem.notes });
+      } else {
+        await financeService.addExpense({ type: 'work', title: newItem.type, category: newItem.type, amount: newItem.amount, date: newItem.date, notes: newItem.notes });
+      }
+      await loadCanonicalExpenses();
+      setIsModalOpen(false);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ المصروف.');
     }
-
-    onSaveExpenses(updated);
-    setIsModalOpen(false);
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المصروف؟' : 'Delete this expense?')) {
-      const updated = expenses.filter((e) => e.id !== id);
-      onSaveExpenses(updated);
+      try {
+        await financeService.deleteCanonicalFinanceExpense(id);
+        await loadCanonicalExpenses();
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'تعذر حذف المصروف.');
+      }
     }
   };
 
