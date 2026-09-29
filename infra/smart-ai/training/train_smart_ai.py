@@ -21,8 +21,7 @@ from trl import SFTConfig, SFTTrainer
 
 ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILES = [
-    ROOT / "backend/ai/training/smart-time-v2.jsonl",
-    ROOT / "backend/ai/training/smart-time-grounded-v1.jsonl",
+    ROOT / "backend/ai/training/smart-time-legacy-90.jsonl",
     ROOT / "backend/ai/training/smart-time-sft.jsonl",
 ]
 ONTOLOGY_FILE = ROOT / "backend/ai/training/tool-ontology.json"
