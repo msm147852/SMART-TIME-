@@ -192,8 +192,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   );
   const vehicleTotal = fuelTotal + maintTotal + oilTotal;
   const monthlyExpenses = useMemo(
-    () => currentMonthExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0),
-    [currentMonthExpenses]
+    () => houseTotal + medicalTotal + workTotal + personalTotal + fuelTotal + maintTotal + oilTotal + educationTotal,
+    [houseTotal, medicalTotal, workTotal, personalTotal, fuelTotal, maintTotal, oilTotal, educationTotal]
   );
 
   // Primary Income from Salary & Extra streams
