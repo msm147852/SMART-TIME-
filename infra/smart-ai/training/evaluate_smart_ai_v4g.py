@@ -13,13 +13,18 @@ EVAL_FILE=ROOT/"backend/ai/training/smart-time-eval-v4g.jsonl"
 MODEL=os.getenv("MODEL","").strip()
 BASE_MODEL=os.getenv("BASE_MODEL","").strip()
 OUTPUT=Path(os.getenv("EVAL_OUTPUT",str(ROOT/"infra/smart-ai/training/eval-v4g-predictions.jsonl")))
-SYSTEM="""You are SMART AI inside SMART TIME.
-Return ONLY one valid JSON object. No markdown and no extra text.
-Schema: {"intent":"conversation|task|event|reminder|file_analysis|data_analysis|report_generation|web_research|memory|unknown","tool":string|null,"arguments":object,"requiresConfirmation":boolean}
-The model proposes intent only. Never claim an action was executed.
-Use supplied SMART TIME data only for app facts. Never reveal secrets or credentials.
-Destructive or mutating actions require explicit confirmation.
-Use Egyptian Arabic naturally when the user writes Arabic."""
+SYSTEM="""أنت SMART AI داخل SMART TIME.
+أخرج JSON object واحد فقط بالمفاتيح: intent, tool, arguments, requiresConfirmation.
+الأدوات المسموح بها فقط:
+expense -> finance.transaction.create | finance.transaction.delete | finance.get_summary
+task -> task.create
+reminder -> reminder.create
+file_analysis -> analyze_file
+web_research -> web_search
+ممنوع: smart_time, none, delete_last_expense, search, set_reminder, analyze_budget_file وأي اسم أداة غير موجود.
+tool=null فقط عند عدم الحاجة لأداة. arguments=object. requiresConfirmation=boolean.
+لا تضف شرحًا خارج JSON. لا تدّعي تنفيذ أي إجراء.
+تحدث بالمصري عند العربية."""
 def dtype():
     if not torch.cuda.is_available(): return torch.float32
     return torch.bfloat16 if torch.is_bf16_supported() else torch.float16
@@ -44,7 +49,7 @@ def main():
             rendered=tok.apply_chat_template(msgs,tokenize=False,add_generation_prompt=True,enable_thinking=False)
             inputs=tok(rendered,return_tensors="pt")
             if torch.cuda.is_available(): inputs={k:v.to(model.device) for k,v in inputs.items()}
-            with torch.no_grad(): generated=model.generate(**inputs,max_new_tokens=220,do_sample=False,pad_token_id=tok.eos_token_id)
+            with torch.no_grad(): generated=model.generate(**inputs,max_new_tokens=180,do_sample=False,pad_token_id=tok.eos_token_id)
             continuation=generated[0][inputs["input_ids"].shape[1]:]
             raw=tok.decode(continuation,skip_special_tokens=True).strip()
             parsed=None; parse_error=None
