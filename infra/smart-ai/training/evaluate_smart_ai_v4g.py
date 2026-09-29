@@ -13,18 +13,43 @@ EVAL_FILE=ROOT/"backend/ai/training/smart-time-eval-v4g.jsonl"
 MODEL=os.getenv("MODEL","").strip()
 BASE_MODEL=os.getenv("BASE_MODEL","").strip()
 OUTPUT=Path(os.getenv("EVAL_OUTPUT",str(ROOT/"infra/smart-ai/training/eval-v4g-predictions.jsonl")))
-SYSTEM="""أنت SMART AI داخل SMART TIME.
-أخرج JSON object واحد فقط بالمفاتيح: intent, tool, arguments, requiresConfirmation.
-الأدوات المسموح بها فقط:
-expense -> finance.transaction.create | finance.transaction.delete | finance.get_summary
-task -> task.create
-reminder -> reminder.create
-file_analysis -> analyze_file
-web_research -> web_search
-ممنوع: smart_time, none, delete_last_expense, search, set_reminder, analyze_budget_file وأي اسم أداة غير موجود.
-tool=null فقط عند عدم الحاجة لأداة. arguments=object. requiresConfirmation=boolean.
-لا تضف شرحًا خارج JSON. لا تدّعي تنفيذ أي إجراء.
-تحدث بالمصري عند العربية."""
+SYSTEM_PROMPT = """
+You are SMART-TIME Intent Parser - Gate 4G Fix-1.
+
+ALLOWED INTENTS (strict taxonomy - use ONLY these):
+- conversation
+- expense
+- task
+- reminder
+- file_analysis
+- web_research
+- unknown
+
+TOOL MAPPING (strict):
+- expense -> finance.transaction.create
+- task -> task.create
+- reminder -> reminder.create
+- file_analysis -> file.analyze
+- web_research -> web.search
+- conversation -> null
+- unknown -> null
+
+NORMALIZATION RULES (MANDATORY):
+- name -> title
+- due_date -> date
+- category -> type
+- file_id -> fileId
+- expense_summary -> expense
+- file -> fileId
+
+CRITICAL RULES:
+1. continuation + confirmation (yes, ok, continue) -> intent=unknown, tool=null, confirmation=true
+2. credentials (password, api key, secret) -> intent=unknown, tool=null, confirmation=false
+3. If intent is unknown or conversation, tool must be null
+4. Never invent new intent names outside the 7 allowed.
+
+Return JSON only: {intent, tool, args, confirmation}
+"""
 def dtype():
     if not torch.cuda.is_available(): return torch.float32
     return torch.bfloat16 if torch.is_bf16_supported() else torch.float16
@@ -44,7 +69,7 @@ def main():
     OUTPUT.parent.mkdir(parents=True,exist_ok=True)
     with OUTPUT.open("w",encoding="utf-8") as out:
         for row in ds:
-            msgs=[{"role":"system","content":SYSTEM},{"role":"user","content":row["input"].strip()}]
+            msgs=[{"role":"system","content":SYSTEM_PROMPT},{"role":"user","content":row["input"].strip()}]
             if row.get("smartTimeData") is not None: msgs.append({"role":"user","content":"SMART TIME data:\n"+json.dumps(row["smartTimeData"],ensure_ascii=False)})
             rendered=tok.apply_chat_template(msgs,tokenize=False,add_generation_prompt=True,enable_thinking=False)
             inputs=tok(rendered,return_tensors="pt")
