@@ -70,3 +70,53 @@ Compare:
 - candidate adapter
 
 Keep the current adapter until the candidate wins the agreed objective metrics.
+
+
+## Gate 4G — behavioral validation
+
+Gate 4G benchmarks the current Qwen3-4B + LoRA before any new training.
+
+Versioned suite:
+- `backend/ai/training/smart-time-eval-v4g.jsonl`
+- `infra/smart-ai/training/evaluate_smart_ai_v4g.py`
+- `scripts/score-smart-ai-eval-v4g.mjs`
+
+The model must return a strict structured proposal:
+`intent + tool + arguments + requiresConfirmation`.
+
+Coverage:
+1. Egyptian Arabic conversation
+2. SMART-TIME intent recognition
+3. structured expense/task/reminder actions
+4. confirmation/destructive-action boundaries
+5. file-analysis intent
+6. web-research intent
+7. clarification/context handling
+8. secret protection
+9. no-fabrication grounding
+10. English routing
+
+Gate 4G is PASS only when at least 80% of cases satisfy all required structural checks. A generated proposal is never execution evidence.
+
+Run on the validated GPU environment:
+
+```bash
+python infra/smart-ai/training/evaluate_smart_ai_v4g.py
+node scripts/score-smart-ai-eval-v4g.mjs
+```
+
+Do not retrain from Gate 4G failures alone. Classify failures first; orchestration/tool/runtime fixes take precedence over QLoRA.
+
+## Next execution order
+
+Gate 4G behavioral validation
+→ AI Gateway
+→ Context Engine
+→ Memory
+→ Planner
+→ Tool Registry
+→ Execution
+→ Verification
+→ Artifacts
+
+CAD/DWG remains out of SMART-TIME scope.
