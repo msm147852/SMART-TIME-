@@ -75,9 +75,16 @@ STRICT OUTPUT:
 - Never emit file.analyze, web.search, search, smart_time, none, delete_last_expense, set_reminder, analyze_budget_file, or any other tool name outside the allowed list.
 - Never add prose, markdown, code fences, or extra JSON fields.
 """
+
 def dtype():
-    if not torch.cuda.is_available(): return torch.float32
-    return torch.bfloat16 if torch.is_bf16_supported() else torch.float16
+    if not torch.cuda.is_available():
+        return torch.float32
+    bf16_supported = getattr(torch, "is_bf16_supported", None)
+    if callable(bf16_supported):
+        return torch.bfloat16 if bf16_supported() else torch.float16
+    cuda_capability = torch.cuda.get_device_capability()
+    return torch.bfloat16 if cuda_capability[0] >= 8 else torch.float16
+
 def load_model():
     if not MODEL: raise SystemExit("MODEL is required.")
     tok=AutoTokenizer.from_pretrained(MODEL,use_fast=True)
@@ -89,6 +96,7 @@ def load_model():
     else:
         model=AutoModelForCausalLM.from_pretrained(MODEL,torch_dtype=dtype(),device_map="auto" if torch.cuda.is_available() else None)
     model.eval(); return model,tok
+
 def main():
     ds=load_dataset("json",data_files=str(EVAL_FILE),split="train"); model,tok=load_model()
     OUTPUT.parent.mkdir(parents=True,exist_ok=True)
@@ -109,4 +117,5 @@ def main():
             except Exception as exc: parse_error=str(exc)
             out.write(json.dumps({"case_id":row["case_id"],"category":row["category"],"expected":row["expected"],"raw":raw,"prediction":parsed,"parse_error":parse_error},ensure_ascii=False)+"\n")
     print(f"Wrote {len(ds)} Gate 4G predictions to {OUTPUT}")
+
 if __name__=="__main__": main()
