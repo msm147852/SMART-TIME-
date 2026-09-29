@@ -85,12 +85,6 @@ export const VehicleExpensesSection: React.FC<VehicleExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  fuelList,
-  onSaveFuel,
-  maintList,
-  onSaveMaint,
-  oilFilterList,
-  onSaveOilFilter,
 }) => {
   const isAr = language === 'ar';
   const [fuelList, setFuelList] = useState<VehicleFuelRecord[]>([]);
