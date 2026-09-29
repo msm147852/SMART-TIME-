@@ -1,13 +1,10 @@
 name: OPEN MIND AI CI
 
 on:
+  push:
+    branches: [feat/v6-finance-ui]
   pull_request:
-    paths:
-      - "backend/ai/**"
-      - "tools/**"
-      - "package.json"
-      - "tsconfig.json"
-      - ".github/workflows/open-mind-ci.yml"
+    branches: [feat/v6-finance-ui]
 
 jobs:
   open-mind:

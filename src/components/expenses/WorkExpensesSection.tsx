@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   ArrowLeft,
@@ -16,15 +16,14 @@ import {
 } from 'lucide-react';
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
 import { Language } from '../../types';
-import { SpecializedExpense } from './HouseExpensesSection';
+import { financeService } from '../../services/financeService';
+import type { SpecializedExpense } from './HouseExpensesSection';
 
 interface WorkExpensesSectionProps {
   language: Language;
   currency: string;
   selectedMonth: string;
   onBack: () => void;
-  expenses: SpecializedExpense[];
-  onSaveExpenses: (list: SpecializedExpense[]) => void;
 }
 
 export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
@@ -32,10 +31,14 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  expenses,
-  onSaveExpenses,
 }) => {
   const isAr = language === 'ar';
+  const [canonicalExpenses, setCanonicalExpenses] = useState<SpecializedExpense[]>([]);
+  const loadCanonicalExpenses = async () => {
+    const rows = await financeService.getExpenses({ type: 'work' });
+    setCanonicalExpenses(rows.map((x) => ({ id: String(x.id), section: 'work', type: String(x.title || x.category || 'مصروف عمل'), amount: Number(x.amount) || 0, date: String(x.date || '').slice(0, 10), notes: x.notes ? String(x.notes) : undefined })));
+  };
+  useEffect(() => { void loadCanonicalExpenses(); }, []);
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,10 +66,10 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
     'أخرى (مخصص)',
   ];
 
-  const currentMonthExpenses = expenses.filter((e) => isDateInMonth(e.date, selectedMonth));
+  const currentMonthExpenses = canonicalExpenses.filter((e) => isDateInMonth(e.date, selectedMonth));
   const monthTotal = currentMonthExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-  const filteredList = expenses.filter((item) => {
+  const filteredList = canonicalExpenses.filter((item) => {
     const matchesSearch =
       item.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.customType && item.customType.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -95,7 +98,7 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) { window.alert(isAr ? 'من فضلك أدخل مبلغًا صحيحًا أكبر من صفر.' : 'Please enter a valid amount greater than zero.'); return; }
@@ -110,21 +113,27 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    let updated: SpecializedExpense[];
-    if (editingId) {
-      updated = expenses.map((e) => (e.id === editingId ? newItem : e));
-    } else {
-      updated = [newItem, ...expenses];
+    try {
+      if (editingId) {
+        await financeService.updateCanonicalFinanceExpense(editingId, { type: 'work', title: newItem.type, category: newItem.type, amount: newItem.amount, date: newItem.date, notes: newItem.notes });
+      } else {
+        await financeService.addExpense({ type: 'work', title: newItem.type, category: newItem.type, amount: newItem.amount, date: newItem.date, notes: newItem.notes });
+      }
+      await loadCanonicalExpenses();
+      setIsModalOpen(false);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ المصروف.');
     }
-
-    onSaveExpenses(updated);
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المصروف؟' : 'Delete this expense?')) {
-      const updated = expenses.filter((e) => e.id !== id);
-      onSaveExpenses(updated);
+      try {
+        await financeService.deleteCanonicalFinanceExpense(id);
+        await loadCanonicalExpenses();
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'تعذر حذف المصروف.');
+      }
     }
   };
 

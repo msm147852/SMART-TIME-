@@ -2,7 +2,7 @@ name: Phase 4 - Verify Storage Adapter
 
 on:
   push:
-    branches: [feat/v3-next]
+    branches: [feat/v3-next, feat/v6-finance-ui]
 
 jobs:
   verify:

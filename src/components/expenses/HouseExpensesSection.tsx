@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   ArrowLeft,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
 import { Language, MedicalExpenseRecord } from '../../types';
+import { financeService } from '../../services/financeService';
 
 export interface SpecializedExpense {
   id: string;
@@ -38,10 +39,6 @@ interface HouseExpensesSectionProps {
   currency: string;
   selectedMonth: string;
   onBack: () => void;
-  expenses: SpecializedExpense[];
-  onSaveExpenses: (list: SpecializedExpense[]) => void;
-  medicalExpenses: MedicalExpenseRecord[];
-  onSaveMedicalExpenses: (list: MedicalExpenseRecord[]) => void;
 }
 
 export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
@@ -49,12 +46,25 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
   currency,
   selectedMonth,
   onBack,
-  expenses,
-  onSaveExpenses,
-  medicalExpenses,
-  onSaveMedicalExpenses,
 }) => {
   const isAr = language === 'ar';
+  const [expenses, setExpenses] = useState<SpecializedExpense[]>([]);
+  const [medicalExpenses, setMedicalExpenses] = useState<MedicalExpenseRecord[]>([]);
+  const loadCanonicalExpenses = async () => {
+    const [houseRows, medicalRows] = await Promise.all([
+      financeService.getExpenses({ type: 'house' }),
+      financeService.getExpenses({ type: 'medical' }),
+    ]);
+    setExpenses(houseRows.map(x => {
+      let meta:any={}; try{meta=x.notes?JSON.parse(String(x.notes)):{};}catch{}
+      return {id:String(x.id),section:'house',type:String(x.title||x.category||'مصروف منزلي'),customType:meta.customType,amount:Number(x.amount)||0,paymentType:meta.paymentType,date:String(x.date||'').slice(0,10),notes:meta.notes||String(x.notes||'')||undefined};
+    }));
+    setMedicalExpenses(medicalRows.map(x => {
+      let meta:any={}; try{meta=x.notes?JSON.parse(String(x.notes)):{};}catch{}
+      return {id:String(x.id),familyMember:String(meta.familyMember||x.title||'فرد الأسرة'),facilityName:meta.facilityName||undefined,facilityType:meta.facilityType||'مستشفى',conditionDescription:String(meta.conditionDescription||''),doctorDiagnosis:meta.doctorDiagnosis||undefined,examinationCost:Number(meta.examinationCost)||0,medicationCost:Number(meta.medicationCost)||0,date:String(x.date||'').slice(0,10),notes:meta.notes||undefined};
+    }));
+  };
+  useEffect(() => { void loadCanonicalExpenses(); }, []);
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const [activeTab, setActiveTab] = useState<'home' | 'medical'>('home');
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
@@ -137,7 +147,7 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) { window.alert(isAr ? 'من فضلك أدخل مبلغًا صحيحًا أكبر من صفر.' : 'Please enter a valid amount greater than zero.'); return; }
@@ -153,21 +163,18 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    let updated: SpecializedExpense[];
-    if (editingId) {
-      updated = expenses.map((e) => (e.id === editingId ? newItem : e));
-    } else {
-      updated = [newItem, ...expenses];
-    }
-
-    onSaveExpenses(updated);
-    setIsModalOpen(false);
+    try {
+      const notesPayload = JSON.stringify({ customType: newItem.customType, paymentType: newItem.paymentType, notes: newItem.notes });
+      if (editingId) await financeService.updateCanonicalFinanceExpense(editingId,{type:'house',title:newItem.type,category:newItem.type,amount:newItem.amount,date:newItem.date,notes:notesPayload});
+      else await financeService.addExpense({type:'house',title:newItem.type,category:newItem.type,amount:newItem.amount,date:newItem.date,notes:notesPayload});
+      await loadCanonicalExpenses(); setIsModalOpen(false);
+    } catch(error){ window.alert(error instanceof Error?error.message:'تعذر حفظ المصروف المنزلي.'); }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المصروف؟' : 'Delete this expense?')) {
-      const updated = expenses.filter((e) => e.id !== id);
-      onSaveExpenses(updated);
+      try { await financeService.deleteCanonicalFinanceExpense(id); await loadCanonicalExpenses(); }
+      catch(error){ window.alert(error instanceof Error?error.message:'تعذر حذف المصروف.'); }
     }
   };
 
@@ -186,7 +193,7 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
     setMedicalDate(item.date); setMedicalNotes(item.notes || ''); setIsMedicalModalOpen(true);
   };
 
-  const handleSaveMedical = (e: React.FormEvent) => {
+  const handleSaveMedical = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!medicalFamilyMember.trim() || !medicalCondition.trim()) { window.alert(isAr ? 'من فضلك أدخل اسم فرد الأسرة وتوصيف الحالة.' : 'Please enter family member and condition.'); return; }
     const exam = Number(medicalExamCost) || 0; const meds = Number(medicalMedicationCost) || 0;
@@ -196,12 +203,16 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
       facilityType: medicalFacilityType, conditionDescription: medicalCondition.trim(), doctorDiagnosis: medicalDiagnosis.trim() || undefined,
       examinationCost: exam, medicationCost: meds, date: medicalDate, notes: medicalNotes.trim() || undefined,
     };
-    onSaveMedicalExpenses(editingMedicalId ? medicalExpenses.map(x => x.id === editingMedicalId ? item : x) : [item, ...medicalExpenses]);
-    setIsMedicalModalOpen(false);
+    try {
+      const notesPayload=JSON.stringify({familyMember:item.familyMember,facilityName:item.facilityName,facilityType:item.facilityType,conditionDescription:item.conditionDescription,doctorDiagnosis:item.doctorDiagnosis,examinationCost:item.examinationCost,medicationCost:item.medicationCost,notes:item.notes});
+      if(editingMedicalId) await financeService.updateCanonicalFinanceExpense(editingMedicalId,{type:'medical',title:item.familyMember,category:item.facilityType,amount:item.examinationCost+item.medicationCost,date:item.date,notes:notesPayload});
+      else await financeService.addExpense({type:'medical',title:item.familyMember,category:item.facilityType,amount:item.examinationCost+item.medicationCost,date:item.date,notes:notesPayload});
+      await loadCanonicalExpenses(); setIsMedicalModalOpen(false);
+    } catch(error){ window.alert(error instanceof Error?error.message:'تعذر حفظ المصروف الطبي.'); }
   };
 
-  const deleteMedical = (id: string) => {
-    if (window.confirm(isAr ? 'هل أنت متأكد من حذف المصروف الطبي؟' : 'Delete this medical expense?')) onSaveMedicalExpenses(medicalExpenses.filter(x => x.id !== id));
+  const deleteMedical = async (id: string) => {
+    if (window.confirm(isAr ? 'هل أنت متأكد من حذف المصروف الطبي؟' : 'Delete this medical expense?')) { try { await financeService.deleteCanonicalFinanceExpense(id); await loadCanonicalExpenses(); } catch(error){ window.alert(error instanceof Error?error.message:'تعذر حذف المصروف الطبي.'); } }
   };
 
   const exportMedical = (mode: 'excel' | 'print') => {
