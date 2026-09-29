@@ -161,6 +161,15 @@ def main() -> None:
             torch_dtype=choose_dtype(),
         )
 
+    gradient_checkpointing = os.getenv(
+        "GRADIENT_CHECKPOINTING", "1"
+    ).strip().lower() not in {"0", "false", "no"}
+    if gradient_checkpointing:
+        model.config.use_cache = False
+        model.gradient_checkpointing_enable()
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+
     peft_config = None
     if USE_LORA:
         peft_config = LoraConfig(
@@ -193,6 +202,7 @@ def main() -> None:
         fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
         completion_only_loss=True,
         packing=False,
+        gradient_checkpointing=gradient_checkpointing,
     )
 
     trainer = SFTTrainer(
