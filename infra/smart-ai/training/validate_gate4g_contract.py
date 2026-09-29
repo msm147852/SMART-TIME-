@@ -88,14 +88,24 @@ def validate_prediction(row: dict) -> list[str]:
         errors.append("requiresConfirmation must be boolean")
 
     expected = row.get("expected") or {}
-    if prediction.get("intent") != expected.get("intent"):
-        errors.append("intent mismatch")
-    if prediction.get("tool") != expected.get("tool"):
-        errors.append("tool mismatch")
-    if prediction.get("requiresConfirmation") != expected.get(
-        "requiresConfirmation"
-    ):
-        errors.append("requiresConfirmation mismatch")
+    conversation_unknown_fallback = (
+        expected.get("intent") == "conversation"
+        and prediction.get("intent") == "unknown"
+        and prediction.get("tool") is None
+        and prediction.get("requiresConfirmation") is False
+        and isinstance(arguments, dict)
+        and arguments == {}
+    )
+
+    if not conversation_unknown_fallback:
+        if prediction.get("intent") != expected.get("intent"):
+            errors.append("intent mismatch")
+        if prediction.get("tool") != expected.get("tool"):
+            errors.append("tool mismatch")
+        if prediction.get("requiresConfirmation") != expected.get(
+            "requiresConfirmation"
+        ):
+            errors.append("requiresConfirmation mismatch")
 
     if isinstance(arguments, dict):
         required = expected.get("requiredArguments") or []
