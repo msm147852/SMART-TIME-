@@ -2,7 +2,7 @@ name: OPEN MIND AI CI
 
 on:
   push:
-    branches: [feat/v6-finance-ui]
+    branches: [feat/v6-finance-ui, feat/v3-next]
   pull_request:
     branches: [feat/v6-finance-ui]
 
