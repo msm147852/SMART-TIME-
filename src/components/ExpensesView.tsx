@@ -18,8 +18,6 @@ import { AddExpenseModal } from './expenses/AddExpenseModal';
 interface ExpensesViewProps {
   language: Language;
   currency: string;
-  expenses?: Expense[];
-  onUpdateExpenses?: (expenses: Expense[]) => void;
   userProfile?: import('../types').UserProfile;
   onBackToHome?: () => void;
 }
@@ -195,6 +193,24 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     () => houseTotal + medicalTotal + workTotal + personalTotal + fuelTotal + maintTotal + oilTotal + educationTotal,
     [houseTotal, medicalTotal, workTotal, personalTotal, fuelTotal, maintTotal, oilTotal, educationTotal]
   );
+
+  const associationFinancials = useMemo(() => {
+    let installments = 0;
+    let earned = 0;
+    const [yy, mm] = selectedMonth.split('-').map(Number);
+    const monthStart = new Date(yy, mm - 1, 1, 0, 0, 0);
+    associationsList.forEach((a) => {
+      const start = new Date(`${a.startDate}T00:00:00`);
+      if (!Number.isNaN(start.getTime()) && start <= monthStart) {
+        const monthIndex = (yy - start.getFullYear()) * 12 + (mm - 1 - start.getMonth());
+        if (monthIndex >= 0 && monthIndex < Math.max(1, Math.floor(Number(a.memberCount) || 1))) {
+          installments += Number(a.installment) || 0;
+        }
+      }
+      if ((a.payoutDate || '').slice(0, 7) === selectedMonth) earned += Number(a.value) || 0;
+    });
+    return { installments, earned };
+  }, [associationsList, selectedMonth]);
 
   // Primary Income from Salary & Extra streams
   const primaryIncome = useMemo(
