@@ -23,7 +23,9 @@ ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILES = [
     ROOT / "backend/ai/training/smart-time-v2.jsonl",
     ROOT / "backend/ai/training/smart-time-grounded-v1.jsonl",
+    ROOT / "backend/ai/training/smart-time-sft.jsonl",
 ]
+ONTOLOGY_FILE = ROOT / "backend/ai/training/tool-ontology.json"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
 BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen3-4B").strip()
 USE_LORA = os.getenv("USE_LORA", "1").strip().lower() not in {"0", "false", "no"}
@@ -61,6 +63,14 @@ def build_prompt_messages(example: dict) -> dict:
     instruction = str(example.get("instruction", "")).strip()
     if instruction:
         system += "\nTraining behavior:\n" + instruction
+    if ONTOLOGY_FILE.exists():
+        ontology = json.loads(ONTOLOGY_FILE.read_text(encoding="utf-8"))
+        system += (
+            "\nCanonical tool contract (JSON only):\n"
+            + json.dumps(ontology, ensure_ascii=False)
+            + "\nUse ONLY canonical intent/tool names from this contract. "
+              "Never emit forbidden or legacy tool names."
+        )
 
     prompt = [
         {"role": "system", "content": system},
@@ -115,9 +125,10 @@ def choose_dtype() -> torch.dtype:
 
 def main() -> None:
     dataset = load_training_dataset()
-    if len(dataset) < 80:
+    expected_total = 130
+    if len(dataset) != expected_total:
         raise SystemExit(
-            f"Training dataset is too small for this experiment: {len(dataset)} examples."
+            f"Gate 4G training contract requires exactly {expected_total} examples; found {len(dataset)}."
         )
 
     split = dataset.train_test_split(
@@ -189,6 +200,7 @@ def main() -> None:
     trainer.save_model(str(OUTPUT_DIR))
     tokenizer.save_pretrained(str(OUTPUT_DIR))
     print({
+        "training_contract_examples": len(dataset),
         "model": BASE_MODEL,
         "train_examples": len(train_ds),
         "eval_examples": len(eval_ds),
