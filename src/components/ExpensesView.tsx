@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Language, Expense, VehicleAccidentRecord, StudentProfile, StudentExpenseRecord, MedicalExpenseRecord, MonthlyIncome, BankCertificate } from '../types';
-import { StorageAdapter, VehiclesRepository, ExpensesRepository, fetchCanonicalFinanceOverview, createCanonicalFinanceExpense } from '../services';
-import type { FinanceOverview, CanonicalExpenseInput } from '../services/financeService';
+import { Language, VehicleAccidentRecord, StudentProfile, MonthlyIncome, BankCertificate } from '../types';
+import { StorageAdapter, VehiclesRepository, ExpensesRepository, createCanonicalFinanceExpense, getAllExpenses } from '../services';
+import type { CanonicalExpenseInput } from '../services/financeService';
 import type { ExpenseType } from '../contracts/financeContract';
 import { isDateInMonth, getCertificatesProfitForMonth, getPrimaryIncomeForMonth } from '../services/financeCalculations';
 import { FinancialDashboard } from './expenses/FinancialDashboard';
@@ -47,68 +47,28 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
   // Universal Add Expense Modal
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
-  const [canonicalOverview, setCanonicalOverview] = useState<FinanceOverview | null>(null);
+  const [allExpenses, setAllExpenses] = useState<Array<Record<string, unknown>>>([]);
   const [canonicalFinanceError, setCanonicalFinanceError] = useState<string | null>(null);
-  const refreshCanonicalFinance = async () => {
-    try { setCanonicalFinanceError(null); setCanonicalOverview(await fetchCanonicalFinanceOverview()); }
-    catch (error) { setCanonicalFinanceError(error instanceof Error ? error.message : 'تعذر قراءة البيانات المالية الموحدة.'); }
+  const refreshCanonicalExpenses = async () => {
+    try {
+      setCanonicalFinanceError(null);
+      setAllExpenses(await getAllExpenses());
+    } catch (error) {
+      setCanonicalFinanceError(error instanceof Error ? error.message : 'تعذر قراءة البيانات المالية الموحدة.');
+    }
   };
-  useEffect(() => { void refreshCanonicalFinance(); }, []);
+  useEffect(() => { void refreshCanonicalExpenses(); }, []);
+
 
   // --- 2. DATA STATES (PERSISTED) ---
 
-  // House Expenses
-  const [houseList, setHouseList] = useState<SpecializedExpense[]>(() => {
-    return StorageAdapter.getItem<SpecializedExpense[]>('smart_time_house_expenses', [
-      { id: 'h1', section: 'house', type: 'فطار', amount: 150, paymentType: 'supply', date: `${currentYearMonth}-02` },
-      { id: 'h2', section: 'house', type: 'إصلاحات كهربائية', amount: 450, paymentType: 'labor', date: `${currentYearMonth}-05` },
-      { id: 'h3', section: 'house', type: 'غداء', amount: 320, paymentType: 'supply', date: `${currentYearMonth}-06` },
-      { id: 'h4', section: 'house', type: 'شراء مفروشات', amount: 1200, paymentType: 'supply', date: `${currentYearMonth}-08` },
-    ]);
-  });
-
-  // Medical expenses (inside the Home section)
-  const [medicalList, setMedicalList] = useState<MedicalExpenseRecord[]>(() => {
-    return StorageAdapter.getItem<MedicalExpenseRecord[]>('smart_time_medical_expenses', []);
-  });
-
-  // Work Expenses
-  const [workList, setWorkList] = useState<SpecializedExpense[]>(() => {
-    return StorageAdapter.getItem<SpecializedExpense[]>('smart_time_work_expenses', [
-      { id: 'w1', section: 'work', type: 'أدوات مكتبية', amount: 350, date: `${currentYearMonth}-03`, notes: 'أوراق طباعة وأحبار' },
-      { id: 'w2', section: 'work', type: 'اشتراكات برمجيات وسيرفرات', amount: 800, date: `${currentYearMonth}-04`, notes: 'سيرفر الاستضافة السحابية' },
-    ]);
-  });
-
-  // Personal Expenses
-  const [personalList, setPersonalList] = useState<SpecializedExpense[]>(() => {
-    return StorageAdapter.getItem<SpecializedExpense[]>('smart_time_personal_expenses', []);
-  });
-
-  // Personal associations (جمعياتي)
+  // Canonical expense data is loaded from finance_expenses only.
+  // Personal associations (جمعياتي) remain in their existing non-expense source.
   const [associationsList, setAssociationsList] = useState<AssociationRecord[]>(() => {
     return StorageAdapter.getItem<AssociationRecord[]>('smart_time_personal_associations', []);
   });
 
-  // Vehicle: Fuel, Maintenance, Accidents
-  const [fuelList, setFuelList] = useState<VehicleFuelRecord[]>(() => {
-    return StorageAdapter.getItem<VehicleFuelRecord[]>('smart_time_vehicle_fuel', [
-      { id: 'f1', fuelType: 'بنزين 92', price: 650, odometer: 45200, dateTime: `${currentYearMonth}-03T10:00` },
-      { id: 'f2', fuelType: 'بنزين 92', price: 700, odometer: 45850, dateTime: `${currentYearMonth}-07T14:30` },
-    ]);
-  });
-
-  const [maintList, setMaintList] = useState<VehicleMaintenanceRecord[]>(() => {
-    return StorageAdapter.getItem<VehicleMaintenanceRecord[]>('smart_time_vehicle_maint', [
-      { id: 'm1', maintenanceType: 'كهرباء', description: 'تغيير شمعات الإشعال وفحص البطارية', supplyName: 'بوجيهات أصلية', supplyPrice: 800, laborDescription: 'تركيب وفحص', laborPrice: 200, total: 1000, date: `${currentYearMonth}-05` },
-    ]);
-  });
-
-
-  const [oilFilterList, setOilFilterList] = useState<VehicleOilFilterRecord[]>(() => {
-    return StorageAdapter.getItem<VehicleOilFilterRecord[]>('smart_time_vehicle_oil_filters', []);
-  });
-
+  // Vehicle accidents are non-expense records and remain in their existing source.
   const [accidentList, setAccidentList] = useState<VehicleAccidentRecord[]>(() => {
     return VehiclesRepository.getAccidentRecords();
   });
@@ -121,15 +81,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       { id: 'std_2', name: 'فاطمة محمد', nationalId: '31808220105068', age: '11', stage: 'ابتدائي' },
     ];
     return StorageAdapter.getItem<StudentProfile[]>('smart_time_students', defaultStudents);
-  });
-
-  const [studentExpensesList, setStudentExpensesList] = useState<StudentExpenseRecord[]>(() => {
-    return StorageAdapter.getItem<StudentExpenseRecord[]>('smart_time_student_expenses', [
-      { id: 'se_s1', studentId: 'std_salma', subCategory: 'lessons', title: 'دروس الرياضيات واللغات', amount: 850, date: `${currentYearMonth}-01` },
-      { id: 'se_s2', studentId: 'std_salma', subCategory: 'school', title: 'قسط المصروفات المدرسية', amount: 3200, date: `${currentYearMonth}-03` },
-      { id: 'se_s3', studentId: 'std_salma', subCategory: 'books', title: 'كتب ومذكرات خارجية', amount: 450, date: `${currentYearMonth}-04` },
-      { id: 'se_s4', studentId: 'std_salma', subCategory: 'transport', title: 'اشتراك باص المدرسة الشهري', amount: 600, date: `${currentYearMonth}-05` },
-    ]);
   });
 
   // Income Sources List
@@ -209,112 +160,41 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
     ExpensesRepository.saveBankCertificates(list);
   };
 
-  // --- 4. REAL-TIME FINANCIAL CALCULATIONS FOR SELECTED MONTH ---
-  const currentMonthHouse = useMemo(
-    () => houseList.filter((e) => isDateInMonth(e.date, selectedMonth)),
-    [houseList, selectedMonth]
+  // --- 4. CANONICAL FINANCIAL CALCULATIONS FOR SELECTED MONTH ---
+  const currentMonthExpenses = useMemo(
+    () => allExpenses.filter((expense) => isDateInMonth(String(expense.date ?? ''), selectedMonth)),
+    [allExpenses, selectedMonth]
   );
-  const houseTotal = useMemo(
-    () => currentMonthHouse.reduce((s, e) => s + (Number(e.amount) || 0), 0),
-    [currentMonthHouse]
-  );
-
-  const currentMonthMedical = useMemo(
-    () => medicalList.filter((e) => isDateInMonth(e.date, selectedMonth)),
-    [medicalList, selectedMonth]
-  );
-  const medicalTotal = useMemo(
-    () => currentMonthMedical.reduce((s, e) => s + (Number(e.examinationCost) || 0) + (Number(e.medicationCost) || 0), 0),
-    [currentMonthMedical]
-  );
+  const expensesByType = (type: ExpenseType) =>
+    currentMonthExpenses.filter((expense) => String(expense.type ?? '') === type);
+  const currentMonthHouse = useMemo(() => expensesByType('house'), [currentMonthExpenses]);
+  const currentMonthMedical = useMemo(() => expensesByType('medical'), [currentMonthExpenses]);
+  const currentMonthWork = useMemo(() => expensesByType('work'), [currentMonthExpenses]);
+  const currentMonthPersonal = useMemo(() => expensesByType('personal'), [currentMonthExpenses]);
+  const currentMonthFuel = useMemo(() => expensesByType('vehicle_fuel'), [currentMonthExpenses]);
+  const currentMonthMaint = useMemo(() => expensesByType('vehicle_maint'), [currentMonthExpenses]);
+  const currentMonthOil = useMemo(() => expensesByType('vehicle_oil'), [currentMonthExpenses]);
+  const currentMonthEducation = useMemo(() => expensesByType('student'), [currentMonthExpenses]);
+  const sumCanonicalAmounts = (items: Array<Record<string, unknown>>) =>
+    items.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  const houseTotal = useMemo(() => sumCanonicalAmounts(currentMonthHouse), [currentMonthHouse]);
+  const medicalTotal = useMemo(() => sumCanonicalAmounts(currentMonthMedical), [currentMonthMedical]);
   const homeAndMedicalTotal = houseTotal + medicalTotal;
-
-  const currentMonthWork = useMemo(
-    () => workList.filter((e) => isDateInMonth(e.date, selectedMonth)),
-    [workList, selectedMonth]
-  );
-  const workTotal = useMemo(
-    () => currentMonthWork.reduce((s, e) => s + (Number(e.amount) || 0), 0),
-    [currentMonthWork]
-  );
-
-  const currentMonthPersonal = useMemo(
-    () => personalList.filter((e) => isDateInMonth(e.date, selectedMonth)),
-    [personalList, selectedMonth]
-  );
-  const personalTotal = useMemo(
-    () => currentMonthPersonal.reduce((s, e) => s + (Number(e.amount) || 0), 0),
-    [currentMonthPersonal]
-  );
-
-  const currentMonthFuel = useMemo(
-    () => fuelList.filter((f) => isDateInMonth(f.dateTime, selectedMonth)),
-    [fuelList, selectedMonth]
-  );
-  const fuelTotal = useMemo(
-    () => currentMonthFuel.reduce((s, f) => s + (Number(f.price) || 0), 0),
-    [currentMonthFuel]
-  );
-
-  const currentMonthMaint = useMemo(
-    () => maintList.filter((m) => isDateInMonth(m.date, selectedMonth)),
-    [maintList, selectedMonth]
-  );
-  const maintTotal = useMemo(
-    () => currentMonthMaint.reduce((s, m) => s + (Number(m.total) || 0), 0),
-    [currentMonthMaint]
-  );
-
-  const currentMonthOil = useMemo(
-    () => oilFilterList.filter((o) => isDateInMonth(o.date, selectedMonth)),
-    [oilFilterList, selectedMonth]
-  );
-  const oilTotal = useMemo(
-    () => currentMonthOil.reduce((s, o) => s + (Number(o.price) || 0), 0),
-    [currentMonthOil]
-  );
-
+  const workTotal = useMemo(() => sumCanonicalAmounts(currentMonthWork), [currentMonthWork]);
+  const personalTotal = useMemo(() => sumCanonicalAmounts(currentMonthPersonal), [currentMonthPersonal]);
+  const fuelTotal = useMemo(() => sumCanonicalAmounts(currentMonthFuel), [currentMonthFuel]);
+  const maintTotal = useMemo(() => sumCanonicalAmounts(currentMonthMaint), [currentMonthMaint]);
+  const oilTotal = useMemo(() => sumCanonicalAmounts(currentMonthOil), [currentMonthOil]);
+  const educationTotal = useMemo(() => sumCanonicalAmounts(currentMonthEducation), [currentMonthEducation]);
   const currentMonthAccidents = useMemo(
     () => accidentList.filter((a) => isDateInMonth(a.date, selectedMonth)),
     [accidentList, selectedMonth]
   );
-  const accidentTotal = useMemo(
-    () => currentMonthAccidents.reduce((s, a) => s + (Number(a.estimatedDamage) || 0), 0),
-    [currentMonthAccidents]
+  const vehicleTotal = fuelTotal + maintTotal + oilTotal;
+  const monthlyExpenses = useMemo(
+    () => currentMonthExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0),
+    [currentMonthExpenses]
   );
-
-  const vehicleTotal = fuelTotal + maintTotal + oilTotal + accidentTotal;
-
-  const currentMonthEducation = useMemo(
-    () => studentExpensesList.filter((e) => isDateInMonth(e.date, selectedMonth)),
-    [studentExpensesList, selectedMonth]
-  );
-  const educationTotal = useMemo(
-    () => currentMonthEducation.reduce((s, e) => s + (Number(e.amount) || 0), 0),
-    [currentMonthEducation]
-  );
-
-  const associationFinancials = useMemo(() => {
-    let installments = 0;
-    let earned = 0;
-    const [yy, mm] = selectedMonth.split('-').map(Number);
-    const monthStart = new Date(yy, mm - 1, 1, 0, 0, 0);
-    associationsList.forEach((a) => {
-      const start = new Date(`${a.startDate}T00:00:00`);
-      if (!Number.isNaN(start.getTime()) && start <= monthStart) {
-        const monthIndex = (yy - start.getFullYear()) * 12 + (mm - 1 - start.getMonth());
-        // الجمعية مدتها = عدد الأفراد، وتبدأ من تاريخ بداية الأقساط.
-        if (monthIndex >= 0 && monthIndex < Math.max(1, Math.floor(Number(a.memberCount) || 1))) {
-          installments += Number(a.installment) || 0;
-        }
-      }
-      if ((a.payoutDate || '').slice(0, 7) === selectedMonth) earned += Number(a.value) || 0;
-    });
-    return { installments, earned };
-  }, [associationsList, selectedMonth]);
-
-  const canonicalMonthlyExpenses = useMemo(() => canonicalOverview?.expenses.filter((expense) => isDateInMonth(String(expense.date ?? ''), selectedMonth)).reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0) ?? null, [canonicalOverview, selectedMonth]);
-  const monthlyExpenses = canonicalMonthlyExpenses ?? (homeAndMedicalTotal + personalTotal + associationFinancials.installments + vehicleTotal + educationTotal);
 
   // Primary Income from Salary & Extra streams
   const primaryIncome = useMemo(
@@ -342,86 +222,34 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   // Master net income is always derived from the same monthly income and all expense sections.
   const netIncome = monthlyIncome - monthlyExpenses;
 
-  // Recent Transactions Stream across all sections
+  // Recent Transactions Stream: canonical finance_expenses only.
   const recentTransactions = useMemo(() => {
-    const list: {
-      id: string;
-      section: 'house' | 'work' | 'personal' | 'vehicle' | 'education';
-      title: string;
-      amount: number;
-      date: string;
-      badge: string;
-    }[] = [];
-
-    houseList.forEach((h) => {
-      list.push({
-        id: h.id,
-        section: 'house',
-        title: h.type,
-        amount: h.amount,
-        date: h.date,
-        badge: h.paymentType === 'labor' ? (isAr ? 'مصنعية' : 'Labor') : isAr ? 'منزل' : 'Home',
-      });
-    });
-
-    medicalList.forEach((m) => {
-      list.push({
-        id: m.id,
-        section: 'house',
-        title: `طبي: ${m.familyMember}${m.facilityName ? ` - ${m.facilityName}` : ''}`,
-        amount: (Number(m.examinationCost) || 0) + (Number(m.medicationCost) || 0),
-        date: m.date,
-        badge: isAr ? 'طبي' : 'Medical',
-      });
-    });
-
-    personalList.forEach((w) => {
-      list.push({
-        id: w.id,
-        section: 'work',
-        title: w.type,
-        amount: w.amount,
-        date: w.date,
-        badge: isAr ? 'شخصي' : 'Personal',
-      });
-    });
-
-    fuelList.forEach((f) => {
-      list.push({
-        id: f.id,
-        section: 'vehicle',
-        title: `${f.fuelType} (عداد: ${f.odometer} كم)`,
-        amount: f.price,
-        date: f.dateTime.split('T')[0],
-        badge: isAr ? 'وقود' : 'Fuel',
-      });
-    });
-
-    maintList.forEach((m) => {
-      list.push({
-        id: m.id,
-        section: 'vehicle',
-        title: m.maintenanceType,
-        amount: m.total,
-        date: m.date,
-        badge: isAr ? 'صيانة' : 'Maint',
-      });
-    });
-
-    studentExpensesList.forEach((e) => {
-      const std = students.find((s) => s.id === e.studentId);
-      list.push({
-        id: e.id,
-        section: 'education',
-        title: `${e.title} (${std?.name || ''})`,
-        amount: e.amount,
-        date: e.date,
-        badge: isAr ? 'تعليم' : 'Edu',
-      });
-    });
-
-    return list.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
-  }, [houseList, medicalList, personalList, fuelList, maintList, studentExpensesList, students, isAr]);
+    const labels: Record<string, { section: 'house' | 'work' | 'personal' | 'vehicle' | 'education'; badgeAr: string; badgeEn: string }> = {
+      house: { section: 'house', badgeAr: 'منزل', badgeEn: 'Home' },
+      medical: { section: 'house', badgeAr: 'طبي', badgeEn: 'Medical' },
+      work: { section: 'work', badgeAr: 'عمل', badgeEn: 'Work' },
+      personal: { section: 'personal', badgeAr: 'شخصي', badgeEn: 'Personal' },
+      vehicle_fuel: { section: 'vehicle', badgeAr: 'وقود', badgeEn: 'Fuel' },
+      vehicle_maint: { section: 'vehicle', badgeAr: 'صيانة', badgeEn: 'Maint' },
+      vehicle_oil: { section: 'vehicle', badgeAr: 'زيوت', badgeEn: 'Oil' },
+      student: { section: 'education', badgeAr: 'تعليم', badgeEn: 'Edu' },
+    };
+    return [...allExpenses].map((expense) => {
+      const type = String(expense.type ?? '');
+      const label = labels[type];
+      if (!label) return null;
+      const date = String(expense.date ?? '').slice(0, 10);
+      return {
+        id: String(expense.id ?? `${type}-${date}-${String(expense.title ?? expense.category ?? 'expense')}`),
+        section: label.section,
+        title: String(expense.title ?? expense.category ?? type),
+        amount: Number(expense.amount) || 0,
+        date,
+        badge: isAr ? label.badgeAr : label.badgeEn,
+      };
+    }).filter((item): item is NonNullable<typeof item> => Boolean(item?.date))
+      .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+  }, [allExpenses, isAr]);
 
   // Phase 6 canonical mutation path.
   const handleUniversalAddExpense = async (data: {
@@ -447,7 +275,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
     try {
       await createCanonicalFinanceExpense(input);
-      await refreshCanonicalFinance();
+      await refreshCanonicalExpenses();
       setIsAddExpenseModalOpen(false);
     } catch (error) {
       setCanonicalFinanceError(error instanceof Error ? error.message : 'تعذر حفظ المصروف الموحد.');
@@ -471,8 +299,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           onSelectSection={(sec) => setCurrentScreen(sec)}
           houseTotal={homeAndMedicalTotal}
           houseCount={currentMonthHouse.length + currentMonthMedical.length}
-          workTotal={personalTotal + associationFinancials.installments}
-          workCount={currentMonthPersonal.length + associationsList.length}
+          workTotal={personalTotal}
+          workCount={currentMonthPersonal.length}
           vehicleTotal={vehicleTotal}
           vehicleCount={currentMonthFuel.length + currentMonthMaint.length + currentMonthOil.length + currentMonthAccidents.length}
           educationTotal={educationTotal}
@@ -591,20 +419,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           monthlyIncome={monthlyIncome}
           monthlyExpenses={monthlyExpenses}
           netIncome={netIncome}
-          houseTotal={houseTotal}
+          houseTotal={homeAndMedicalTotal}
           workTotal={personalTotal}
           vehicleTotal={vehicleTotal}
           educationTotal={educationTotal}
-          houseList={houseList}
-          medicalList={medicalList}
-          personalList={personalList}
           associationsList={associationsList}
-          fuelList={fuelList}
-          maintList={maintList}
-          oilFilterList={oilFilterList}
-          accidentList={accidentList}
-          studentExpensesList={studentExpensesList}
-          students={students}
           incomeList={incomeList}
         />
       )}
