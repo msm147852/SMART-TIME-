@@ -171,7 +171,7 @@ export const HouseExpensesSection: React.FC<HouseExpensesSectionProps> = ({
     } catch(error){ window.alert(error instanceof Error?error.message:'تعذر حفظ المصروف المنزلي.'); }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المصروف؟' : 'Delete this expense?')) {
       try { await financeService.deleteCanonicalFinanceExpense(id); await loadCanonicalExpenses(); }
       catch(error){ window.alert(error instanceof Error?error.message:'تعذر حذف المصروف.'); }
