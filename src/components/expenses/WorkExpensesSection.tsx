@@ -17,6 +17,7 @@ import {
 import { formatMoney, isDateInMonth } from '../../services/financeCalculations';
 import { Language } from '../../types';
 import { financeService } from '../../services/financeService';
+import type { SpecializedExpense } from './HouseExpensesSection';
 
 interface WorkExpensesSectionProps {
   language: Language;
