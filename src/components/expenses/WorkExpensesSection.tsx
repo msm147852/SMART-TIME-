@@ -126,7 +126,7 @@ export const WorkExpensesSection: React.FC<WorkExpensesSectionProps> = ({
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المصروف؟' : 'Delete this expense?')) {
       try {
         await financeService.deleteCanonicalFinanceExpense(id);
