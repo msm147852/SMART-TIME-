@@ -14,7 +14,7 @@ from pathlib import Path
 
 import torch
 from datasets import concatenate_datasets, load_dataset
-from peft import LoraConfig, TaskType
+from peft import LoraConfig, TaskType, prepare_model_for_kbit_training
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
@@ -29,6 +29,7 @@ ONTOLOGY_FILE = ROOT / "backend/ai/training/tool-ontology.json"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
 BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen3-4B").strip()
 USE_LORA = os.getenv("USE_LORA", "1").strip().lower() not in {"0", "false", "no"}
+USE_QLORA = os.getenv("USE_QLORA", "1").strip().lower() not in {"0", "false", "no"}
 MAX_LENGTH = int(os.getenv("MAX_LENGTH", "1024"))
 EPOCHS = float(os.getenv("EPOCHS", "3"))
 LR = float(os.getenv("LEARNING_RATE", "2e-4"))
@@ -141,10 +142,25 @@ def main() -> None:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL,
-        torch_dtype=choose_dtype(),
-    )
+    if USE_QLORA:
+        from transformers import BitsAndBytesConfig
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=choose_dtype(),
+            bnb_4bit_use_double_quant=True,
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL,
+            quantization_config=quant_config,
+            device_map="auto",
+        )
+        model = prepare_model_for_kbit_training(model)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL,
+            torch_dtype=choose_dtype(),
+        )
 
     peft_config = None
     if USE_LORA:
@@ -201,6 +217,7 @@ def main() -> None:
     tokenizer.save_pretrained(str(OUTPUT_DIR))
     print({
         "training_contract_examples": len(dataset),
+        "use_qlora": USE_QLORA,
         "model": BASE_MODEL,
         "train_examples": len(train_ds),
         "eval_examples": len(eval_ds),
