@@ -24,7 +24,8 @@
     "verify:phase5-finance-migration": "node scripts/verify-phase5-finance-migration.mjs",
     "verify:phase5-ai-canonical": "node scripts/verify-phase5-ai-canonical.mjs",
     "verify:phase5-no-duplicate-writes": "node scripts/verify-phase5-no-duplicate-writes.mjs",
-    "verify:phase5-final": "node scripts/verify-phase5-final.mjs"
+    "verify:phase5-final": "node scripts/verify-phase5-final.mjs",
+    "validate:smart-ai-v2-json": "node scripts/validate-smart-ai-v2-json.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
