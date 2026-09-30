@@ -22,6 +22,7 @@ from trl import SFTConfig, SFTTrainer
 ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILES = [
     ROOT / "backend/ai/training/smart-time-sft.jsonl",
+    ROOT / "backend/ai/training/smart-time-grounded-v4-batch-a.jsonl",
     ROOT / "backend/ai/training/smart-time-grounded-v4-batch-b.jsonl",
 ]
 ONTOLOGY_FILE = ROOT / "backend/ai/training/tool-ontology.json"
@@ -47,7 +48,12 @@ SYSTEM_AR = (
     "لا تخترع أي رقم أو سجل أو حقيقة غير موجودة في البيانات.\n"
     "لا تكشف أسرارًا أو مفاتيح API أو كلمات مرور أو PIN.\n"
     "لا تنفذ أي تعديل على البيانات من نفسك؛ أي تعديل يحتاج تأكيد المستخدم.\n"
-    "عند طلب إخراج منظم، أخرج JSON فقط بالمفاتيح الكانونية."
+    "عند طلب إخراج منظم، أخرج JSON فقط بالمفاتيح الكانونية: "
+    "{\"intent\": \"...\", \"tool\": \"...\", "
+    "\"arguments\": {}, \"requiresConfirmation\": false}.\n"
+    "استخدم arguments وليس args، وrequiresConfirmation وليس confirmation.\n"
+    "طبّق التطبيع: category->type، name->title، due_date->date، file_id->fileId.\n"
+    "استخدم analyze_file وليس file.analyze، وweb_search وليس web.search."
 )
 
 SYSTEM_EN = (
@@ -128,7 +134,7 @@ def choose_dtype() -> torch.dtype:
 
 def main() -> None:
     dataset = load_training_dataset()
-    expected_total = 246
+    expected_total = 346
     if len(dataset) != expected_total:
         raise SystemExit(
             f"Gate 4G training contract requires exactly {expected_total} examples; found {len(dataset)}."
