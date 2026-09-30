@@ -159,8 +159,7 @@ def main() -> None:
         )
 
     response_template_ids = tokenizer.encode(
-        "<|im_start|>assistant
-",
+        "<|im_start|>assistant\n",
         add_special_tokens=False,
     )
     data_collator = DataCollatorForCompletionOnlyLM(
