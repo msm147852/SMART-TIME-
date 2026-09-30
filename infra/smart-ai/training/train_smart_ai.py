@@ -91,8 +91,7 @@ def build_prompt_messages(example: dict) -> dict:
     if context is not None:
         prompt.append({
             "role": "user",
-            "content": "Synthetic SMART TIME data:
-" + json.dumps(
+            "content": "Synthetic SMART TIME data:\n" + json.dumps(
                 context, ensure_ascii=False
             ),
         })
