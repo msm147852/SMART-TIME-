@@ -127,7 +127,8 @@ def load_training_dataset():
 def choose_dtype() -> torch.dtype:
     if not torch.cuda.is_available():
         return torch.float32
-    if torch.cuda.is_bf16_supported():
+    major, _minor = torch.cuda.get_device_capability()
+    if major >= 8:
         return torch.bfloat16
     return torch.float16
 
@@ -161,6 +162,7 @@ def main() -> None:
         model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL,
             quantization_config=quant_config,
+            torch_dtype=choose_dtype(),
         )
         model = prepare_model_for_kbit_training(model)
     else:
@@ -208,8 +210,10 @@ def main() -> None:
         assistant_only_loss=True,
         loss_type="nll",
         report_to="none",
-        bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
-        fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
+        # Keep Trainer AMP disabled for QLoRA on pre-Ampere GPUs.
+        # The 4-bit compute dtype is still selected by choose_dtype().
+        bf16=False,
+        fp16=False,
         packing=False,
         gradient_checkpointing=gradient_checkpointing,
     )
