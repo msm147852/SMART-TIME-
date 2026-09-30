@@ -41,44 +41,64 @@ LORA_ALPHA = int(os.getenv("LORA_ALPHA", "32"))
 LORA_DROPOUT = float(os.getenv("LORA_DROPOUT", "0.05"))
 
 SYSTEM_AR = (
-    "أنت SMART AI داخل SMART TIME، واسم شخصيتك لهلوبة.\n"
+    "أنت SMART AI داخل SMART TIME، واسم شخصيتك لهلوبة.
+"
     "لهلوبة ست بيت مصرية شاطرة، سكرتيرة محترفة، وصاحبة مصرية جدعة؛ "
-    "ذكية وحنينة وعملية، تفهم الكلام المصري الطبيعي وترد باختصار ووضوح.\n"
-    "الشخصية لا تغيّر عقد JSON ولا أسماء الأدوات ولا قواعد الأمان.\n"
-    "استخدم بيانات SMART TIME فقط عند الحديث عن أرقام أو سجلات أو تواريخ.\n"
-    "لا تخترع أي رقم أو سجل أو حقيقة غير موجودة في البيانات.\n"
-    "لا تكشف أسرارًا أو مفاتيح API أو كلمات مرور أو PIN.\n"
-    "لا تنفذ أي تعديل على البيانات من نفسك؛ أي تعديل يحتاج تأكيد المستخدم.\n"
+    "ذكية وحنينة وعملية، تفهم الكلام المصري الطبيعي وترد باختصار ووضوح.
+"
+    "الشخصية لا تغيّر عقد JSON ولا أسماء الأدوات ولا قواعد الأمان.
+"
+    "استخدم بيانات SMART TIME فقط عند الحديث عن أرقام أو سجلات أو تواريخ.
+"
+    "لا تخترع أي رقم أو سجل أو حقيقة غير موجودة في البيانات.
+"
+    "لا تكشف أسرارًا أو مفاتيح API أو كلمات مرور أو PIN.
+"
+    "لا تنفذ أي تعديل على البيانات من نفسك؛ أي تعديل يحتاج تأكيد المستخدم.
+"
     "عند طلب إخراج منظم، أخرج JSON فقط بالمفاتيح الكانونية: "
     "{\"intent\": \"...\", \"tool\": \"...\", "
-    "\"arguments\": {}, \"requiresConfirmation\": false}.\n"
-    "استخدم arguments وليس args، وrequiresConfirmation وليس confirmation.\n"
-    "طبّق التطبيع: category->type، name->title، due_date->date، file_id->fileId.\n"
+    "\"arguments\": {}, \"requiresConfirmation\": false}.
+"
+    "استخدم arguments وليس args، وrequiresConfirmation وليس confirmation.
+"
+    "طبّق التطبيع: category->type، name->title، due_date->date، file_id->fileId.
+"
     "استخدم analyze_file وليس file.analyze، وweb_search وليس web.search."
 )
 
 SYSTEM_EN = (
-    "You are SMART AI inside SMART TIME.\n"
-    "Use only supplied SMART TIME data for numbers, records, and dates.\n"
-    "Never invent a number, record, or fact that is not present in the data.\n"
-    "Never reveal secrets, API keys, passwords, or PINs.\n"
-    "Never mutate data yourself; changes require explicit confirmation.\n"
+    "You are SMART AI inside SMART TIME.
+"
+    "Use only supplied SMART TIME data for numbers, records, and dates.
+"
+    "Never invent a number, record, or fact that is not present in the data.
+"
+    "Never reveal secrets, API keys, passwords, or PINs.
+"
+    "Never mutate data yourself; changes require explicit confirmation.
+"
     "Be concise and natural."
 )
 
 
 def build_prompt_messages(example: dict) -> dict:
-    has_arabic = any("\u0600" <= char <= "\u06ff" for char in example["input"])
+    has_arabic = any("؀" <= char <= "ۿ" for char in example["input"])
     system = SYSTEM_AR if has_arabic else SYSTEM_EN
     instruction = str(example.get("instruction", "")).strip()
     if instruction:
-        system += "\nTraining behavior:\n" + instruction
+        system += "
+Training behavior:
+" + instruction
     if ONTOLOGY_FILE.exists():
         ontology = json.loads(ONTOLOGY_FILE.read_text(encoding="utf-8"))
         system += (
-            "\nCanonical tool contract (JSON only):\n"
+            "
+Canonical tool contract (JSON only):
+"
             + json.dumps(ontology, ensure_ascii=False)
-            + "\nUse ONLY canonical intent/tool names from this contract. "
+            + "
+Use ONLY canonical intent/tool names from this contract. "
               "Never emit forbidden or legacy tool names."
         )
 
@@ -91,7 +111,8 @@ def build_prompt_messages(example: dict) -> dict:
     if context is not None:
         prompt.append({
             "role": "user",
-            "content": "Synthetic SMART TIME data:\n" + json.dumps(
+            "content": "Synthetic SMART TIME data:
+" + json.dumps(
                 context, ensure_ascii=False
             ),
         })
@@ -120,7 +141,7 @@ def load_training_dataset():
             raise ValueError(f"{file.name}: missing columns: {sorted(missing)}")
         dataset = dataset.map(build_prompt_messages)
         datasets.append(dataset.remove_columns([
-            c for c in dataset.column_names if c not in {"prompt", "completion"}
+            c for c in dataset.column_names if c != "text"
         ]))
     return concatenate_datasets(datasets)
 
@@ -159,7 +180,8 @@ def main() -> None:
         )
 
     response_template_ids = tokenizer.encode(
-        "<|im_start|>assistant\n",
+        "<|im_start|>assistant
+",
         add_special_tokens=False,
     )
     data_collator = DataCollatorForCompletionOnlyLM(
