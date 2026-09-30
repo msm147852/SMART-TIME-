@@ -162,7 +162,7 @@ def main() -> None:
         model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL,
             quantization_config=quant_config,
-            torch_dtype=choose_dtype(),
+            dtype=choose_dtype(),
         )
         model = prepare_model_for_kbit_training(model)
     else:
