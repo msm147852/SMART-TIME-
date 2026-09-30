@@ -207,6 +207,7 @@ def main() -> None:
         greater_is_better=False,
         max_length=MAX_LENGTH,
         assistant_only_loss=True,
+        loss_type="nll",
         report_to="none",
         bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
         fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
