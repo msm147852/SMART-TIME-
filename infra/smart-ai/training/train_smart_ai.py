@@ -72,18 +72,13 @@ def build_prompt_messages(example: dict) -> dict:
     system = SYSTEM_AR if has_arabic else SYSTEM_EN
     instruction = str(example.get("instruction", "")).strip()
     if instruction:
-        system += "
-Training behavior:
-" + instruction
+        system += "\nTraining behavior:\n" + instruction
     if ONTOLOGY_FILE.exists():
         ontology = json.loads(ONTOLOGY_FILE.read_text(encoding="utf-8"))
         system += (
-            "
-Canonical tool contract (JSON only):
-"
+            "\nCanonical tool contract (JSON only):\n"
             + json.dumps(ontology, ensure_ascii=False)
-            + "
-Use ONLY canonical intent/tool names from this contract. "
+            + "\nUse ONLY canonical intent/tool names from this contract. "
               "Never emit forbidden or legacy tool names."
         )
 
