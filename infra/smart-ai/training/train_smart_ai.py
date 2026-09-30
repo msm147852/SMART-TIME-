@@ -161,7 +161,6 @@ def main() -> None:
         model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL,
             quantization_config=quant_config,
-            device_map="auto",
         )
         model = prepare_model_for_kbit_training(model)
     else:
