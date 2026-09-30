@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILES = [
     ROOT / "backend/ai/training/smart-time-sft.jsonl",
     ROOT / "backend/ai/training/smart-time-grounded-v4-batch-a.jsonl",
-    ROOT / "backend/ai/training/smart-time-grounded-v4-batch-b.jsonl",
+    ROOT / "backend/ai/training/smart-time-grounded-v4-batch-b-train.jsonl",
 ]
 ONTOLOGY_FILE = ROOT / "backend/ai/training/tool-ontology.json"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
