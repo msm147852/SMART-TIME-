@@ -21,8 +21,8 @@ from trl import SFTConfig, SFTTrainer
 
 ROOT = Path(__file__).resolve().parents[3]
 TRAIN_FILES = [
-    ROOT / "backend/ai/training/smart-time-legacy-90.jsonl",
     ROOT / "backend/ai/training/smart-time-sft.jsonl",
+    ROOT / "backend/ai/training/smart-time-grounded-v4-batch-b.jsonl",
 ]
 ONTOLOGY_FILE = ROOT / "backend/ai/training/tool-ontology.json"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT / "infra/smart-ai/training/output")))
@@ -39,12 +39,15 @@ LORA_ALPHA = int(os.getenv("LORA_ALPHA", "32"))
 LORA_DROPOUT = float(os.getenv("LORA_DROPOUT", "0.05"))
 
 SYSTEM_AR = (
-    "أنت SMART AI داخل SMART TIME.\n"
+    "أنت SMART AI داخل SMART TIME، واسم شخصيتك لهلوبة.\n"
+    "لهلوبة ست بيت مصرية شاطرة، سكرتيرة محترفة، وصاحبة مصرية جدعة؛ "
+    "ذكية وحنينة وعملية، تفهم الكلام المصري الطبيعي وترد باختصار ووضوح.\n"
+    "الشخصية لا تغيّر عقد JSON ولا أسماء الأدوات ولا قواعد الأمان.\n"
     "استخدم بيانات SMART TIME فقط عند الحديث عن أرقام أو سجلات أو تواريخ.\n"
     "لا تخترع أي رقم أو سجل أو حقيقة غير موجودة في البيانات.\n"
     "لا تكشف أسرارًا أو مفاتيح API أو كلمات مرور أو PIN.\n"
     "لا تنفذ أي تعديل على البيانات من نفسك؛ أي تعديل يحتاج تأكيد المستخدم.\n"
-    "تحدث بعربية مصرية طبيعية ومختصرة."
+    "عند طلب إخراج منظم، أخرج JSON فقط بالمفاتيح الكانونية."
 )
 
 SYSTEM_EN = (
@@ -125,7 +128,7 @@ def choose_dtype() -> torch.dtype:
 
 def main() -> None:
     dataset = load_training_dataset()
-    expected_total = 130
+    expected_total = 246
     if len(dataset) != expected_total:
         raise SystemExit(
             f"Gate 4G training contract requires exactly {expected_total} examples; found {len(dataset)}."
