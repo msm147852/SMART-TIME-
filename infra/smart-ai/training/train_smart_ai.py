@@ -17,7 +17,6 @@ from datasets import concatenate_datasets, load_dataset
 from peft import LoraConfig, TaskType, prepare_model_for_kbit_training
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
-from trl.trainer.sft_trainer import DataCollatorForCompletionOnlyLM
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -101,7 +100,7 @@ def build_prompt_messages(example: dict) -> dict:
         })
 
     return {
-        "text": [
+        "messages": [
             *prompt,
             {"role": "assistant", "content": example["output"].strip()},
         ],
@@ -120,7 +119,7 @@ def load_training_dataset():
             raise ValueError(f"{file.name}: missing columns: {sorted(missing)}")
         dataset = dataset.map(build_prompt_messages)
         datasets.append(dataset.remove_columns([
-            c for c in dataset.column_names if c != "text"
+            c for c in dataset.column_names if c != "messages"
         ]))
     return concatenate_datasets(datasets)
 
@@ -150,23 +149,6 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
-    def formatting_func(example):
-        return tokenizer.apply_chat_template(
-            example["text"],
-            tokenize=False,
-            add_generation_prompt=False,
-        )
-
-    response_template_ids = tokenizer.encode(
-        "<|im_start|>assistant\n",
-        add_special_tokens=False,
-    )
-    data_collator = DataCollatorForCompletionOnlyLM(
-        response_template=response_template_ids,
-        tokenizer=tokenizer,
-        mlm=False,
-    )
 
     if USE_QLORA:
         from transformers import BitsAndBytesConfig
@@ -223,7 +205,8 @@ def main() -> None:
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
-        max_seq_length=MAX_LENGTH,
+        max_length=MAX_LENGTH,
+        assistant_only_loss=True,
         report_to="none",
         bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
         fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
@@ -237,8 +220,6 @@ def main() -> None:
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
-        formatting_func=formatting_func,
-        data_collator=data_collator,
         peft_config=peft_config,
     )
 
