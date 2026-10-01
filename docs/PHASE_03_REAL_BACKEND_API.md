@@ -1,6 +1,6 @@
 # SMART-TIME Phase 3 — Real Backend API Closure
 
-Status: IN PROGRESS
+Status: CLOSURE CANDIDATE — technical gates passed
 Branch: `phase/03-real-backend-api`
 Baseline: `feat/v3-next@852b87f5ce4ac3b2678d0de80c777f185da0c67e`
 Date: 2026-10-01
@@ -50,7 +50,18 @@ The Phase 3 verification workflow is required to run against the final closure c
 
 ## Sign-off record
 
-Owner: pending
-Decision: pending
-Date: pending
-Notes: pending
+Owner: user (explicit instruction to continue Phase 3 and not advance before closure)
+Decision: PASS — Phase 3 technical gates passed; owner authorized closure.
+Date: 2026-10-01
+Closure evidence:
+- P3-01 HTTP boot/health: PASS
+- P3-02 Database API health: PASS
+- P3-03 Authentication boundary: PASS
+- P3-04 Authenticated AI status: PASS
+- P3-05 AI chat HTTP contract: PASS
+- P3-06 Finance API create -> read-back -> delete: PASS
+- P3-07 Regression baseline: PASS
+- P3-08 Clean-run reproducibility: PASS
+- P3-09 Security boundary: PASS
+- P3-10 Owner sign-off: PASS
+Notes: No Phase 4 implementation is authorized by this closure record.
