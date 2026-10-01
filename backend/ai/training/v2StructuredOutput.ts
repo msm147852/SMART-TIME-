@@ -36,7 +36,7 @@ export function validateV2Output(raw: string): V2ValidationResult {
   const errors: string[] = [];
   const text = String(raw ?? "").trim();
   if (!text) return { valid: false, errors: ["empty_output"] };
-  if (/<think>|<\\/think>/i.test(text)) errors.push("think_block_forbidden");
+  if (/<think>|<\/think>/i.test(text)) errors.push("think_block_forbidden");
   if (text.startsWith("```") || text.endsWith("```")) errors.push("markdown_fence_forbidden");
 
   let value: unknown;
