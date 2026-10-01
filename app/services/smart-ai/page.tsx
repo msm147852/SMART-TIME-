@@ -16,10 +16,10 @@ export default function SmartAIServicePage() {
           </div>
 
           <h1 className="text-4xl font-black tracking-tight sm:text-5xl lg:text-7xl">
-            حوّل كلامك الطبيعي إلى JSON
+            SMART TIME
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-white/50 sm:text-lg">
-            جرّب خدمة SMART TIME AI الحقيقية: اكتب طلبك بالمصري، وشاهد الناتج
+            خدمة SMART TIME: اكتب طلبك بالمصري، وشاهد الناتج
             المنظم قبل ما يكمل طريقه إلى الـ Tool Router وقاعدة البيانات.
           </p>
 
