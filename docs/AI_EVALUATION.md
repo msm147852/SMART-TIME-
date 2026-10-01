@@ -71,7 +71,6 @@ Compare:
 
 Keep the current adapter until the candidate wins the agreed objective metrics.
 
-
 ## Gate 4G — behavioral validation
 
 Gate 4G benchmarks the current Qwen3-4B + LoRA before any new training.
@@ -106,6 +105,51 @@ node scripts/score-smart-ai-eval-v4g.mjs
 ```
 
 Do not retrain from Gate 4G failures alone. Classify failures first; orchestration/tool/runtime fixes take precedence over QLoRA.
+
+## Phase 10 — canonical Voice-First contract
+
+Phase 10 is governed by:
+- `docs/VOICE_FIRST_ARCHITECTURE.md`
+- `infra/smart-ai/training/phase10-training-manifest.json`
+- `scripts/verify-phase10-architecture.mjs`
+
+The canonical runtime order is:
+
+```
+Voice Capture
+-> STT / ASR
+-> Transcript
+-> SMART AI Orchestrator
+-> Intent / Action Proposal
+-> Policy + Schema Validator
+-> Central Tool Registry / Agent Router
+-> Tool / Service
+-> Read-back Verification
+-> SMART AI Response
+-> TTS / Voice Output
+-> User
+```
+
+The canonical evaluation order follows the same trust boundaries:
+
+```
+model health
+-> STT correctness
+-> intent preservation
+-> structured proposal validity
+-> policy/schema validation
+-> confirmation
+-> execution
+-> read-back verification
+-> grounded response
+-> TTS
+-> playback
+-> E2E latency/error
+-> security/privacy
+-> reproducibility
+```
+
+Phase 10 does not authorize a new training run. The pre-run manifest intentionally blocks reproducible training until concrete model revision, dataset hashes, and artifact/rollback evidence are recorded.
 
 ## Canonical 35-phase execution order
 
