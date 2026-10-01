@@ -8,11 +8,6 @@ const read = (p) => fs.readFileSync(path.join(root,p),"utf8");
 const arch = read("docs/VOICE_FIRST_ARCHITECTURE.md");
 const manifest = JSON.parse(read("infra/smart-ai/training/phase10-training-manifest.json"));
 
-const forbiddenDirectAccess = [
-  /model.*database.*secret/i,
-  /model.*db.*credential/i,
-  /SMART AI.*database credentials/i
-];
 if (!arch.includes("The model is not a database client and does not receive secrets.")) {
   errors.push("model secret boundary is not explicitly documented");
 }
@@ -24,9 +19,6 @@ if (!arch.includes("invalid proposals never reach execution")) {
 }
 if (!arch.includes("destructive actions require a final scope/confirmation boundary")) {
   errors.push("destructive confirmation boundary is not explicit");
-}
-for (const re of forbiddenDirectAccess) {
-  if (re.test(arch)) errors.push("suspicious direct model/database-secret wording detected");
 }
 
 const requiredManifestPaths = [
