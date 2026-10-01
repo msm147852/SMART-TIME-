@@ -44,6 +44,10 @@ Those remain later phases in the canonical 35-phase order.
 
 Phase 4 must not start until all Phase 3 technical gates and owner sign-off are PASS and the closure PR is merged into `feat/v3-next`.
 
+## Execution note
+
+The Phase 3 verification workflow is required to run against the final closure candidate commit. A documentation-only commit after the workflow file exists is used to ensure the workflow is picked up by GitHub Actions.
+
 ## Sign-off record
 
 Owner: pending
