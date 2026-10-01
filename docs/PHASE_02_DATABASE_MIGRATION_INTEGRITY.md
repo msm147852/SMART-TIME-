@@ -1,6 +1,6 @@
 # SMART-TIME Phase 2 — Database + Migration Integrity
 
-Status: IN PROGRESS
+Status: CLOSURE CANDIDATE — awaiting owner sign-off
 Branch: `phase/02-database-migration-integrity`
 Baseline: `feat/v3-next@d27504fd43fcbb5d97ca1f466f7e72da030c75de`
 Date: 2026-10-01
@@ -44,6 +44,23 @@ Close the database layer as a verified foundation before backend/API work contin
 Phase 2 does not introduce the AI tool registry, orchestrator, model training, voice stack, or attachments. Those belong to later phases.
 
 Phase 2 does not retroactively close historical storage-key phases. The old `phase2-verify.yml` storage-key workflow is legacy evidence and is not the closure criterion for this audited Phase 2.
+
+## Technical gate evidence
+
+CI workflow:
+https://github.com/msm147852/SMART-TIME-/actions/runs/36839494586
+
+Result:
+- P2-01 Canonical schema ownership: PASS
+- P2-02 Bootstrap schema completeness: PASS
+- P2-03 Migration idempotence: PASS
+- P2-04 SQLite integrity: PASS
+- P2-05 Canonical indexes: PASS
+- P2-06 Read/write integrity: PASS
+- P2-07 Regression baseline: PASS
+- P2-08 Clean-run reproducibility: PASS
+
+The technical gates are complete. Phase 2 remains open until owner sign-off is recorded.
 
 ## Sign-off record
 
