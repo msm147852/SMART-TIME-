@@ -17,6 +17,13 @@
       "conclusion": "success",
       "commit": "334e48e4e68b75ac84de5e5abd0fed4584f81e25",
       "url": "https://github.com/msm147852/SMART-TIME-/actions/runs/36925204907"
+    },
+    "security_reproducibility_verifier": "scripts/verify-phase10-security-repro.mjs",
+    "security_reproducibility_verification_run": {
+      "id": 36925576099,
+      "conclusion": "success",
+      "commit": "e84c30c5cb47e60275bc125b675e01db46451873",
+      "url": "https://github.com/msm147852/SMART-TIME-/actions/runs/36925576099"
     }
   },
   "checks": {
@@ -28,7 +35,9 @@
     "verifier_executed_in_ci": true,
     "verifier_passed": true,
     "security_boundary_documented": true,
-    "reproducibility_contract_documented": true
+    "reproducibility_contract_documented": true,
+    "security_boundary_verified_in_ci": true,
+    "reproducibility_contract_verified_in_ci": true
   },
   "downstream_not_claimed_as_done": [
     "real STT",
