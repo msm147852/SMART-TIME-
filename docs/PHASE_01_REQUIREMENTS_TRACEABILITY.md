@@ -92,7 +92,7 @@ https://github.com/msm147852/SMART-TIME-/blob/feat/v3-next/docs/AI_EVALUATION.md
 |---|---|
 | docs/AI_ARCHITECTURE.md | canonical architecture, provider boundary, agent loop, artifacts, voice, memory, security |
 | docs/AI_EVALUATION.md | evaluation policy, Gate 4G, training policy, required evidence |
-| docs/AI_DEPLOYMENT.md | Railway/GPU/provider/API/security/deployment progression |
+| docs/AI_DEPLOYMENT.md | Railway/GPU/provider/API/security/deployment progression |\n\nhttps://github.com/msm147852/SMART-TIME-/blob/feat/v3-next/docs/AI_DEPLOYMENT.md
 | docs/CURRENT_STATE.md | implementation baseline and known gaps |
 | backend/ai/localInference.ts | current local inference/provider boundary and SSE implementation |
 | backend/ai/openMindBrain.ts | current deterministic planning/runtime baseline |
