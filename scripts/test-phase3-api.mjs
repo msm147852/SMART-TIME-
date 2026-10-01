@@ -112,6 +112,7 @@ try {
     method: "POST",
     headers: authHeaders,
     body: JSON.stringify({
+      type: "personal",
       title: "Phase 3 API smoke",
       amount: 17.5,
       category: "test",
