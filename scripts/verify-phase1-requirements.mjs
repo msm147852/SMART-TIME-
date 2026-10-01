@@ -24,10 +24,17 @@ const requiredTokens = [
   "## 6. Canonical phase execution order",
   "## 7. Phase 1 closure gates",
   "## 9. Sign-off record",
-  "https://github.com/msm147852/SMART-TIME-/blob/feat/v3-next/docs/AI_ARCHITECTURE.md",
-  "https://github.com/msm147852/SMART-TIME-/blob/feat/v3-next/docs/AI_EVALUATION.md",
-  "https://github.com/msm147852/SMART-TIME-/blob/feat/v3-next/docs/AI_DEPLOYMENT.md",
-  "https://github.com/msm147852/SMART-TIME-/blob/feat/v3-next/docs/CURRENT_STATE.md"
+  "docs/AI_ARCHITECTURE.md",
+  "docs/AI_EVALUATION.md",
+  "docs/AI_DEPLOYMENT.md",
+  "docs/CURRENT_STATE.md",
+  "backend/ai/localInference.ts",
+  "backend/ai/openMindBrain.ts",
+  "backend/ai/toolExecutor.ts",
+  "backend/ai/smart-ai-tool/contextMemory.ts",
+  "src/components/AiCenterView.tsx",
+  "src/components/VoiceSearchModal.tsx",
+  "package.json"
 ];
 
 for (const token of requiredTokens) {
