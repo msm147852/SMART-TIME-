@@ -21,7 +21,14 @@ for (const needle of ["SEED","MODEL_REVISION","EXPECTED_PYTHON_VERSION","DETERMI
 for (const line of ["torch==2.10.0","transformers==5.18.0","datasets==5.0.1","peft==0.21.1","bitsandbytes==0.50.2","accelerate==1.15.0","trl==1.14.1"]) mustContain(reqText, line, "pinned requirement");
 for (const needle of ["Python: 3.12.13","Default seed: 42","Deterministic algorithms: enabled by default","run-metadata.json","rerun"]) mustContain(docText, needle, "reproducibility documentation");
 mustContain(pkg.scripts?.["verify:phase6-training-runtime"] ?? "", "scripts/verify-phase6-training-runtime.mjs", "package script");
-try { execFileSync("python3", ["-m", "py_compile", scriptPath], { stdio: "inherit" }); } catch { fail("Python syntax check failed"); }
+try {
+  const pythonVersion = execFileSync("python3", ["--version"], { encoding: "utf8" }).trim();
+  if (!pythonVersion.includes("3.12.13")) fail("Python runtime must be exactly 3.12.13; found " + pythonVersion);
+  execFileSync("python3", ["-m", "py_compile", scriptPath], { stdio: "inherit" });
+} catch (error) {
+  if (String(error?.message ?? "").includes("Python runtime must be exactly")) throw error;
+  fail("Python syntax/runtime check failed");
+}
 const gitCommit = (() => { try { return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(); } catch { return "unavailable"; } })();
 const datasetFiles = ["backend/ai/training/smart-time-sft.jsonl","backend/ai/training/smart-time-grounded-v4-batch-a.jsonl","backend/ai/training/smart-time-grounded-v4-batch-b-train.jsonl"];
 for (const rel of datasetFiles) if (!existsSync(resolve(root, rel))) fail("training dataset missing: " + rel);
