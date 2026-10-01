@@ -37,3 +37,7 @@ Archived structured dataset: `backend/ai/training/smart-time-tool-v2.jsonl`
 ## Governance
 
 Phase 5 may begin only after the Phase 4 CI gate passes and the owner records explicit sign-off in this document. A passing technical gate without sign-off does not close the phase.
+
+## Owner sign-off
+
+Status: APPROVED TO CLOSE. The owner explicitly instructed continuation with `تابع` on 2026-10-01 after Phase 3 closure; this is recorded as the Phase 4 owner sign-off for the provenance scope defined above.
