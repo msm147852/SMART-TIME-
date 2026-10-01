@@ -33,7 +33,7 @@ OUTPUT_ROOT = Path(os.getenv("OUTPUT_ROOT", str(ROOT / "infra/smart-ai/training/
 OUTPUT_DIR = OUTPUT_ROOT
 SEED = int(os.getenv("SEED", "42"))
 DETERMINISTIC_TRAINING = os.getenv("DETERMINISTIC_TRAINING", "1").strip().lower() not in {"0", "false", "no"}
-MODEL_REVISION = os.getenv("MODEL_REVISION", "main").strip()
+MODEL_REVISION = os.getenv("MODEL_REVISION", "").strip()
 BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen3-4B").strip()
 USE_LORA = os.getenv("USE_LORA", "1").strip().lower() not in {"0", "false", "no"}
 USE_QLORA = os.getenv("USE_QLORA", "1").strip().lower() not in {"0", "false", "no"}
@@ -228,7 +228,20 @@ def choose_dtype() -> torch.dtype:
     return torch.float16
 
 
+def validate_runtime_contract() -> None:
+    if not MODEL_REVISION:
+        raise SystemExit(
+            "MODEL_REVISION must be an immutable model revision (commit/tag), not an implicit moving branch."
+        )
+    expected_python = os.getenv("EXPECTED_PYTHON_VERSION", "3.12.13")
+    if platform.python_version() != expected_python:
+        raise SystemExit(
+            f"Training runtime requires Python {expected_python}; found {platform.python_version()}."
+        )
+
+
 def main() -> None:
+    validate_runtime_contract()
     configure_reproducibility()
     selected_dtype = choose_dtype()
     run_fingerprint, run_contract = build_run_identity(selected_dtype)
@@ -248,7 +261,7 @@ def main() -> None:
     )
     train_ds, eval_ds = split["train"], split["test"]
 
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=MODEL_REVISION, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -262,6 +275,7 @@ def main() -> None:
         )
         model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL,
+            revision=MODEL_REVISION,
             quantization_config=quant_config,
             dtype=selected_dtype,
         )
@@ -269,6 +283,7 @@ def main() -> None:
     else:
         model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL,
+            revision=MODEL_REVISION,
             torch_dtype=selected_dtype,
         )
 
