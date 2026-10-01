@@ -1,0 +1,39 @@
+{
+  "phase": 11,
+  "name": "Voice Foundation — Shubra Voice Specification",
+  "branch": "feat/v3-next",
+  "status": "IN_PROGRESS_BLOCKED",
+  "technical_gate": "PARTIAL",
+  "training_run_started": false,
+  "training_authorized_by_phase": false,
+  "evidence": {
+    "voice_specification": "docs/SHUBRA_VOICE_SPEC.md",
+    "voice_manifest": "infra/smart-voice/phase11-voice-manifest.json",
+    "verification_script": "scripts/verify-phase11-voice-foundation.mjs",
+    "ci_workflow": ".github/workflows/phase11-voice-foundation-verify.yml"
+  },
+  "checks": {
+    "voice_specification_committed": true,
+    "profile_contract_declared": true,
+    "consent_contract_declared": true,
+    "measurable_acceptance_criteria_declared": true,
+    "raw_audio_git_policy_declared": true,
+    "training_blocked": true,
+    "approved_sample_package_present": false,
+    "sample_hashes_present": false,
+    "sample_quality_evidence_present": false,
+    "security_evidence_complete": false,
+    "reproducibility_evidence_complete": false,
+    "owner_signoff": false
+  },
+  "blockers": [
+    "OWNER_APPROVED_SAMPLE_PACKAGE_REQUIRED"
+  ],
+  "downstream_not_claimed_as_done": [
+    "real STT",
+    "production TTS runtime validation",
+    "Voice DNA cloning benchmark",
+    "Voice E2E"
+  ],
+  "next_phase_authorized": false
+}
