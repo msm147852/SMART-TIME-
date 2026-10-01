@@ -85,7 +85,7 @@ export default function App() {
   const servicePath = typeof window !== 'undefined' ? window.location.pathname : '/';
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.pathname === '/') {
-      window.history.replaceState({}, '', '/services');
+      window.location.replace('/services');
     }
   }, []);
 
