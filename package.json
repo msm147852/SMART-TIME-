@@ -24,7 +24,8 @@
     "verify:phase5-finance-migration": "node scripts/verify-phase5-finance-migration.mjs",
     "verify:phase5-ai-canonical": "node scripts/verify-phase5-ai-canonical.mjs",
     "verify:phase5-no-duplicate-writes": "node scripts/verify-phase5-no-duplicate-writes.mjs",
-    "verify:phase5-final": "node scripts/verify-phase5-final.mjs"
+    "verify:phase5-final": "node scripts/verify-phase5-final.mjs",
+    "test:phase2-db": "tsx backend/database.phase2.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
