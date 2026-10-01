@@ -244,7 +244,7 @@ def main() -> None:
 
     split = dataset.train_test_split(
         test_size=min(0.15, max(2 / len(dataset), 0.05)),
-        seed=42,
+        seed=SEED,
     )
     train_ds, eval_ds = split["train"], split["test"]
 
