@@ -18,6 +18,7 @@ import { createCanonicalExpense, updateCanonicalExpense, deleteCanonicalExpense,
 import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
+import { POST as smartAiV2Infer } from "./app/api/ai/infer/route.js";
 
 dotenv.config();
 
@@ -97,6 +98,21 @@ seedServiceStatuses();
 seedDefaultChatRooms();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+app.post("/api/ai/infer", async (req, res) => {
+  try {
+    const request = new Request("http://localhost/api/ai/infer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...(req.body || {}), userId: req.body?.userId }),
+    });
+    const response = await smartAiV2Infer(request);
+    const text = await response.text();
+    res.status(response.status).type("application/json").send(text);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "SMART AI V2 route failed", retry: true });
+  }
+});
 
 // Mount Chat API
 app.use("/api/chat", chatRouter);
