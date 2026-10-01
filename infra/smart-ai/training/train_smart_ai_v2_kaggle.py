@@ -123,7 +123,7 @@ def main():
     # that API defaults to including emulation and can report True on T4.
     dtype=torch.bfloat16 if bf16 else torch.float16
     bnb=BitsAndBytesConfig(load_in_4bit=True,bnb_4bit_quant_type='nf4',bnb_4bit_use_double_quant=True,bnb_4bit_compute_dtype=dtype)
-    model=AutoModelForCausalLM.from_pretrained(BASE,quantization_config=bnb,device_map='auto',trust_remote_code=True)
+    model=AutoModelForCausalLM.from_pretrained(BASE,quantization_config=bnb,torch_dtype=dtype,device_map='auto',trust_remote_code=True)
     model.config.use_cache=False
     model=prepare_model_for_kbit_training(model)
     if hasattr(model,'enable_input_require_grads'): model.enable_input_require_grads()
