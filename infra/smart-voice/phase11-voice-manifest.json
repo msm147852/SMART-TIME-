@@ -1,0 +1,60 @@
+{
+  "phase": 11,
+  "name": "Voice Foundation — Shubra Voice Specification",
+  "status": "IN_PROGRESS_BLOCKED_ON_APPROVED_SAMPLE_PACKAGE",
+  "branch": "feat/v3-next",
+  "profile_contract": {
+    "locale": "ar-EG",
+    "dialect": "Egyptian/Shubra",
+    "provider_neutral": true,
+    "owner_consent_required": true,
+    "guardian_consent_required_for_child": true
+  },
+  "sample_package": {
+    "status": "MISSING_OWNER_APPROVED_SAMPLES",
+    "raw_audio_in_git": false,
+    "required_sample_types": [
+      "neutral_conversational",
+      "natural_shubra_conversation",
+      "numbers_dates_names_code_switching",
+      "spontaneous_conversation"
+    ],
+    "required_metadata": [
+      "sample_id",
+      "sha256",
+      "duration_ms",
+      "mime_type",
+      "speaker_count",
+      "approval_status"
+    ]
+  },
+  "acceptance_suite": {
+    "version": "phase11-shubra-v1",
+    "required": [
+      "stable_profile_id",
+      "ar_EG_locale",
+      "egyptian_shubra_dialect_declared",
+      "owner_consent_recorded",
+      "guardian_consent_for_child_profiles",
+      "sample_checksums_present",
+      "sample_metadata_present",
+      "single_speaker",
+      "no_severe_distortion",
+      "raw_audio_encrypted_at_rest",
+      "raw_audio_excluded_from_ai_prompts",
+      "raw_audio_excluded_from_logs",
+      "revocation_supported",
+      "provider_credentials_server_side",
+      "profile_id_required_for_personalized_synthesis"
+    ]
+  },
+  "training_authorized_by_phase": false,
+  "raw_audio_commit_policy": "FORBIDDEN",
+  "closure_blocker": "OWNER_APPROVED_SAMPLE_PACKAGE_REQUIRED",
+  "downstream_not_claimed_as_done": [
+    "real STT",
+    "production TTS runtime validation",
+    "Voice DNA cloning benchmark",
+    "Voice E2E"
+  ]
+}
