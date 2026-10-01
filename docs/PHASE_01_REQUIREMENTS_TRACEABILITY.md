@@ -138,6 +138,21 @@ In particular, it does not claim:
 - the full agent loop exists;
 - attachments/artifacts are production-ready.
 
+## 8. Phase 1 test matrix
+
+| Test ID | Check | Command/evidence | Pass condition | Gate role |
+|---|---|---|---|---|
+| TM-01 | Requirements document integrity | `node scripts/verify-phase1-requirements.mjs` | Phase 1 requirements, traceability, scope and sequential rule all detected; no TBD/TODO markers. | Required |
+| TM-02 | Type safety | `npm run lint` | TypeScript exits 0. | Required |
+| TM-03 | Existing AI behavior regression | `npm run test:open-mind` | Existing Open Mind unit/E2E tests exit 0. | Required |
+| TM-04 | Application build | `npm run build` | Vite + server build exits 0. | Required |
+| TM-05 | CI reproducibility | GitHub Actions on Phase 1 branch | Same gate commands pass on clean Ubuntu/Node 22 runner. | Required |
+| TM-06 | Requirements-to-plan traceability | This document + audited 35-phase plan | Every frozen requirement maps to explicit phase(s) and evidence. | Required |
+| TM-07 | Architecture-order consistency | `docs/AI_EVALUATION.md` vs this document | Canonical order is identical and no competing next-order remains. | Required |
+| TM-08 | Owner sign-off | Section 9 sign-off record | Owner explicitly records PASS and date. | Required |
+
+A green build or test suite does not close the phase by itself. Phase 1 closes only when TM-01 through TM-08 are all PASS.
+
 ## 9. Sign-off record
 
 Owner: pending
