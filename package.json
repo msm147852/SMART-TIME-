@@ -28,7 +28,8 @@
     "test:phase2-db": "tsx backend/database.phase2.test.ts",
     "test:phase3-api": "node scripts/test-phase3-api.mjs",
     "verify:phase4-dataset-provenance": "node scripts/verify-phase4-dataset-provenance.mjs",
-    "verify:phase5-model-data-registry": "node scripts/verify-phase5-model-data-registry.mjs"
+    "verify:phase5-model-data-registry": "node scripts/verify-phase5-model-data-registry.mjs",
+    "verify:phase6-training-runtime": "node scripts/verify-phase6-training-runtime.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
