@@ -30,4 +30,4 @@ A reproducible run proves that its inputs and runtime contract are identified co
 
 ## Owner sign-off
 
-Status: PENDING. Sign-off is recorded only after the Phase 6 CI gate passes on the final branch state and the phase implementation is merged.
+Status: APPROVED TO CLOSE. The owner explicitly instructed continuation with `تابع` on 2026-10-01 after Phases 1–5 were formally closed. Phase 6 CI run `36850052330` passed the verifier, lint, and build. This sign-off applies to the runtime/reproducibility scope defined above; it does not approve any model artifact for production.
