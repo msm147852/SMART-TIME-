@@ -72,6 +72,9 @@ if (manifest) {
   if (JSON.stringify(manifest.evaluation_order) !== JSON.stringify(expectedOrder)) {
     errors.push("manifest evaluation order does not match the canonical architecture");
   }
+  if (!manifest.evaluation_suite?.version) errors.push("evaluation suite version missing");
+  if (!Array.isArray(manifest.expected_gates) || manifest.expected_gates.length !== expectedOrder.length) errors.push("expected gates must cover the canonical evaluation order");
+  if (!manifest.runtime?.library_versions?.node || !manifest.runtime?.library_versions?.python) errors.push("runtime/library version contract missing");
   if (manifest.activation_policy !== "evaluation_then_manual_runtime_enable") {
     errors.push("unexpected activation policy");
   }
