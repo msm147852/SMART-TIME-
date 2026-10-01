@@ -1,124 +1,64 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
-type InferenceResponse = {
-  result?: unknown;
-  validation?: unknown;
-  routed?: boolean;
-  executed?: boolean;
-  requiresConfirmation?: boolean;
-  routerStatus?: string;
-  retryAttempts?: number;
-  [key: string]: unknown;
-};
+type ChatMessage = { id: number; role: "user" | "assistant"; text: string };
+type ApiPayload = { result?: { tool?: string }; error?: string };
+const APP_FEATURE_TOOLS = new Set(["add_expense", "add_daily_task", "calendar.event.create"]);
 
-function formatJson(value: unknown) {
-  if (typeof value === "string") {
-    try { return JSON.stringify(JSON.parse(value), null, 2); } catch { return value; }
-  }
-  return JSON.stringify(value, null, 2);
+function assistantText(result: ApiPayload["result"]) {
+  if (result?.tool && APP_FEATURE_TOOLS.has(result.tool)) return "الميزة دي في التطبيق - حمله من هنا";
+  if (result?.tool === "clarification") return "ممكن توضّحلي طلبك أكتر؟";
+  if (result?.tool === "unsupported") return "الطلب ده متاح داخل تطبيق SMART TIME الكامل.";
+  return "أهلاً بيك! أنا مساعد SMART TIME. أقدر أساعدك في فهم طلبك، والميزات الكاملة موجودة داخل التطبيق.";
 }
-
-function isValid(payload: InferenceResponse) {
-  return Boolean(payload.validation && typeof payload.validation === "object" && (payload.validation as Record<string, unknown>).valid === true);
-}
-
-function isMutation(result: unknown) {
-  const tool = result && typeof result === "object" ? (result as Record<string, unknown>).tool : undefined;
-  return tool === "add_expense" || tool === "add_daily_task" || tool === "calendar.event.create";
+function speak(text: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ar-EG"; utterance.rate = 0.95; window.speechSynthesis.speak(utterance);
 }
 
 export default function SmartAIDemo() {
-  useEffect(() => { document.title = "SMART TIME"; }, []);
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState<unknown>(null);
-  const [validation, setValidation] = useState<boolean | null>(null);
-  const [routed, setRouted] = useState(false);
-  const [executed, setExecuted] = useState(false);
-  const [requiresConfirmation, setRequiresConfirmation] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("جاهز");
+  const [messages, setMessages] = useState<ChatMessage[]>([{ id: 1, role: "assistant", text: "أهلاً بيك 👋 أنا مساعد SMART TIME. اسألني أو اتكلم معايا بالعربي." }]);
+  const [input, setInput] = useState(""); const [loading, setLoading] = useState(false); const [listening, setListening] = useState(false); const [error, setError] = useState("");
+  const nextId = useRef(2); const recognitionRef = useRef<any>(null);
 
-  async function requestInference(confirmed = false) {
-    const prompt = input.trim();
-    if (!prompt) return;
-    setLoading(!confirmed);
-    setConfirming(confirmed);
-    setError("");
-    setStatus(confirmed ? "جاري تأكيد التنفيذ..." : "جاري inference → validation...");
-    if (!confirmed) {
-      setOutput(null); setValidation(null); setRouted(false); setExecuted(false); setRequiresConfirmation(false);
-    }
+  useEffect(() => { document.title = "SMART TIME"; return () => { window.speechSynthesis?.cancel(); recognitionRef.current?.stop?.(); }; }, []);
+
+  function toggleMic() {
+    if (listening) { recognitionRef.current?.stop?.(); setListening(false); return; }
+    const Recognition = (window as any).webkitSpeechRecognition;
+    if (!Recognition) { setError("المتصفح الحالي لا يدعم التعرف على الصوت."); return; }
+    const recognition = new Recognition();
+    recognition.lang = "ar-EG"; recognition.continuous = false; recognition.interimResults = false;
+    recognition.onstart = () => { setListening(true); setError(""); };
+    recognition.onresult = (event: any) => setInput(String(event.results?.[0]?.[0]?.transcript || ""));
+    recognition.onerror = () => { setListening(false); setError("حصلت مشكلة في الميكروفون. جرّب تاني."); };
+    recognition.onend = () => setListening(false); recognitionRef.current = recognition; recognition.start();
+  }
+
+  async function sendMessage(event?: FormEvent) {
+    event?.preventDefault(); const text = input.trim(); if (!text || loading) return;
+    setMessages((current) => [...current, { id: nextId.current++, role: "user", text }]); setInput(""); setError(""); setLoading(true);
     try {
-      const body: Record<string, unknown> = { input: prompt, confirmed };
-      if (confirmed) body.confirmedResult = output;
-      const response = await fetch("/api/ai/infer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const payload = (await response.json()) as InferenceResponse;
-      if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : "تعذر تشغيل خدمة الـ AI.");
-      const result = payload.result ?? null;
-      setOutput(result);
-      setValidation(isValid(payload));
-      setRouted(payload.routed === true);
-      setExecuted(payload.executed === true);
-      setRequiresConfirmation(payload.requiresConfirmation === true);
-      setStatus(payload.executed === true ? "تم التحقق من التنفيذ وحفظه" : payload.requiresConfirmation === true ? "في انتظار تأكيدك" : payload.routed === true ? "تم التوجيه بدون تنفيذ" : "تمت المصادقة على الناتج");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "حدث خطأ غير متوقع أثناء الاتصال بالخدمة.");
-      setStatus("فشل"); setExecuted(false);
-    } finally { setLoading(false); setConfirming(false); }
+      const response = await fetch("/api/ai/infer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: text }) });
+      const payload = (await response.json()) as ApiPayload;
+      if (!response.ok) throw new Error(payload.error || "تعذر الاتصال بالمساعد.");
+      const reply = assistantText(payload.result);
+      setMessages((current) => [...current, { id: nextId.current++, role: "assistant", text: reply }]); speak(reply);
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "حصل خطأ غير متوقع."); }
+    finally { setLoading(false); }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (loading || confirming) return;
-    await requestInference(false);
-  }
-
-  const showConfirm = requiresConfirmation && !executed && output !== null && isMutation(output);
-
-  return (
-    <section className="w-full rounded-3xl border border-white/10 bg-white/[0.035] p-4 shadow-2xl shadow-black/30 sm:p-6 lg:p-8">
-      <form onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="جرب: سجلي 100 جنيه منظفات" dir="rtl" className="min-h-14 flex-1 rounded-2xl border border-white/10 bg-[#0a0a0a] px-5 text-base text-white outline-none placeholder:text-white/30 transition focus:border-white/30 focus:ring-2 focus:ring-white/10" aria-label="طلب Smart AI" />
-          <button type="submit" disabled={loading || confirming || !input.trim()} className="min-h-14 rounded-2xl bg-white px-7 font-bold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40">{loading ? "جاري التحويل..." : "حول لـ JSON"}</button>
-        </div>
+  return <section className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/30">
+    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-4 sm:px-5"><div><p className="text-sm font-bold">مساعد SMART TIME</p><p className="mt-1 text-xs text-zinc-500">Qwen3-4B V2 · r=64 · enable_thinking=false</p></div><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" title="متصل" /></div>
+    <div className="flex min-h-[390px] flex-col gap-4 p-4 sm:p-5">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto">{messages.map((message) => <div key={message.id} className={message.role === "user" ? "flex justify-start" : "flex justify-end"}><div className={message.role === "user" ? "max-w-[85%] rounded-2xl rounded-br-md bg-white px-4 py-3 text-sm leading-7 text-black" : "max-w-[85%] rounded-2xl rounded-bl-md border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm leading-7 text-zinc-100"}>{message.text}</div></div>)}{loading && <div className="flex justify-end"><div className="rounded-2xl rounded-bl-md border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-500">بفكر…</div></div>}</div>
+      {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
+      <form onSubmit={sendMessage} className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-[#0a0a0a] p-2">
+        <button type="button" onClick={toggleMic} aria-label={listening ? "إيقاف الميكروفون" : "تشغيل الميكروفون"} className={listening ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-black" : "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white"} title={listening ? "إيقاف التسجيل" : "تحدث"}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true"><rect x="8" y="3" width="8" height="12" rx="4" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" strokeLinecap="round" /></svg></button>
+        <input value={input} onChange={(event) => setInput(event.target.value)} placeholder={listening ? "بتسمعك…" : "اكتب رسالتك…"} dir="rtl" className="min-w-0 flex-1 bg-transparent px-2 py-3 text-sm text-white outline-none placeholder:text-zinc-600" aria-label="رسالتك" />
+        <button type="submit" disabled={loading || !input.trim()} aria-label="إرسال" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Zm3 8h13" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
       </form>
-      <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-white/45">
-        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">POST /api/ai/infer</span>
-        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">JSON-Only</span>
-        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">{status}</span>
-      </div>
-      {error && <div role="alert" className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.06] p-4 text-sm leading-7 text-red-200">{error}</div>}
-      {output !== null && !error && (
-        <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#070707]">
-          <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="text-sm font-bold text-white">النتيجة</p><p className="mt-1 text-xs text-white/35">Structured JSON response</p></div>
-            <div className="flex flex-wrap gap-2 text-xs font-bold">
-              <span className={`rounded-full border px-3 py-1.5 ${validation ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-amber-400/20 bg-amber-400/10 text-amber-300"}`}>{validation ? "Validation ✓" : "Validation ✗"}</span>
-              <span className={`rounded-full border px-3 py-1.5 ${routed ? "border-sky-400/20 bg-sky-400/10 text-sky-300" : "border-white/10 text-white/40"}`}>{routed ? "Routed ✓" : "Routed —"}</span>
-              <span className={`rounded-full border px-3 py-1.5 ${executed ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-white/10 text-white/40"}`}>{executed ? "Executed ✓" : "Executed —"}</span>
-            </div>
-          </div>
-          <pre dir="ltr" className="max-h-[520px] overflow-auto p-5 text-left text-xs leading-7 text-white/80 sm:text-sm">{formatJson(output)}</pre>
-          {showConfirm && (
-            <div className="border-t border-amber-400/20 bg-amber-400/[0.05] p-5">
-              <p className="text-sm font-bold text-amber-200">العملية هتغيّر بياناتك.</p>
-              <p className="mt-1 text-xs leading-6 text-amber-100/60">لا يتم التنفيذ إلا بعد تأكيد صريح.</p>
-              <button type="button" disabled={confirming} onClick={() => void requestInference(true)} className="mt-4 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-black disabled:opacity-50">{confirming ? "جاري التحقق والتنفيذ..." : "أؤكد التنفيذ"}</button>
-            </div>
-          )}
-        </div>
-      )}
-      <div className="mt-7 border-t border-white/10 pt-6">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-white/35">Service pipeline</p>
-        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-          {["Qwen3-4B V2 (r=64)", "JSON", "Validation", "Tool Router", "DB"].map((step, index, steps) => (
-            <span key={step} className="flex items-center gap-2"><span className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-white/70">{step}</span>{index < steps.length - 1 && <span className="text-white/25" aria-hidden="true">→</span>}</span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+    </div>
+  </section>;
 }
