@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type InferenceResponse = {
   result?: unknown;
@@ -55,7 +55,7 @@ function getValidationStatus(payload: InferenceResponse, result: unknown) {
   }
 }
 
-export default function SmartAIDemo() {
+export default function SmartAIDemo() {\n  useEffect(() => {\n    document.title = "SMART TIME";\n  }, []);
   const [input, setInput] = useState("");
   const [output, setOutput] = useState<unknown>(null);
   const [validation, setValidation] = useState<boolean | null>(null);
