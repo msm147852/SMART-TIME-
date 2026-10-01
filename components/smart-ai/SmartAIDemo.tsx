@@ -55,7 +55,10 @@ function getValidationStatus(payload: InferenceResponse, result: unknown) {
   }
 }
 
-export default function SmartAIDemo() {\n  useEffect(() => {\n    document.title = "SMART TIME";\n  }, []);
+export default function SmartAIDemo() {
+  useEffect(() => {
+    document.title = "SMART TIME";
+  }, []);
   const [input, setInput] = useState("");
   const [output, setOutput] = useState<unknown>(null);
   const [validation, setValidation] = useState<boolean | null>(null);

@@ -66,6 +66,8 @@ import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
+import ServicesPage from '../app/services/page';
+import SmartAIServicePage from '../app/services/smart-ai/page';
 import { CalendarView } from './components/CalendarView';
 import { startTrialSession } from './services/authService';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
@@ -80,6 +82,8 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  const servicePath = typeof window !== 'undefined' ? window.location.pathname : '/';
+
   // Global App State
   const [authChecked, setAuthChecked] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
@@ -353,6 +357,7 @@ export default function App() {
   if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تشغيل النسخة التجريبية…</div>;
 
   return (
+    {servicePath === '/services/smart-ai' ? <SmartAIServicePage /> : servicePath === '/services' ? <ServicesPage /> : (
     <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-accent-500 selection:text-white">
       {/* Authentic Android Mobile Smartphone Shell */}
       <div className="relative w-full sm:max-w-[430px] h-screen sm:h-[93vh] sm:max-h-[915px] bg-white dark:bg-slate-900 sm:rounded-[44px] shadow-2xl sm:ring-1 sm:ring-slate-800 sm:border-[8px] sm:border-slate-800 flex flex-col overflow-hidden">
@@ -690,6 +695,7 @@ export default function App() {
           language={language}
         />
       </div>
+    )}
     </div>
   );
 }

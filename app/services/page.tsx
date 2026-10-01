@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 const features = [
   {
     title: "المالية",
@@ -91,13 +89,12 @@ export default function ServicesPage() {
             </span>
           </div>
 
-          <Link
-            href="/services/smart-ai"
+          <a href="/services/smart-ai"
             className="mt-10 inline-flex items-center gap-3 rounded-2xl bg-white px-7 py-4 text-base font-bold text-black transition hover:-translate-y-0.5 hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#0a0a0a]"
           >
             جرب الـ AI Service
             <span aria-hidden="true">←</span>
-          </Link>
+          </a>
         </div>
       </section>
 
@@ -150,12 +147,11 @@ export default function ServicesPage() {
           <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-white/50 sm:text-base">
             جرّب خدمة SMART TIME AI وشوف كيف يتحول طلبك الطبيعي إلى استجابة منظمة وقابلة للتنفيذ.
           </p>
-          <Link
-            href="/services/smart-ai"
+          <a href="/services/smart-ai"
             className="mt-8 inline-flex rounded-2xl border border-white/15 bg-white px-7 py-4 font-bold text-black transition hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#0a0a0a]"
           >
             جرب الـ AI Service
-          </Link>
+          </a>
         </div>
       </section>
     </main>
