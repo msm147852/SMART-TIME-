@@ -105,7 +105,12 @@ def generation_gate(model,tokenizer,rows):
 def main():
     if not torch.cuda.is_available(): raise RuntimeError('CUDA GPU required')
     print('='*72); print('SMART TIME V2 - Qwen3-4B Kaggle Training'); print('='*72)
-    print('GPU:',torch.cuda.get_device_name(0)); print('BF16:',torch.cuda.is_bf16_supported())
+    gpu_name=torch.cuda.get_device_name(0)
+    major,minor=torch.cuda.get_device_capability(0)
+    bf16=(major >= 8)
+    print('GPU:',gpu_name)
+    print('Compute capability:',f'{major}.{minor}')
+    print('BF16 hardware mode:',bf16)
     rows=load_rows()
     tok=AutoTokenizer.from_pretrained(BASE,trust_remote_code=True)
     if tok.pad_token is None: tok.pad_token=tok.eos_token
@@ -114,7 +119,9 @@ def main():
     train=Dataset.from_list([encode_item(tok,r) for r in train_rows])
     test=Dataset.from_list([encode_item(tok,r) for r in test_rows])
     print('TRAIN:',len(train),'EVAL:',len(test))
-    bf16=bool(torch.cuda.is_bf16_supported()); dtype=torch.bfloat16 if bf16 else torch.float16
+    # Use hardware capability, not torch.cuda.is_bf16_supported(), because
+    # that API defaults to including emulation and can report True on T4.
+    dtype=torch.bfloat16 if bf16 else torch.float16
     bnb=BitsAndBytesConfig(load_in_4bit=True,bnb_4bit_quant_type='nf4',bnb_4bit_use_double_quant=True,bnb_4bit_compute_dtype=dtype)
     model=AutoModelForCausalLM.from_pretrained(BASE,quantization_config=bnb,device_map='auto',trust_remote_code=True)
     model.config.use_cache=False
