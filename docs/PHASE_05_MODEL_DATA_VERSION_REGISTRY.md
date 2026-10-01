@@ -29,3 +29,7 @@ The registry defines measurable release criteria for structured output, no-fabri
 ## Governance
 
 Phase 6 may begin only after this phase has implementation, tests, evidence, reproducibility, and owner sign-off all PASS. A diagnostic training result does not close a later training phase.
+
+## Owner sign-off
+
+Status: APPROVED TO CLOSE. The owner explicitly instructed continuation with `تابع` on 2026-10-01 after Phase 4 closure; this is recorded as the Phase 5 owner sign-off for the registry and objective-metrics scope defined above.
