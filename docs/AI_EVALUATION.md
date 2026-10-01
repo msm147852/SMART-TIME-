@@ -107,16 +107,55 @@ node scripts/score-smart-ai-eval-v4g.mjs
 
 Do not retrain from Gate 4G failures alone. Classify failures first; orchestration/tool/runtime fixes take precedence over QLoRA.
 
-## Next execution order
+## Canonical 35-phase execution order
 
-Gate 4G behavioral validation
-→ AI Gateway
-→ Context Engine
-→ Memory
-→ Planner
-→ Tool Registry
-→ Execution
-→ Verification
-→ Artifacts
+The audited SMART-TIME plan is now the canonical execution order.
+
+1. Requirements + Traceability + Test Matrix
+2. Database + Migration Integrity
+3. Real Backend API
+4. Historical Dataset Provenance
+5. Model/Data/Version Registry + Objective Metrics
+6. Training Runtime + Reproducibility
+7. V1 Training Baseline
+8. V1 Artifact Archive + Rollback Record
+9. V1 Gate Failure Diagnosis
+10. Voice-First Architecture + Execution Order
+11. Voice Foundation — Shubra Voice Specification
+12. Real STT + ASR Corpus
+13. Real TTS / Voice Output Provider
+14. Voice Foundation E2E Gate
+15. Product Knowledge Dataset + Coverage Matrix
+16. Product Knowledge RAG + Source of Truth
+17. Product Knowledge Gate
+18. Egyptian/Shubra Text + ASR Error Corpus
+19. Egyptian/Shubra Language & Behavior Training
+20. Egyptian/Shubra Gate
+21. Conversation + General Behavior Dataset
+22. Conversation + Behavior Training
+23. Conversation + Behavior + Memory Gate
+24. Final Structured Tool Dataset + Scope/Confirmation Augmentation
+25. Final Structured Tool Training
+26. Final Structured / Adversarial Gate
+27. AI Gateway + Provider Abstraction + Private GPU Inference
+28. Mode Router + Smart AI Orchestrator
+29. Central Tool Registry + Policy + Schema Validator
+30. General Agent Loop + Web + Execute -> Verify -> Feed-back
+31. Streaming UI + Attachments/File Ingestion + Artifacts/Storage
+32. Memory + Product/User RAG Integration
+33. Full Voice + Smart AI + Tools E2E + Security/Performance/Mobile
+34. Production Deployment + Beta + Monitoring + Rollback
+35. Post-Beta Improvement Loop + V2.x/V3 Dataset Refresh
+
+### Sequential closure rule
+
+A phase may have future dependencies defined in planning documents, but Phase N+1 must not start before Phase N is formally closed.
+
+A phase is formally closed only when its implementation, tests, behavioral/real-output evidence, security checks, reproducibility evidence, and owner sign-off are all PASS.
+
+The canonical phase requirements and traceability record are maintained in:
+`docs/PHASE_01_REQUIREMENTS_TRACEABILITY.md`
+
+Do not retrain from an evaluation failure alone. Classify failures first and prefer orchestration/tool/runtime fixes when the failure is not model-level.
 
 CAD/DWG remains out of SMART-TIME scope.
