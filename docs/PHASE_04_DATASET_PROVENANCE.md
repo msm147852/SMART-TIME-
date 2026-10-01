@@ -32,7 +32,7 @@ Archived structured dataset: `backend/ai/training/smart-time-tool-v2.jsonl`
 - Source Git blob SHA: `f9d513485922ac4d9ade589e4be2fe2d53a50bb9`
 - Rows: 746
 - Unique inputs: 746
-- Categories: 300 / 150 / 100 / 100 / 32 / 14
+- Categories: 300 / 150 / 150 / 100 / 32 / 14
 
 ## Governance
 
