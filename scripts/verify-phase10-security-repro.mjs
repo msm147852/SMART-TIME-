@@ -30,7 +30,10 @@ const requiredManifestPaths = [
   ["artifact_policy.dataset_hash_required", manifest.artifact_policy?.dataset_hash_required],
   ["artifact_policy.rollback_reference_required", manifest.artifact_policy?.rollback_reference_required],
   ["artifact_policy.artifact_location_required", manifest.artifact_policy?.artifact_location_required],
-  ["activation_policy", manifest.activation_policy]
+  ["activation_policy", manifest.activation_policy],
+  ["evaluation_suite.version", manifest.evaluation_suite?.version],
+  ["runtime.library_versions.node", manifest.runtime?.library_versions?.node],
+  ["runtime.library_versions.python", manifest.runtime?.library_versions?.python]
 ];
 for (const [name,value] of requiredManifestPaths) {
   if (value === undefined || value === null || value === "") errors.push("reproducibility field missing: " + name);
