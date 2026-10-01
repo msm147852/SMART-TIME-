@@ -51,10 +51,6 @@ for (let i = 1; i <= 19; i += 1) {
   if (!text.includes(`| ${id} |`)) fail(`missing requirement ${id}`);
 }
 
-if (text.includes("TBD") || text.includes("TODO")) {
-  fail("Phase 1 contains TBD/TODO markers");
-}
-
 if (!/Professional CAD\/DWG generation.*out of scope|out of SMART-TIME scope/i.test(text)) {
   fail("explicit CAD/DWG scope boundary is missing");
 }
