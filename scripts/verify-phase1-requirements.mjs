@@ -34,6 +34,11 @@ for (const token of requiredTokens) {
   if (!text.includes(token)) fail(`missing required token: ${token}`);
 }
 
+for (let i = 1; i <= 8; i += 1) {
+  const id = `TM-${String(i).padStart(2, "0")}`;
+  if (!text.includes(`| ${id} |`)) fail(`missing test matrix entry ${id}`);
+}
+
 for (let i = 1; i <= 19; i += 1) {
   const id = `R-${String(i).padStart(2, "0")}`;
   if (!text.includes(`| ${id} |`)) fail(`missing requirement ${id}`);
