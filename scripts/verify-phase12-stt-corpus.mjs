@@ -6,6 +6,7 @@ const voicePath = 'src/components/VoiceSearchModal.tsx';
 const appPath = 'src/App.tsx';
 const aiPath = 'src/components/AiCenterView.tsx';
 const evidenceSchemaPath = 'docs/PHASE_12_RUNTIME_EVIDENCE_SCHEMA.json';
+const voiceConversationPath = 'src/components/SmartAiVoiceConversationModal.tsx';
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const doc = fs.readFileSync(docPath, 'utf8');
@@ -13,6 +14,7 @@ const voice = fs.readFileSync(voicePath, 'utf8');
 const app = fs.readFileSync(appPath, 'utf8');
 const ai = fs.readFileSync(aiPath, 'utf8');
 const evidenceSchema = JSON.parse(fs.readFileSync(evidenceSchemaPath, 'utf8'));
+const voiceConversation = fs.readFileSync(voiceConversationPath, 'utf8');
 
 if (manifest.phase !== 12) throw new Error('Phase 12 manifest mismatch');
 if (manifest.status !== 'IN_PROGRESS') throw new Error('Phase 12 must remain IN_PROGRESS until every gate passes');
@@ -43,7 +45,16 @@ if (!ai.includes('setInputText(initialInputText.trim())')) throw new Error('AI i
 if (!app.includes('handleVoiceTranscript')) throw new Error('App voice transcript handler is missing');
 if (!app.includes('setIsVoiceOpen(false)')) throw new Error('Voice modal must close without auto-executing an AI action');
 if (!ai.includes('onSubmit')) throw new Error('AI input form boundary is missing');
-if (!evidenceSchema.required_cases || evidenceSchema.required_cases.length !== 6) throw new Error('Phase 12 runtime evidence schema is incomplete');
+if (!ai.includes('SmartAiVoiceConversationModal')) throw new Error('SMART AI voice conversation modal is not wired into the AI view');
+if (!ai.includes('setIsVoiceConversationOpen(true)')) throw new Error('SMART AI voice conversation entry button is missing');
+if (!ai.includes('handleSendMessage(transcript, true)')) throw new Error('Voice conversation must send the observed turn through the AI message boundary');
+if (!voiceConversation.includes('continuous = true')) throw new Error('Voice conversation must use continuous recognition');
+if (!voiceConversation.includes('interimResults = true')) throw new Error('Voice conversation must expose interim speech feedback');
+if (!voiceConversation.includes('onspeechend')) throw new Error('Voice conversation must detect speech end before processing a turn');
+if (!voiceConversation.includes('await onTurnRef.current(text)')) throw new Error('Voice conversation must process only the accumulated final transcript');
+if (!voiceConversation.includes('if (activeRef.current) startListening()')) throw new Error('Voice conversation must return to listening after a turn');
+if (voiceConversation.includes('console.log') || voiceConversation.includes('console.error') || voiceConversation.includes('console.warn')) throw new Error('Voice conversation component must not log microphone/transcript/provider data');
+if (!evidenceSchema.required_cases || evidenceSchema.required_cases.length !== 7) throw new Error('Phase 12 runtime evidence schema is incomplete');
 
 for (const required of [
   'Real STT capture',
