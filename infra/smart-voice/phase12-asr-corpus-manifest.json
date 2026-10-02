@@ -1,0 +1,80 @@
+{
+  "phase": 12,
+  "name": "Real STT + ASR Corpus",
+  "status": "IN_PROGRESS",
+  "branch": "feat/v3-next",
+  "training_authorized_by_phase": false,
+  "corpus_policy": {
+    "raw_corpus_in_git": false,
+    "user_recordings_added_to_corpus_by_default": false,
+    "credentials_in_repo": false
+  },
+  "stt_contract": {
+    "input": "live_microphone_audio",
+    "primary_locale": "ar-EG",
+    "final_transcript_only_for_downstream": true,
+    "fake_transcript_forbidden": true,
+    "timer_driven_transcript_forbidden": true
+  },
+  "sources": [
+    {
+      "id": "asr-egarb-csc",
+      "name": "ASR-EgArbCSC",
+      "language": "ar-EG",
+      "dialect": "Egyptian Arabic",
+      "style": "spontaneous conversation",
+      "hours": 5.5,
+      "audio": "WAV PCM, 16 kHz, 16-bit, mono",
+      "transcript": "UTF-8 TXT",
+      "license": "CC BY-NC-ND 4.0",
+      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED"
+    },
+    {
+      "id": "arzen",
+      "name": "ArzEn",
+      "language": "Egyptian Arabic + English",
+      "dialect": "Egyptian Arabic",
+      "style": "spontaneous conversational code-switching",
+      "hours": 12,
+      "utterances": 6216,
+      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
+      "license_status": "VERIFY_BEFORE_ACQUISITION"
+    },
+    {
+      "id": "a-speechdb",
+      "name": "A-SpeechDB",
+      "language": "Arabic",
+      "dialect": "Egyptian speakers",
+      "style": "continuous speech",
+      "hours": 20,
+      "speakers": 205,
+      "audio": "16 kHz, 16-bit PCM",
+      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
+      "license_status": "ELRA_LICENSE_REQUIRED"
+    },
+    {
+      "id": "egyptian-speecon",
+      "name": "Egyptian Arabic Speecon",
+      "language": "Arabic as spoken in Egypt",
+      "dialect": "Egyptian",
+      "style": "spontaneous + read speech",
+      "adult_speakers": 550,
+      "child_speakers": 50,
+      "audio": "16 kHz, 16-bit",
+      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
+      "license_status": "ELRA_LICENSE_REQUIRED"
+    }
+  ],
+  "closure_requirements": {
+    "real_microphone_test": false,
+    "ar_eg_transcription_test": false,
+    "code_switch_test": false,
+    "numbers_dates_test": false,
+    "permission_denial_test": false,
+    "provider_failure_test": false,
+    "corpus_pair_validation": false,
+    "sha256_manifest_complete": false,
+    "security_reproducibility_pass": false,
+    "owner_signoff": false
+  }
+}
