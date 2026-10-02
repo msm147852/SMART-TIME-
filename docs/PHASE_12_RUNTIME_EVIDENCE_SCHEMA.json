@@ -43,6 +43,12 @@
       "type": "microphone",
       "input": "Egyptian Arabic utterance under realistic noise/ambiguity",
       "expected": "observed final transcript is recorded as returned by STT; no fabricated text or automatic action"
+    },
+    {
+      "id": "smart-ai-voice-conversation",
+      "type": "voice_conversation",
+      "input": "Egyptian Arabic multi-sentence turn in SMART AI voice conversation mode",
+      "expected": "conversation listens until speech ends, submits only the observed final transcript to SMART AI, waits for the AI response, speaks the response, then returns to listening without fabricated text or automatic action"
     }
   ],
   "corpus_validation": {
