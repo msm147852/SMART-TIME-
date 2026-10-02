@@ -17,58 +17,52 @@ function assistantText(result: ApiPayload["result"]) {
   return "أهلاً بيك! أنا مساعد SMART TIME. أقدر أساعدك في فهم طلبك، والميزات الكاملة موجودة داخل التطبيق.";
 }
 
-function speak(text: string): Promise<void> {
-  if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) {
-    return Promise.resolve();
+async function speak(text: string): Promise<void> {
+  if (typeof window === "undefined" || !text.trim()) return;
+
+  // SMART AI must not silently downgrade to a random browser Arabic voice.
+  // The conversation contract requires Egyptian Arabic from the server-side
+  // VoiceTuT provider. Browser TTS remains an explicit non-Egyptian fallback
+  // only when the user later chooses a generic voice mode.
+  const response = await fetch("/api/ai/egyptian-tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: text.trim(), speaker: "Mohamed" }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || "محرك الصوت المصري غير متاح حاليًا.");
   }
 
-  const synth = window.speechSynthesis;
-  synth.cancel();
+  const blob = await response.blob();
+  if (!blob.size) throw new Error("محرك الصوت المصري أعاد ملفًا صوتيًا فارغًا.");
 
-  return new Promise((resolve, reject) => {
-    const utterance = new SpeechSynthesisUtterance(text.trim());
-    utterance.lang = "ar-EG";
-    utterance.rate = 0.96;
-    utterance.pitch = 0.92;
-    utterance.volume = 1;
-
-    // Prefer a real Egyptian-Arabic device voice. The browser may not expose
-    // ar-EG on every Android build, so fall back to the closest Arabic voice
-    // instead of pretending that a non-Egyptian voice is Egyptian.
-    const voices = synth.getVoices();
-    const egyptian = voices.find((voice) => voice.lang.toLowerCase() === "ar-eg");
-    const arabic = voices.find((voice) => voice.lang.toLowerCase().startsWith("ar"));
-    if (egyptian) utterance.voice = egyptian;
-    else if (arabic) utterance.voice = arabic;
-
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    const fail = (event: SpeechSynthesisErrorEvent) => {
-      if (settled) return;
-      settled = true;
-      if (event.error === "canceled" || event.error === "interrupted") resolve();
-      else reject(new Error(`TTS failed: ${event.error}`));
-    };
-
-    utterance.onend = finish;
-    utterance.onerror = fail;
-    synth.speak(utterance);
-
-    // Some mobile speech engines can fail to emit onend after a cancellation.
-    window.setTimeout(() => {
-      if (!settled && !synth.speaking && !synth.pending) finish();
-    }, 250);
-  });
+  const url = URL.createObjectURL(blob);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      audio.onended = () => resolve();
+      audio.onerror = () => reject(new Error("تعذر تشغيل الرد الصوتي المصري."));
+      void audio.play().catch(reject);
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function stopSpeech() {
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
+  // Stop any HTMLAudioElement used by the server-generated Egyptian reply.
+  document.querySelectorAll("audio").forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.removeAttribute("src");
+    audio.load();
+  });
 }
 
 export default function SmartAIDemo() {
