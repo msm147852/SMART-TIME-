@@ -17,10 +17,10 @@
       "status": "PARTIAL",
       "artifact": "docs/phase12_runtime_case_results.json",
       "completed_cases": [
-        "ar-eg"
+        "ar-eg",
+        "code-switch"
       ],
       "remaining_cases": [
-        "code-switch",
         "numbers-dates",
         "permission-denial",
         "provider-network-failure",
@@ -49,7 +49,6 @@
   },
   "blockers": [
     "audio artifact integrity verified; transcript/audio pairing remains unverified",
-    "code-switch runtime test not yet captured",
     "numbers/date runtime test not yet captured",
     "permission-denial runtime test not yet captured",
     "provider/network failure runtime test not yet captured",
