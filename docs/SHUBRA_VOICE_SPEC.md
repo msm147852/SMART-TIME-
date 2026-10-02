@@ -1,6 +1,6 @@
 # SMART-TIME — Phase 11 Shubra Voice Foundation Specification
 
-Status: PHASE 11 IN PROGRESS
+Status: FORMALLY_CLOSED
 Phase: 11 — Voice Foundation — Shubra Voice Specification
 Branch: feat/v3-next
 
@@ -111,7 +111,7 @@ Those belong to Phases 12–14 or later according to the canonical 35-phase plan
 
 ## Closure rule
 
-Phase 11 cannot be formally closed until:
+Phase 11 was formally closed after:
 - this specification is committed;
 - the profile/consent contract is represented in a versioned manifest;
 - acceptance checks pass;
@@ -120,4 +120,4 @@ Phase 11 cannot be formally closed until:
 - reproducibility evidence is recorded;
 - owner sign-off is recorded.
 
-No raw audio is fabricated or committed to satisfy closure.
+No raw audio is fabricated or committed to satisfy closure. Owner approval and the approved sample manifest are recorded in the Phase 11 closure record.
