@@ -1,0 +1,38 @@
+{
+  "phase": "A2",
+  "name": "Real Groq STT",
+  "status": "OPEN_RUNTIME_EVIDENCE",
+  "branch": "feat/v3-next",
+  "implementation": [
+    "server.ts /api/ai/stt",
+    "backend/ai/providers/groqProvider.ts",
+    "src/services/groqSttService.ts",
+    "src/components/VoiceSearchModal.tsx",
+    "src/components/SmartAiVoiceConversationModal.tsx"
+  ],
+  "automated": {
+    "provider_contract": "PASS",
+    "a2_static_contract": "PASS",
+    "lint": "PASS",
+    "open_mind_tests": "PASS",
+    "build": "PENDING_ON_LATEST_COMMIT",
+    "phase12_regression": "PASS"
+  },
+  "railway": {
+    "service": "SMART-TIME-AI-PREVIEW",
+    "environment": "staging",
+    "latest_deployment_status": "SUCCESS_ON_PREVIOUS_A2_COMMIT",
+    "healthcheck": "configured on /api/ai/groq_health",
+    "secret": "GROQ_API_KEY configured server-side; value not recorded"
+  },
+  "runtime_cases": {
+    "real_mic_ar_eg": "OPEN",
+    "code_switch": "OPEN",
+    "numbers_dates": "OPEN",
+    "permission_denial": "OPEN",
+    "provider_network_failure": "OPEN",
+    "noisy_ambiguous": "OPEN"
+  },
+  "blocker": "Real browser/microphone runtime evidence is required. Connected tools do not provide a browser microphone session, so this evidence cannot be fabricated.",
+  "next_phase_authorized": false
+}
