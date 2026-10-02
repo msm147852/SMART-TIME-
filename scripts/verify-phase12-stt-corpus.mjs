@@ -95,6 +95,6 @@ if (!smartAiDemo.includes('/api/ai/egyptian-tts')) throw new Error('SMART AI dem
 if (!fs.readFileSync('server.ts', 'utf8').includes('app.post("/api/ai/egyptian-tts"')) throw new Error('Egyptian TTS endpoint is missing');
 if (!fs.readFileSync('infra/smart-voice/voicetut-provider/app.py', 'utf8').includes('speaker: str = ""')) throw new Error('VoiceTuT provider must support built-in Egyptian speakers');
 if (!fs.readFileSync('infra/smart-voice/voicetut-provider/app.py', 'utf8').includes('allowed_speakers')) throw new Error('VoiceTuT provider must allowlist built-in speakers');
-if (!fs.readFileSync('server.ts', 'utf8').includes('speaker: "Mohamed"')) throw new Error('SMART AI must request an explicit Egyptian built-in speaker');
+if (!smartAiDemo.includes('speaker: "Mohamed"')) throw new Error('SMART AI must request an explicit Egyptian built-in speaker');
 
 console.log('PHASE 12 CLOSURE: BLOCKED UNTIL REAL-STT + CORPUS + SECURITY + REPRO + BEHAVIORAL EVIDENCE PASS');
