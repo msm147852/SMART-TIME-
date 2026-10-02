@@ -56,5 +56,18 @@
     "provider_failure_verified": false,
     "security_reproducibility_closure_verified": false
   },
-  "note": "This artifact records the five user-provided recordings as reproducible local evidence. Raw audio remains outside Git."
+  "note": "This artifact records the five user-provided recordings as reproducible local evidence. Raw audio remains outside Git.",
+  "verification": {
+    "local_artifact_verification": {
+      "status": "PASS",
+      "verifier": "scripts/verify-phase12-user-audio.py",
+      "verifier_commit": "6e7ea17b63699d6770552b311e87d7b0fbcf22d1",
+      "verified_against_manifest": true,
+      "raw_audio_uploaded_to_git": false
+    },
+    "transcript_pairing": {
+      "status": "NOT_VERIFIED",
+      "reason": "No transcript artifacts were supplied/validated for these five recordings."
+    }
+  }
 }
