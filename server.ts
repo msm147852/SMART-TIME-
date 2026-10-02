@@ -19,7 +19,7 @@ import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventRemin
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 import { POST as smartAiV2Infer } from "./app/api/ai/infer/route.js";
-import { getGroqHealth } from "./backend/ai/providers/groqProvider.js";
+import { getGroqHealth, groqProvider } from "./backend/ai/providers/groqProvider.js";
 
 dotenv.config();
 
