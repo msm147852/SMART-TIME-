@@ -13,8 +13,24 @@
     "corpus_manifest": "infra/smart-voice/phase12-asr-corpus-manifest.json",
     "verifier": "scripts/verify-phase12-stt-corpus.mjs",
     "ci_workflow": ".github/workflows/phase12-stt-corpus-verify.yml",
-    "real_microphone_test": null,
-    "behavioral_evidence": null,
+    "real_microphone_test": {
+      "status": "PARTIAL",
+      "artifact": "docs/phase12_runtime_case_results.json",
+      "completed_cases": [
+        "ar-eg"
+      ],
+      "remaining_cases": [
+        "code-switch",
+        "numbers-dates",
+        "permission-denial",
+        "provider-network-failure",
+        "noisy-ambiguous"
+      ]
+    },
+    "behavioral_evidence": {
+      "status": "PARTIAL",
+      "artifact": "docs/phase12_runtime_case_results.json"
+    },
     "security_evidence": null,
     "reproducibility_evidence": null,
     "static_verification": {
@@ -33,12 +49,11 @@
   },
   "blockers": [
     "audio artifact integrity verified; transcript/audio pairing remains unverified",
-    "real microphone behavioral evidence not yet captured",
-    "Egyptian Arabic runtime test not yet captured",
     "code-switch runtime test not yet captured",
     "numbers/date runtime test not yet captured",
     "permission-denial runtime test not yet captured",
     "provider/network failure runtime test not yet captured",
+    "noisy/ambiguous runtime test not yet captured",
     "final security/reproducibility closure evidence not yet complete",
     "owner sign-off not yet recorded"
   ],
