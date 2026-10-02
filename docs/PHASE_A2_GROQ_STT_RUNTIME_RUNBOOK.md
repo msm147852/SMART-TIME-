@@ -1,65 +1,75 @@
 # Phase A2 — Groq STT Runtime Evidence Runbook
 
 Branch: `feat/v3-next`
+Runtime target: `Microphone -> MediaRecorder -> authenticated /api/ai/stt -> Groq Whisper -> transcript`
+Primary application locale contract: `ar-EG`. Groq receives the supported Arabic language code `ar` plus an Egyptian-Arabic transcription prompt.
 
-## Runtime target
+## Preconditions
+- Railway staging service: `SMART-TIME-AI-PREVIEW`
+- Environment: `staging`
+- Branch: `feat/v3-next`
+- `GROQ_API_KEY` configured server-side.
+- Real microphone and browser permission available.
+- Do not inject synthetic transcripts.
 
-`Microphone -> MediaRecorder -> authenticated /api/ai/stt -> Groq Whisper -> transcript`
-
-Primary Arabic locale: `ar-EG`. The provider request uses Groq's supported Arabic language code while the application contract reports `ar-EG`.
-
-## Required six cases
+## Required seven runtime cases
 
 1. **Real Egyptian Arabic microphone**
    - Allow microphone.
    - Speak naturally in Egyptian Arabic.
-   - PASS requires non-empty transcript and response locale `ar-EG`.
-   - No action is executed from STT alone.
+   - PASS: non-empty observed transcript; no fabricated text; no action executes from STT alone.
 
 2. **Egyptian Arabic + English code-switch**
    - Speak a natural sentence containing common English terms.
-   - PASS requires the spoken English terms to remain present when actually spoken.
-   - No fabricated words.
+   - PASS: observed English terms remain when actually spoken; no invented words.
 
 3. **Numbers and dates**
-   - Speak Egyptian Arabic containing numbers, dates, and/or times.
-   - PASS requires the transcript to preserve the spoken numeric/date content sufficiently for downstream parsing.
+   - Speak Egyptian Arabic containing numbers, dates and/or times.
+   - PASS: observed numeric/date content is preserved sufficiently for downstream parsing.
 
 4. **Permission denial**
    - Deny microphone permission.
-   - PASS requires an explicit `not-allowed` UI error.
-   - No STT request and no transcript/action may be produced.
+   - PASS: explicit `not-allowed`/permission error; no transcript; no STT request; no action.
 
 5. **Provider/network failure**
-   - With microphone permission granted, force the STT provider/network path to fail (for example by temporarily blocking the staging provider request in the browser/network test environment).
-   - PASS requires explicit provider/network error handling and no action.
+   - Observe or deliberately induce an STT provider/network failure in staging.
+   - PASS: explicit provider/network error; no fabricated transcript; no action.
 
 6. **Noisy/ambiguous speech**
    - Use realistic background noise or ambiguous speech.
-   - PASS requires the observed transcript, including an empty/uncertain result when appropriate; the UI/backend must never invent an action from missing speech.
+   - PASS: record only the observed transcript, including uncertainty/empty result where applicable; never invent an action from missing speech.
 
-## Evidence to record for each case
+7. **SMART AI voice conversation**
+   - Open SMART AI voice conversation and speak one multi-sentence Egyptian Arabic turn.
+   - PASS: microphone capture -> Groq STT -> final transcript -> SMART AI response; microphone remains closed while the AI responds; interruption cancels stale turn and does not duplicate the next turn.
 
+## Evidence per case
+Record:
 - timestamp
 - browser + version
 - OS
 - application build/commit
+- locale
 - microphone permission state
-- response HTTP status
-- provider/model/locale metadata (never API key)
-- short transcript excerpt
+- HTTP status for STT request where applicable
+- provider/model metadata if exposed
+- short transcript excerpt only
 - PASS/FAIL
-- screenshot or browser console/network evidence where relevant
+- screenshot or console/network evidence as appropriate
+
+Never record:
+- `GROQ_API_KEY`
+- Authorization bearer tokens
+- raw microphone audio in Git
+- full sensitive transcripts in logs
 
 ## Security checks
-
-- `GROQ_API_KEY` is never entered in the browser.
-- The client sends audio only to `/api/ai/stt`.
-- The server authenticates the request.
+- Secret exists only server-side.
+- Client calls only `/api/ai/stt`.
+- Server requires authenticated user.
 - Audio is not persisted by SMART TIME.
 - Payload size and per-user rate limits are enforced.
-- Provider errors do not expose the provider secret.
+- Provider failures do not expose secrets.
 
-## Closure rule
-
-A2 remains OPEN until all six runtime cases have reproducible evidence and the A2 closure record is updated. CI/static verification and Railway deployment success are necessary but are not a substitute for real microphone/runtime evidence.
+## Closure
+A2 remains OPEN until all seven runtime cases have reproducible evidence, the Phase 12 external audio/corpus evidence remains valid, security/privacy checks pass, and the phase-closing CI run is green.
