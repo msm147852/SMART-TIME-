@@ -45,3 +45,9 @@ This document distinguishes:
 - evidence that is currently missing and therefore cannot be promoted to PASS.
 
 It does not alter model artifacts, datasets, Voice DNA samples, or training authorization.
+
+## Phase 7–9 technical repair update — 2026-10-02
+
+The missing historical governance layer has been repaired on the active branch. Phase 7 and Phase 8 now have explicit historical closure records; Phase 9 has an explicit diagnostic closure record based on recovered Run #3 and Fix1 evidence. The active gate evidence is Run #3 0/120, later Fix1 119/120, and unsupported 14/32. The historical 113/120 claim is retained only as superseded historical context because its authoritative raw 120-case artifact was not recovered.
+
+**Important:** these records are technical closure evidence only and remain pending explicit owner sign-off. They do not authorize Phase 12, and no retraining was performed during the reconciliation.
