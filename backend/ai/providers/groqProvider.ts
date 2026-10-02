@@ -204,6 +204,38 @@ export class GroqProvider implements AIProvider {
     }
   }
 
+  async transcribeAudio(input: {
+    audio: Uint8Array;
+    mimeType: string;
+    language?: string;
+    filename?: string;
+    prompt?: string;
+  }): Promise<{ provider: string; model: string; text: string; requestId?: string }> {
+    if (!this.apiKey) throw new GroqProviderError("GROQ_API_KEY is not configured.", "not_configured");
+    const model = String(process.env.GROQ_STT_MODEL || "whisper-large-v3-turbo").trim() || "whisper-large-v3-turbo";
+    const form = new FormData();
+    form.append("file", new Blob([input.audio], { type: input.mimeType }), input.filename || "voice.webm");
+    form.append("model", model);
+    form.append("language", input.language || "ar");
+    form.append("response_format", "json");
+    form.append("temperature", "0");
+    if (input.prompt?.trim()) form.append("prompt", input.prompt.trim().slice(0, 900));
+
+    const response = await this.request("/audio/transcriptions", {
+      method: "POST",
+      body: form,
+    });
+    const payload = await this.readJson(response);
+    const text = messageContent(payload?.text);
+    if (!text) throw new GroqProviderError("Groq returned an empty transcript.", "invalid_response", response.status);
+    return {
+      provider: this.id,
+      model: String(payload?.model || model),
+      text,
+      requestId: payload?.x_groq?.id ? String(payload.x_groq.id) : undefined,
+    };
+  }
+
   async generateStructured(request: AIStructuredRequest) {
     const model = readModel(request.model || this.defaultModel);
     const body = {
