@@ -16,16 +16,8 @@
     "real_microphone_test": {
       "status": "PARTIAL",
       "artifact": "docs/phase12_runtime_case_results.json",
-      "completed_cases": [
-        "ar-eg",
-        "code-switch"
-      ],
-      "remaining_cases": [
-        "numbers-dates",
-        "permission-denial",
-        "provider-network-failure",
-        "noisy-ambiguous"
-      ]
+      "completed_cases": ["ar-eg", "code-switch", "numbers-dates"],
+      "remaining_cases": ["permission-denial", "provider-network-failure", "noisy-ambiguous"]
     },
     "behavioral_evidence": {
       "status": "PARTIAL",
@@ -49,7 +41,6 @@
   },
   "blockers": [
     "audio artifact integrity verified; transcript/audio pairing remains unverified",
-    "numbers/date runtime test not yet captured",
     "permission-denial runtime test not yet captured",
     "provider/network failure runtime test not yet captured",
     "noisy/ambiguous runtime test not yet captured",
