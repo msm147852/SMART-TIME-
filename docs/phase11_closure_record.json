@@ -11,7 +11,11 @@
     "voice_manifest": "infra/smart-voice/phase11-voice-manifest.json",
     "verification_script": "scripts/verify-phase11-voice-foundation.mjs",
     "ci_workflow": ".github/workflows/phase11-voice-foundation-verify.yml",
-    "sample_quality": "infra/smart-voice/phase11-voice-manifest.json"
+    "sample_quality": "infra/smart-voice/phase11-voice-manifest.json",
+    "security_reproducibility_ci": "Phase 11 Voice Security Verify #3",
+    "security_reproducibility_run_id": 36965270460,
+    "security_reproducibility_commit": "fc0ae8b692a9202cce02b45d0d81dcdf4d215581",
+    "security_reproducibility_result": "PASS"
   },
   "checks": {
     "voice_specification_committed": true,
@@ -23,14 +27,12 @@
     "approved_sample_package_present": true,
     "sample_hashes_present": true,
     "sample_quality_evidence_present": true,
-    "security_evidence_complete": false,
+    "security_evidence_complete": true,
     "reproducibility_evidence_complete": true,
     "owner_signoff": false
   },
   "blockers": [
-    "OWNER_SIGNOFF_REQUIRED",
-    "RAW_AUDIO_SECURITY_AT_REST_EVIDENCE_REQUIRED",
-    "REVOCATION_AND_STORAGE_POLICY_EVIDENCE_REQUIRED"
+    "OWNER_SIGNOFF_REQUIRED"
   ],
   "downstream_not_claimed_as_done": [
     "real STT",
