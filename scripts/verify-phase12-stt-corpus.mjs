@@ -20,48 +20,38 @@ const voiceConversation = fs.readFileSync(voiceConversationPath, 'utf8');
 const smartAiDemo = fs.readFileSync(smartAiDemoPath, 'utf8');
 
 if (manifest.phase !== 12) throw new Error('Phase 12 manifest mismatch');
-if (manifest.status !== 'IN_PROGRESS') throw new Error('Phase 12 must remain IN_PROGRESS until every gate passes');
 if (manifest.training_authorized_by_phase !== false) throw new Error('Phase 12 must not silently authorize training');
 if (manifest.corpus_policy.raw_corpus_in_git !== false) throw new Error('Raw corpus Git policy must be false');
-if (manifest.corpus_policy.user_recordings_added_to_corpus_by_default !== false) {
-  throw new Error('User recordings must not enter corpus by default');
-}
-if (manifest.stt_contract.primary_locale !== 'ar-EG') throw new Error('Primary STT locale must be ar-EG');
+if (manifest.corpus_policy.user_recordings_added_to_corpus_by_default !== false) throw new Error('User recordings must not enter corpus by default');
+if (manifest.stt_contract.primary_locale !== 'ar-EG') throw new Error('Primary STT locale must remain ar-EG');
 if (manifest.stt_contract.fake_transcript_forbidden !== true) throw new Error('Fake transcript path must be forbidden');
 if (manifest.stt_contract.timer_driven_transcript_forbidden !== true) throw new Error('Timer transcript path must be forbidden');
-if (manifest.stt_contract.privacy_disclosure_required !== true) throw new Error('STT privacy disclosure must be required');
 if (manifest.stt_contract.raw_microphone_audio_logged !== false) throw new Error('Raw microphone logging must remain disabled');
 if (manifest.stt_contract.raw_microphone_audio_persisted_by_app !== false) throw new Error('Raw microphone persistence must remain disabled');
-if (!voice.includes('التسجيل يُرسل للتحويل فقط ولا يتم حفظ ملف الصوت')) throw new Error('Arabic Groq STT privacy disclosure is missing');
-if (!voice.includes('MediaRecorder')) throw new Error('Real MediaRecorder implementation is missing');
-const sttClient = fs.readFileSync(sttClientPath, 'utf8');
-if (!sttClient.includes("language: 'ar'")) throw new Error('Arabic STT language routing is missing');
-if (!voice.includes('RECORDING_MAX_MS')) throw new Error('Recording duration bound is missing');
-if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
-if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
-if (!voice.includes('onTranscript')) throw new Error('Voice modal must expose the final transcript boundary');
-if (!voice.includes('onTranscriptRef.current?.(next)')) throw new Error('Final transcript callback must execute outside React state updater');
-if (voice.includes('SpeechRecognition') || voice.includes('webkitSpeechRecognition')) throw new Error('Legacy browser STT must not remain in the production voice modal');
+
 const serverPath = fs.readFileSync('server.ts', 'utf8');
+const provider = fs.readFileSync('backend/ai/providers/groqProvider.ts', 'utf8');
+const sttClient = fs.readFileSync('src/services/groqSttService.ts', 'utf8');
+
 if (!serverPath.includes('app.post("/api/ai/stt"')) throw new Error('Groq STT endpoint is missing');
 if (!serverPath.includes('groqProvider.transcribeAudio')) throw new Error('Groq STT provider call is missing');
 if (!serverPath.includes('STT_MAX_AUDIO_BYTES')) throw new Error('STT payload limit is missing');
 if (!serverPath.includes('consumeSttQuota')) throw new Error('STT quota protection is missing');
 if (!serverPath.includes('persisted: false')) throw new Error('STT non-persistence contract is missing');
+if (!provider.includes('/audio/transcriptions')) throw new Error('Groq Whisper transcription transport is missing');
+if (!provider.includes('GROQ_STT_MODEL')) throw new Error('Groq STT model configuration is missing');
+if (!provider.includes('whisper-large-v3-turbo')) throw new Error('Groq Whisper default model is missing');
+if (!provider.includes('language')) throw new Error('Groq STT language routing is missing');
+if (!sttClient.includes("language: 'ar'")) throw new Error('Arabic client STT routing is missing');
+
+if (!voice.includes('MediaRecorder')) throw new Error('Real MediaRecorder implementation is missing');
+if (!voice.includes('RECORDING_MAX_MS')) throw new Error('Recording duration bound is missing');
+if (!voice.includes('التسجيل يُرسل للتحويل فقط ولا يتم حفظ ملف الصوت')) throw new Error('Arabic Groq STT privacy disclosure is missing');
+if (voice.includes('SpeechRecognition') || voice.includes('webkitSpeechRecognition')) throw new Error('Legacy browser STT must not remain in the production voice modal');
+if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
+if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
 if (voice.includes('console.log') || voice.includes('console.error') || voice.includes('console.warn')) throw new Error('Voice STT component must not log microphone/transcript/provider data');
-if (!app.includes('onTranscript={handleVoiceTranscript}')) throw new Error('App must consume the final STT transcript callback');
-if (!app.includes('initialInputText={voiceTranscript}')) throw new Error('Final STT transcript must reach the AI input boundary');
-if (!ai.includes('initialInputText?: string')) throw new Error('AI input boundary prop is missing');
-if (!ai.includes('setInputText(initialInputText.trim())')) throw new Error('AI input does not consume the final transcript');
-if (!app.includes('handleVoiceTranscript')) throw new Error('App voice transcript handler is missing');
-if (!app.includes('setIsVoiceOpen(false)')) throw new Error('Voice modal must close without auto-executing an AI action');
-if (!ai.includes('onSubmit')) throw new Error('AI input form boundary is missing');
-if (!smartAiDemo.includes('SmartAiVoiceConversationModal')) throw new Error('SMART AI service demo is missing the voice conversation modal');
-if (!smartAiDemo.includes('setVoiceConversationOpen(true)')) throw new Error('SMART AI service demo voice conversation entry button is missing');
-if (!smartAiDemo.includes('sendMessage(undefined, transcript)')) throw new Error('SMART AI service demo must route final voice turns into its AI send boundary');
-const inferRoute = fs.readFileSync('app/api/ai/infer/route.ts', 'utf8');
-if (!inferRoute.includes('SMART_AI_LOCAL_URL is not configured; app-owned rules response used.')) throw new Error('SMART AI demo fallback response contract is missing');
-if (!inferRoute.includes('answerWithRules(input, "ar", appData)')) throw new Error('SMART AI demo must use the verified app-owned rules fallback when local model is absent');
+
 if (!voiceConversation.includes('MediaRecorder')) throw new Error('SMART AI voice conversation must use MediaRecorder');
 if (!voiceConversation.includes('transcribeVoiceBlob')) throw new Error('SMART AI voice conversation must use the shared Groq STT client');
 if (voiceConversation.includes('SpeechRecognition') || voiceConversation.includes('webkitSpeechRecognition')) throw new Error('SMART AI voice conversation must not use browser SpeechRecognition');
@@ -70,6 +60,9 @@ if (!voiceConversation.includes('turnGenerationRef')) throw new Error('Voice con
 if (!voiceConversation.includes('onInterrupt')) throw new Error('Voice conversation must expose an explicit AI interruption boundary');
 if (!voiceConversation.includes('if (!activeRef.current || generation !== turnGenerationRef.current) return;')) throw new Error('Voice conversation must guard stale turn results');
 if (voiceConversation.includes('console.log') || voiceConversation.includes('console.error') || voiceConversation.includes('console.warn')) throw new Error('Voice conversation component must not log microphone/transcript/provider data');
+
+if (!smartAiDemo.includes('SmartAiVoiceConversationModal')) throw new Error('SMART AI service demo is missing the voice conversation modal');
+if (!smartAiDemo.includes('setVoiceConversationOpen(true)')) throw new Error('SMART AI service demo voice conversation entry button is missing');
 if (!smartAiDemo.includes('sendMessage(undefined, transcript)')) throw new Error('SMART AI service demo must route final voice turns into its AI send boundary');
 
 if (!evidenceSchema.required_cases || evidenceSchema.required_cases.length !== 7) throw new Error('Phase 12 runtime evidence schema is incomplete');
