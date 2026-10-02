@@ -102,7 +102,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 const groqHealthHandler = async (_req: express.Request, res: express.Response) => {
   // Preparation-only endpoint: never expose provider diagnostics from production.
-  if (process.env.VERCEL_ENV !== "preview" && process.env.NODE_ENV === "production") {
+  const previewEnvironment = process.env.VERCEL_ENV === "preview" || process.env.RAILWAY_ENVIRONMENT_NAME === "staging";
+  if (!previewEnvironment && process.env.NODE_ENV === "production") {
     return res.status(404).json({ error: "preview-only" });
   }
   try {
