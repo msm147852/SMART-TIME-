@@ -23,11 +23,16 @@
       "conclusion": "success"
     },
     "runtime_evidence_schema": "docs/PHASE_12_RUNTIME_EVIDENCE_SCHEMA.json",
-    "egyspeak_acquisition_validator": "scripts/acquire_validate_egyspeak_phase12.py"
+    "egyspeak_acquisition_validator": "scripts/acquire_validate_egyspeak_phase12.py",
+    "user_audio_artifact_verification": {
+      "status": "PASS",
+      "artifact": "docs/phase12_user_audio_evidence.json",
+      "verifier": "scripts/verify-phase12-user-audio.py",
+      "raw_audio_in_git": false
+    }
   },
   "blockers": [
-    "authorized real corpus acquisition and checksum manifest not yet executed",
-    "audio/transcript pairing validation on acquired corpus not yet executed",
+    "audio artifact integrity verified; transcript/audio pairing remains unverified",
     "real microphone behavioral evidence not yet captured",
     "Egyptian Arabic runtime test not yet captured",
     "code-switch runtime test not yet captured",
