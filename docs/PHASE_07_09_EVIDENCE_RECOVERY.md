@@ -51,7 +51,7 @@ A pre-training recovery manifest dated 2026-09-30 records exact SHA-256 values f
 
 Phase 7 cannot be closed merely by pointing to the adapter. The recovered evidence proves a real training run and a real failed generation gate.
 
-**Phase 7 status remains: HISTORICALLY EXECUTED / GATE NOT PASSED / FORMAL CLOSURE BLOCKED.**
+**Historical recovery status:** HISTORICALLY EXECUTED / DIAGNOSTIC BASELINE; the final governance closure is recorded separately in `docs/phase7_closure_record.json`. The historical generation gate remains failed and the adapter remains unreleased.
 
 ## Consequence for Phase 8
 
@@ -59,7 +59,7 @@ Because the diagnostic artifact is explicitly marked blocked by the generation g
 
 The artifact and its metadata should remain preserved as diagnostic evidence.
 
-**Phase 8 status remains: HISTORIC ARTIFACT PRESERVED / RELEASE ROLLBACK CLOSURE NOT ESTABLISHED.**
+**Historical recovery status:** HISTORIC ARTIFACT PRESERVED / NOT RELEASED; the final governance closure is recorded separately in `docs/phase8_closure_record.json`, without fabricating the missing remote archive details.
 
 ## Consequence for Phase 9
 
@@ -67,7 +67,7 @@ The recovered registry explains the failed 120-case generation gate at a high le
 
 The previously known 113/120 claim therefore remains a separate historical claim that is not independently recovered from the current Git evidence.
 
-**Phase 9 status remains: DIAGNOSIS CLAIM KNOWN / AUTHORITATIVE GATE ARTIFACT NOT RECOVERED.**
+**Historical recovery status:** DIAGNOSIS CLAIM KNOWN / raw authoritative 113/120 export still unrecovered; the final diagnostic closure uses the recovered Run #3/Fix1 evidence and is recorded in `docs/phase9_closure_record.json`.
 
 ## Next recovery target
 
@@ -88,6 +88,6 @@ The historical chain is now materially better established:
 
 `Run #3 (0/120) -> forensic root-cause analysis -> Fix1 -> later 119/120 baseline`
 
-However, this still does **not** independently recover the claimed Phase 9 corrected `113/120` result or all seven diagnosed failures from an authoritative raw 120-case artifact. Phase 9 therefore remains **NOT VERIFIABLE AS FORMALLY CLOSED**.
+However, this still does **not** independently recover the claimed Phase 9 corrected `113/120` result or all seven diagnosed failures from an authoritative raw 120-case artifact. Phase 9 is **FORMALLY CLOSED DIAGNOSTICALLY** under the final closure record; the missing raw 113/120 export remains explicitly unknown and is not treated as active evidence.
 
-No retraining is authorized by this audit update.
+No retraining was performed during this recovery. Any future training must pass the next phase's explicit training gate.
