@@ -4,12 +4,15 @@ import assert from "node:assert/strict";
 const read = (path) => fs.readFileSync(path, "utf8");
 const server = read("server.ts");
 const modal = read("src/components/VoiceSearchModal.tsx");
+const conversationModal = read("src/components/SmartAiVoiceConversationModal.tsx");
 const provider = read("backend/ai/providers/groqProvider.ts");
 
 assert.match(server, /app\.post\("\/api\/ai\/stt"/);
 assert.match(server, /authUser\(req\)/);
 assert.match(server, /audioBase64/);
 assert.match(server, /STT_MAX_AUDIO_BYTES/);
+assert.match(server, /maxBase64Chars/);
+assert.match(server, /persisted: false/);
 assert.match(server, /consumeSttQuota/);
 assert.match(server, /groqProvider\.transcribeAudio/);
 assert.match(server, /persisted: false/);
@@ -25,6 +28,10 @@ const sharedStt = read("src/services/groqSttService.ts");
 assert.match(sharedStt, /apiUrl\('\/api\/ai\/stt'\)/);
 assert.match(sharedStt, /authHeaders\(\)/);
 assert.match(sharedStt, /audioBase64/);
+assert.match(conversationModal, /MediaRecorder/);
+assert.match(conversationModal, /turnGenerationRef/);
+assert.match(conversationModal, /isLikelyDuplicate/);
+assert.doesNotMatch(conversationModal, /SpeechRecognition|webkitSpeechRecognition/);
 assert.doesNotMatch(modal, /SpeechRecognition|webkitSpeechRecognition/);
 assert.doesNotMatch(modal, /setTimeout\([^)]*transcript|fake transcript/i);
 
