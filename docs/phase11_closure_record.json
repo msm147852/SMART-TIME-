@@ -2,8 +2,8 @@
   "phase": 11,
   "name": "Voice Foundation — Shubra Voice Specification",
   "branch": "feat/v3-next",
-  "status": "IN_PROGRESS_BLOCKED",
-  "technical_gate": "PARTIAL",
+  "status": "FORMALLY_CLOSED",
+  "technical_gate": "PASS",
   "training_run_started": false,
   "training_authorized_by_phase": false,
   "evidence": {
@@ -15,7 +15,9 @@
     "security_reproducibility_ci": "Phase 11 Voice Security Verify #3",
     "security_reproducibility_run_id": 36965270460,
     "security_reproducibility_commit": "fc0ae8b692a9202cce02b45d0d81dcdf4d215581",
-    "security_reproducibility_result": "PASS"
+    "security_reproducibility_result": "PASS",
+    "owner_signoff": "Owner approval recorded in chat",
+    "closure_manifest_commit": "b7a5373ef11ff87adbb15899fbd1401e32168b02"
   },
   "checks": {
     "voice_specification_committed": true,
@@ -29,16 +31,20 @@
     "sample_quality_evidence_present": true,
     "security_evidence_complete": true,
     "reproducibility_evidence_complete": true,
-    "owner_signoff": false
+    "owner_signoff": true
   },
-  "blockers": [
-    "OWNER_SIGNOFF_REQUIRED"
-  ],
+  "blockers": [],
   "downstream_not_claimed_as_done": [
     "real STT",
     "production TTS runtime validation",
     "Voice DNA cloning benchmark",
     "Voice E2E"
   ],
-  "next_phase_authorized": false
+  "next_phase_authorized": true,
+  "owner_signoff": {
+    "status": "APPROVED",
+    "approved_by_owner": true,
+    "approved_in_chat": true,
+    "approved_at": "2026-10-02"
+  }
 }
