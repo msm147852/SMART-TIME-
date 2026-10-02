@@ -33,6 +33,19 @@
       },
       "artifact": "conversation screenshot 1000318820.jpg",
       "notes": "Screenshot shows a second runtime result after the Egyptian Arabic case; recognized text contains the code-switched meeting concept and numeric time."
+    },
+    {
+      "id": "numbers-dates",
+      "status": "OBSERVED_FAIL",
+      "observed": {
+        "microphone_used": true,
+        "android_microphone_privacy_indicator_visible": true,
+        "final_transcript_visible": true,
+        "observed_transcript_excerpt": "انا عندي ميعاد يوم 15 اكتوبر 2023 الساعه 7:30 الصبح وهتحرك من البيت الساعه 6:45",
+        "spoken_target": "أنا عندي ميعاد يوم 15 أكتوبر 2026 الساعة 7:30 الصبح، وهتحرك من البيت الساعة 6:45."
+      },
+      "artifact": "conversation screenshot 1000318821.jpg",
+      "notes": "Runtime microphone path is evidenced, but the recognized year is 2023 while the spoken target for this case is 2026. Therefore the numbers/date behavioral case does not pass and must be rerun."
     }
   ],
   "remaining_cases": [
