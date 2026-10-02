@@ -64,5 +64,5 @@ export function validateV2Output(raw: string): V2ValidationResult {
     }
   }
   if (errors.length) return { valid: false, errors };
-  return { valid: true, parsed: value as V2ValidatedOutput, errors: [] };
+  return { valid: true, parsed: value as unknown as V2ValidatedOutput, errors: [] };
 }
