@@ -20,10 +20,22 @@
       },
       "artifact": "conversation screenshot 1000318819.jpg",
       "notes": "Screenshot shows microphone active/used and a resulting Arabic utterance in the app. Raw audio is not retained."
+    },
+    {
+      "id": "code-switch",
+      "status": "OBSERVED_PASS",
+      "observed": {
+        "microphone_used": true,
+        "android_microphone_privacy_indicator_visible": true,
+        "final_transcript_visible": true,
+        "observed_transcript_excerpt": "انا عايز اروح بكره الشغل بدري واعمل ميتنج الساعه 10:00",
+        "spoken_target": "أنا رايح الشغل بكرة بدري وعايز أعمل meeting الساعة عشرة."
+      },
+      "artifact": "conversation screenshot 1000318820.jpg",
+      "notes": "Screenshot shows a second runtime result after the Egyptian Arabic case; recognized text contains the code-switched meeting concept and numeric time."
     }
   ],
   "remaining_cases": [
-    "code-switch",
     "numbers-dates",
     "permission-denial",
     "provider-network-failure",
