@@ -8,6 +8,7 @@ const aiPath = 'src/components/AiCenterView.tsx';
 const evidenceSchemaPath = 'docs/PHASE_12_RUNTIME_EVIDENCE_SCHEMA.json';
 const voiceConversationPath = 'src/components/SmartAiVoiceConversationModal.tsx';
 const smartAiDemoPath = 'components/smart-ai/SmartAIDemo.tsx';
+const sttClientPath = 'src/services/groqSttService.ts';
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const doc = fs.readFileSync(docPath, 'utf8');
@@ -33,7 +34,8 @@ if (manifest.stt_contract.raw_microphone_audio_logged !== false) throw new Error
 if (manifest.stt_contract.raw_microphone_audio_persisted_by_app !== false) throw new Error('Raw microphone persistence must remain disabled');
 if (!voice.includes('التسجيل يُرسل للتحويل فقط ولا يتم حفظ ملف الصوت')) throw new Error('Arabic Groq STT privacy disclosure is missing');
 if (!voice.includes('MediaRecorder')) throw new Error('Real MediaRecorder implementation is missing');
-if (!voice.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is missing');
+const sttClient = fs.readFileSync(sttClientPath, 'utf8');
+if (!sttClient.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is missing');
 if (!voice.includes('RECORDING_MAX_MS')) throw new Error('Recording duration bound is missing');
 if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
 if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
