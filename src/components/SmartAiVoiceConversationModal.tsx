@@ -1,50 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, MicOff, Sparkles, X } from 'lucide-react';
 import { Language } from '../types';
+import { transcribeVoiceBlob } from '../services/groqSttService';
 
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onresult: ((event: {
-    resultIndex: number;
-    results: ArrayLike<{ isFinal: boolean; 0: { transcript: string; confidence?: number } }>;
-  }) => void) | null;
-  onspeechend: (() => void) | null;
-};
+type VoiceStatus = 'starting' | 'listening' | 'processing' | 'error';
 
-type RecognitionCtor = new () => Recognition;
+const RECORDING_MAX_MS = 90_000;
+const SUPPORTED_MIME_TYPES = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4',
+  'audio/ogg',
+];
 
-const getRecognition = (): RecognitionCtor | null => {
-  const w = window as Window & {
-    SpeechRecognition?: RecognitionCtor;
-    webkitSpeechRecognition?: RecognitionCtor;
-  };
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-};
-
-const normalizeTranscript = (value: string) =>
-  value
-    .replace(/[إأآ]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/[ًٌٍَُِّْـ]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-
-const isLikelyDuplicate = (previous: string, next: string) => {
-  const a = normalizeTranscript(previous);
-  const b = normalizeTranscript(next);
-  if (!a || !b) return false;
-  return a === b || a.includes(b) || b.includes(a);
-};
+function isLikelyDuplicate(previous: string, next: string) {
+  const a = previous.replace(/\s+/g, ' ').trim().toLowerCase();
+  const b = next.replace(/\s+/g, ' ').trim().toLowerCase();
+  return Boolean(a && b && (a === b || a.includes(b) || b.includes(a)));
+}
 
 interface Props {
   isOpen: boolean;
@@ -61,186 +34,199 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   onTurn,
   onInterrupt,
 }) => {
-  const [status, setStatus] = useState<'starting' | 'listening' | 'processing' | 'error'>('starting');
+  const [status, setStatus] = useState<VoiceStatus>('starting');
   const [transcript, setTranscript] = useState('');
-  const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const recognitionRef = useRef<Recognition | null>(null);
-  const finalTranscriptRef = useRef('');
-  const lastFinalCandidateRef = useRef('');
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const stopTimerRef = useRef<number | null>(null);
   const activeRef = useRef(false);
   const processingRef = useRef(false);
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const turnGenerationRef = useRef(0);
+  const lastTranscriptRef = useRef('');
   const onTurnRef = useRef(onTurn);
   const onInterruptRef = useRef(onInterrupt);
-  const turnGenerationRef = useRef(0);
 
   useEffect(() => {
     onTurnRef.current = onTurn;
     onInterruptRef.current = onInterrupt;
   }, [onTurn, onInterrupt]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const Ctor = getRecognition();
-    if (!Ctor) {
-      setStatus('error');
-      setError(language === 'ar'
-        ? 'التحدث الصوتي غير مدعوم في هذا المتصفح.'
-        : 'Voice conversation is not supported in this browser.');
-      return;
+  const clearTimer = () => {
+    if (stopTimerRef.current !== null) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
     }
+  };
 
-    activeRef.current = true;
+  const releaseStream = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
+
+  const resetRecorder = () => {
+    clearTimer();
+    recorderRef.current = null;
+    chunksRef.current = [];
+    releaseStream();
+  };
+
+  const fail = (message: string) => {
     processingRef.current = false;
-    finalTranscriptRef.current = '';
-    lastFinalCandidateRef.current = '';
-    setTranscript('');
-    setInterimTranscript('');
-    setError(null);
-    setStatus('starting');
+    setStatus('error');
+    setError(message);
+  };
 
-    const recognition = new Ctor();
+  const processTurn = async (blob: Blob, generation: number) => {
+    try {
+      const result = await transcribeVoiceBlob(blob, language === 'ar' ? 'ar' : 'en');
+      if (!activeRef.current || generation !== turnGenerationRef.current) return;
 
-    // One recognition session = one user turn.
-    // This is intentional: Android Chrome has known duplication/continuous-mode
-    // inconsistencies, so the conversation itself is continuous while each turn
-    // is isolated and committed exactly once.
-    recognition.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    const clearSilenceTimer = () => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-    };
-
-    const startListening = () => {
-      if (!activeRef.current || processingRef.current) return;
-      clearSilenceTimer();
-      finalTranscriptRef.current = '';
-      lastFinalCandidateRef.current = '';
-      setTranscript('');
-      setInterimTranscript('');
-      setError(null);
-      setStatus('starting');
-      try {
-        recognition.start();
-      } catch {
-        // Browser can reject a duplicate start while the previous session closes.
-      }
-    };
-
-    recognition.onstart = () => {
-      if (!activeRef.current || processingRef.current) return;
-      setStatus('listening');
-      setError(null);
-    };
-
-    recognition.onresult = (event) => {
-      let latestInterim = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const candidate = String(result[0]?.transcript || '').trim();
-        if (!candidate) continue;
-
-        if (result.isFinal) {
-          // Mobile recognizers can emit the same final phrase more than once.
-          // Keep one best candidate for this turn instead of concatenating echoes.
-          if (!isLikelyDuplicate(lastFinalCandidateRef.current, candidate)) {
-            if (
-              !finalTranscriptRef.current ||
-              candidate.length >= finalTranscriptRef.current.length
-            ) {
-              finalTranscriptRef.current = candidate;
-              lastFinalCandidateRef.current = candidate;
-            }
-          }
-          setTranscript(finalTranscriptRef.current);
-          setInterimTranscript('');
-        } else {
-          latestInterim = candidate;
-        }
-      }
-
-      if (latestInterim) setInterimTranscript(latestInterim);
-    };
-
-    recognition.onspeechend = () => {
-      if (!activeRef.current || processingRef.current) return;
-      clearSilenceTimer();
-
-      // Give the recognizer a short settling window so the last Arabic words
-      // can become final before the session is stopped.
-      silenceTimerRef.current = setTimeout(() => {
-        if (activeRef.current && !processingRef.current) recognition.stop();
-      }, 650);
-    };
-
-    recognition.onerror = (event) => {
-      const code = event.error || 'unknown';
-      clearSilenceTimer();
-      if (!activeRef.current || code === 'aborted' || code === 'no-speech') return;
-
-      processingRef.current = false;
-      setStatus('error');
-      setError(language === 'ar'
-        ? `حصلت مشكلة في الميكروفون: ${code}`
-        : `Microphone/recognition error: ${code}`);
-    };
-
-    recognition.onend = async () => {
-      clearSilenceTimer();
-      setInterimTranscript('');
-      if (!activeRef.current || processingRef.current) return;
-
-      const text = finalTranscriptRef.current.trim();
-      if (!text) {
-        startListening();
+      const text = result.transcript.trim();
+      if (!text || isLikelyDuplicate(lastTranscriptRef.current, text)) {
+        processingRef.current = false;
+        setStatus('listening');
         return;
       }
 
-      processingRef.current = true;
-      const turnGeneration = turnGenerationRef.current;
-      setStatus('processing');
+      lastTranscriptRef.current = text;
+      setTranscript(text);
+      await onTurnRef.current(text);
 
-      try {
-        // IMPORTANT: onTurn resolves only after the AI response has finished
-        // speaking. We do not reopen the microphone while SMART AI is talking.
-        await onTurnRef.current(text);
+      if (!activeRef.current || generation !== turnGenerationRef.current) return;
+      processingRef.current = false;
+      setTranscript('');
+      setError(null);
+      startRecording();
+    } catch (cause) {
+      if (!activeRef.current || generation !== turnGenerationRef.current) return;
+      const code = cause instanceof Error ? String((cause as Error & { code?: string }).code || '') : '';
+      const message = cause instanceof Error ? cause.message : 'Speech transcription failed.';
+      processingRef.current = false;
+      setStatus('error');
+      setError(
+        code === 'authentication-required'
+          ? (language === 'ar' ? 'لازم يكون فيه جلسة دخول فعالة للمحادثة الصوتية.' : 'An authenticated session is required for voice conversation.')
+          : code === 'rate-limit'
+            ? (language === 'ar' ? 'طلبات الصوت زادت مؤقتًا. جرّب بعد شوية.' : 'Voice rate limit reached. Try again shortly.')
+            : language === 'ar' ? message : 'Voice transcription or reply failed.',
+      );
+    }
+  };
 
-        if (!activeRef.current || turnGeneration !== turnGenerationRef.current) return;
+  const stopRecording = () => {
+    clearTimer();
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+    processingRef.current = true;
+    setStatus('processing');
+    recorder.stop();
+  };
 
-        finalTranscriptRef.current = '';
-        lastFinalCandidateRef.current = '';
-        setTranscript('');
-        processingRef.current = false;
-        if (activeRef.current) startListening();
-      } catch {
-        processingRef.current = false;
-        if (activeRef.current) {
-          setStatus('error');
-          setError(language === 'ar'
-            ? 'SMART AI استقبل كلامك، لكن الرد الصوتي فشل. المحادثة متوقفة لحد ما تبدأ الدور التالي.'
-            : 'SMART AI received your turn, but the voice reply failed. The conversation is paused.');
-        }
+  const startRecording = async () => {
+    if (!activeRef.current || processingRef.current) return;
+
+    setStatus('starting');
+    setError(null);
+    setTranscript('');
+    chunksRef.current = [];
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      fail(language === 'ar'
+        ? 'تسجيل الصوت الحقيقي غير مدعوم في هذا المتصفح.'
+        : 'Real audio recording is not supported in this browser.');
+      return;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    } catch (cause) {
+      const name = cause instanceof DOMException ? cause.name : 'UnknownError';
+      fail(name === 'NotAllowedError'
+        ? (language === 'ar' ? 'تم رفض إذن الميكروفون.' : 'Microphone permission was denied.')
+        : (language === 'ar' ? 'تعذر الوصول إلى الميكروفون.' : 'Microphone capture failed.'));
+      return;
+    }
+
+    if (!activeRef.current) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+
+    streamRef.current = stream;
+    const mimeType = SUPPORTED_MIME_TYPES.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64_000 })
+        : new MediaRecorder(stream);
+    } catch {
+      releaseStream();
+      fail(language === 'ar' ? 'تعذر بدء تسجيل الصوت.' : 'Could not start audio recording.');
+      return;
+    }
+
+    chunksRef.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onerror = () => {
+      resetRecorder();
+      fail(language === 'ar' ? 'حدث خطأ أثناء تسجيل الصوت.' : 'An error occurred while recording audio.');
+    };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
+      resetRecorder();
+      const generation = turnGenerationRef.current;
+      if (!blob.size) {
+        fail(language === 'ar' ? 'لم يتم التقاط صوت.' : 'No audio was captured.');
+        return;
       }
+      await processTurn(blob, generation);
     };
 
-    recognitionRef.current = recognition;
-    startListening();
+    recorderRef.current = recorder;
+    try {
+      recorder.start();
+      setStatus('listening');
+      stopTimerRef.current = window.setTimeout(stopRecording, RECORDING_MAX_MS);
+    } catch {
+      resetRecorder();
+      fail(language === 'ar' ? 'تعذر بدء تسجيل الصوت.' : 'Could not start audio recording.');
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    activeRef.current = true;
+    processingRef.current = false;
+    turnGenerationRef.current += 1;
+    lastTranscriptRef.current = '';
+    setTranscript('');
+    setError(null);
+    setStatus('starting');
+    void startRecording();
 
     return () => {
       activeRef.current = false;
       processingRef.current = false;
-      clearSilenceTimer();
-      recognition.abort();
-      recognitionRef.current = null;
+      turnGenerationRef.current += 1;
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try { recorder.stop(); } catch {}
+      }
+      resetRecorder();
     };
   }, [isOpen, language]);
 
@@ -248,8 +234,11 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     activeRef.current = false;
     processingRef.current = false;
     turnGenerationRef.current += 1;
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    recognitionRef.current?.abort();
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); } catch {}
+    }
+    resetRecorder();
     onInterruptRef.current?.();
     onClose();
   };
@@ -258,27 +247,19 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     if (!activeRef.current || !processingRef.current) return;
     turnGenerationRef.current += 1;
     processingRef.current = false;
-    onInterruptRef.current?.();
-    setStatus('starting');
-    setError(null);
-    finalTranscriptRef.current = '';
-    setTranscript('');
-    setInterimTranscript('');
-    // The current recognition session has already ended; startListening is
-    // reached by the next effect cycle after the AI interruption.
-    const recognition = recognitionRef.current;
-    if (recognition) {
-      try {
-        recognition.start();
-      } catch {
-        // If the browser still considers it active, its existing session wins.
-      }
+    clearTimer();
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); } catch {}
     }
+    resetRecorder();
+    onInterruptRef.current?.();
+    setError(null);
+    setTranscript('');
+    void startRecording();
   };
 
   if (!isOpen) return null;
-
-  const displayedTranscript = [transcript, interimTranscript].filter(Boolean).join(' ');
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
@@ -312,54 +293,47 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
                   ? <Loader2 className="w-11 h-11 animate-spin" />
                   : <MicOff className="w-11 h-11" />}
           </div>
-          {status === 'listening' && (
-            <div className="absolute w-36 h-36 rounded-full border-4 border-purple-400/30 animate-ping" />
-          )}
+          {status === 'listening' && <div className="absolute w-36 h-36 rounded-full border-4 border-purple-400/30 animate-ping" />}
         </div>
 
         <div>
           <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
             {status === 'listening'
-              ? (language === 'ar' ? 'أنا سامعك… خد وقتك' : 'I’m listening… take your time')
+              ? (language === 'ar' ? 'أنا سامعك… اضغط إيقاف لما تخلص' : 'I’m listening… stop when you finish')
               : status === 'processing'
                 ? (language === 'ar' ? 'سمعتك… بفهم وبجهز الرد' : 'I heard you… preparing a reply')
                 : status === 'starting'
-                  ? (language === 'ar' ? 'جاهز… اتكلم لما تسمعني' : 'Ready… speak when you are')
+                  ? (language === 'ar' ? 'جاهز…' : 'Ready…')
                   : (language === 'ar' ? 'المحادثة الصوتية متوقفة' : 'Voice conversation paused')}
           </h3>
           <p className="text-xs text-slate-400 mt-1">
             {language === 'ar'
-              ? 'كل دور صوتي بيتقفل لوحده؛ SMART AI مش هيفتح الميكروفون وهو بيتكلم.'
-              : 'Each turn is isolated; the microphone stays closed while SMART AI speaks.'}
+              ? 'كل دور بيتسجل ويتحوّل عبر Groq Whisper، والميكروفون لا يفتح أثناء رد SMART AI.'
+              : 'Each turn is recorded and transcribed by Groq Whisper; the microphone stays closed while SMART AI replies.'}
           </p>
         </div>
 
         <div className="min-h-[84px] p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-arabic font-bold text-slate-800 dark:text-slate-100 flex items-center justify-center">
-          <span>{displayedTranscript || (language === 'ar' ? 'في انتظار كلامك…' : 'Waiting for you…')}</span>
+          <span>{transcript || (language === 'ar' ? 'في انتظار كلامك…' : 'Waiting for you…')}</span>
         </div>
 
-        {error && (
-          <div className="p-3 rounded-xl border border-red-300 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 text-xs font-bold">
-            {error}
-          </div>
+        {error && <div className="p-3 rounded-xl border border-red-300 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 text-xs font-bold">{error}</div>}
+
+        {status === 'listening' && (
+          <button type="button" onClick={stopRecording} className="w-full py-3 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-sm flex items-center justify-center gap-2">
+            <MicOff className="w-4 h-4" />
+            {language === 'ar' ? 'إيقاف الدور وإرساله' : 'Stop turn and send'}
+          </button>
         )}
 
         {status === 'processing' && (
-          <button
-            type="button"
-            onClick={interruptAi}
-            className="w-full py-3 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-sm flex items-center justify-center gap-2"
-          >
+          <button type="button" onClick={interruptAi} className="w-full py-3 rounded-2xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-sm flex items-center justify-center gap-2">
             <Mic className="w-4 h-4" />
             {language === 'ar' ? 'قاطع الرد واتكلم' : 'Interrupt and speak'}
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={stopConversation}
-          className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm flex items-center justify-center gap-2"
-        >
+        <button type="button" onClick={stopConversation} className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm flex items-center justify-center gap-2">
           <MicOff className="w-4 h-4" />
           {language === 'ar' ? 'إنهاء المحادثة' : 'End conversation'}
         </button>
