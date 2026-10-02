@@ -17,13 +17,58 @@ function assistantText(result: ApiPayload["result"]) {
   return "أهلاً بيك! أنا مساعد SMART TIME. أقدر أساعدك في فهم طلبك، والميزات الكاملة موجودة داخل التطبيق.";
 }
 
-function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "ar-EG";
-  utterance.rate = 0.95;
-  window.speechSynthesis.speak(utterance);
+function speak(text: string): Promise<void> {
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) {
+    return Promise.resolve();
+  }
+
+  const synth = window.speechSynthesis;
+  synth.cancel();
+
+  return new Promise((resolve, reject) => {
+    const utterance = new SpeechSynthesisUtterance(text.trim());
+    utterance.lang = "ar-EG";
+    utterance.rate = 0.96;
+    utterance.pitch = 0.92;
+    utterance.volume = 1;
+
+    // Prefer a real Egyptian-Arabic device voice. The browser may not expose
+    // ar-EG on every Android build, so fall back to the closest Arabic voice
+    // instead of pretending that a non-Egyptian voice is Egyptian.
+    const voices = synth.getVoices();
+    const egyptian = voices.find((voice) => voice.lang.toLowerCase() === "ar-eg");
+    const arabic = voices.find((voice) => voice.lang.toLowerCase().startsWith("ar"));
+    if (egyptian) utterance.voice = egyptian;
+    else if (arabic) utterance.voice = arabic;
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const fail = (event: SpeechSynthesisErrorEvent) => {
+      if (settled) return;
+      settled = true;
+      if (event.error === "canceled" || event.error === "interrupted") resolve();
+      else reject(new Error(`TTS failed: ${event.error}`));
+    };
+
+    utterance.onend = finish;
+    utterance.onerror = fail;
+    synth.speak(utterance);
+
+    // Some mobile speech engines can fail to emit onend after a cancellation.
+    window.setTimeout(() => {
+      if (!settled && !synth.speaking && !synth.pending) finish();
+    }, 250);
+  });
+}
+
+function stopSpeech() {
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
 }
 
 export default function SmartAIDemo() {
@@ -74,7 +119,7 @@ export default function SmartAIDemo() {
         ...current,
         { id: nextId.current++, role: "assistant", text: reply },
       ]);
-      speak(reply);
+      await speak(reply);
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -143,7 +188,11 @@ export default function SmartAIDemo() {
         <SmartAiVoiceConversationModal
           isOpen={voiceConversationOpen}
           language="ar"
-          onClose={() => setVoiceConversationOpen(false)}
+          onClose={() => {
+            stopSpeech();
+            setVoiceConversationOpen(false);
+          }}
+          onInterrupt={stopSpeech}
           onTurn={async (transcript) => {
             await sendMessage(undefined, transcript);
           }}
