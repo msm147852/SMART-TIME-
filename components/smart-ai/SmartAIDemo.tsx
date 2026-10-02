@@ -2,10 +2,15 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { SmartAiVoiceConversationModal } from "../../src/components/SmartAiVoiceConversationModal";
 
 type ChatMessage = { id: number; role: "user" | "assistant"; text: string };
-type ApiPayload = { result?: { tool?: string }; error?: string };
+type ApiPayload = {
+  result?: { tool?: string; reply?: string };
+  error?: string;
+  degraded?: boolean;
+};
 const APP_FEATURE_TOOLS = new Set(["add_expense", "add_daily_task", "calendar.event.create"]);
 
 function assistantText(result: ApiPayload["result"]) {
+  if (result?.reply?.trim()) return result.reply.trim();
   if (result?.tool && APP_FEATURE_TOOLS.has(result.tool)) return "الميزة دي في التطبيق - حمله من هنا";
   if (result?.tool === "clarification") return "ممكن توضّحلي طلبك أكتر؟";
   if (result?.tool === "unsupported") return "الطلب ده متاح داخل تطبيق SMART TIME الكامل.";
