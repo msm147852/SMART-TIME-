@@ -642,7 +642,6 @@ export default function App() {
           expenses={expenses}
           vehicles={vehicles}
           lessons={lessons}
-          onNavigate={(view) => handleNavigateSafe(view)}
         />
 
         {/* Voice Search Modal */}
@@ -650,7 +649,6 @@ export default function App() {
           isOpen={isVoiceOpen}
           onClose={() => setIsVoiceOpen(false)}
           language={language}
-          onNavigate={(view) => handleNavigateSafe(view)}
         />
 
         {/* Settings & Backup Modal */}
