@@ -16,8 +16,16 @@
     "real_microphone_test": {
       "status": "PARTIAL",
       "artifact": "docs/phase12_runtime_case_results.json",
-      "completed_cases": ["ar-eg", "code-switch", "numbers-dates"],
-      "remaining_cases": ["permission-denial", "provider-network-failure", "noisy-ambiguous"]
+      "completed_cases": [
+        "ar-eg",
+        "code-switch",
+        "numbers-dates"
+      ],
+      "remaining_cases": [
+        "permission-denial",
+        "provider-network-failure",
+        "noisy-ambiguous"
+      ]
     },
     "behavioral_evidence": {
       "status": "PARTIAL",
@@ -41,7 +49,6 @@
   },
   "blockers": [
     "audio artifact integrity verified; transcript/audio pairing remains unverified",
-    "permission-denial runtime test not yet captured",
     "provider/network failure runtime test not yet captured",
     "noisy/ambiguous runtime test not yet captured",
     "final security/reproducibility closure evidence not yet complete",
@@ -51,5 +58,19 @@
     "status": "NOT_REQUESTED",
     "approved_by_owner": false
   },
-  "closure_rule": "Phase 13 remains unauthorized until every Phase 12 gate is PASS and owner sign-off is recorded."
+  "closure_rule": "Phase 13 remains unauthorized until every Phase 12 gate is PASS and owner sign-off is recorded.",
+  "real_microphone_test": {
+    "status": "PARTIAL",
+    "completed_cases": [
+      "ar-eg",
+      "code-switch",
+      "numbers-dates",
+      "permission-denial"
+    ],
+    "remaining": [
+      "provider-network-failure",
+      "noisy-ambiguous"
+    ]
+  },
+  "behavioral_evidence": "PARTIAL"
 }
