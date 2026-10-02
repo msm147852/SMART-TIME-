@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, X, Navigation, AlertCircle, Loader2 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../services/i18n';
+import { apiUrl } from '../services/apiConfig';
+import { authHeaders } from '../services/authService';
 
 interface VoiceSearchModalProps {
   isOpen: boolean;
@@ -10,36 +12,22 @@ interface VoiceSearchModalProps {
   onTranscript?: (transcript: string) => void;
 }
 
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onresult: ((event: {
-    resultIndex: number;
-    results: ArrayLike<{
-      isFinal: boolean;
-      0: { transcript: string };
-      length: number;
-    }>;
-  }) => void) | null;
-};
+const RECORDING_MAX_MS = 90_000;
+const SUPPORTED_MIME_TYPES = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4',
+  'audio/ogg',
+];
 
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-const getSpeechRecognition = (): SpeechRecognitionConstructor | null => {
-  const w = window as Window & {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  };
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-};
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to encode audio.'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(blob);
+  });
+}
 
 export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
   isOpen,
@@ -49,109 +37,218 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [speechErrorCode, setSpeechErrorCode] = useState<string | null>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const transcriptRef = useRef('');
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const stopTimerRef = useRef<number | null>(null);
   const onTranscriptRef = useRef(onTranscript);
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
-  useEffect(() => {
-    if (!isOpen) return;
+  const clearStopTimer = () => {
+    if (stopTimerRef.current !== null) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+  };
 
-    transcriptRef.current = '';
-    setTranscript('');
-    setInterimTranscript('');
-    setError(null);
-    setSpeechErrorCode(null);
+  const releaseStream = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
 
-    const Recognition = getSpeechRecognition();
-    if (!Recognition) {
-      setError(language === 'ar'
-        ? 'التعرف الصوتي الحقيقي غير مدعوم في هذا المتصفح.'
-        : 'Real speech recognition is not supported in this browser.');
+  const resetRecorder = () => {
+    clearStopTimer();
+    recorderRef.current = null;
+    chunksRef.current = [];
+    releaseStream();
+  };
+
+  const showError = (code: string, message: string) => {
+    setSpeechErrorCode(code);
+    setError(message);
+    setIsStarting(false);
+    setIsListening(false);
+    setIsProcessing(false);
+  };
+
+  const transcribeBlob = async (blob: Blob) => {
+    if (!blob.size) {
+      showError('empty-audio', language === 'ar' ? 'لم يتم التقاط صوت.' : 'No audio was captured.');
       return;
     }
 
-    const recognition = new Recognition();
-    recognition.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsStarting(false);
-      setIsListening(true);
-      setError(null);
-      setSpeechErrorCode(null);
-    };
-
-    recognition.onresult = (event) => {
-      let interim = '';
-      let finalText = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const text = result[0]?.transcript ?? '';
-        if (result.isFinal) finalText += text;
-        else interim += text;
-      }
-
-      if (finalText.trim()) {
-        const normalized = finalText.trim();
-        const next = transcriptRef.current
-          ? transcriptRef.current + ' ' + normalized
-          : normalized;
-        transcriptRef.current = next;
-        setTranscript(next);
-        onTranscriptRef.current?.(next);
-      }
-      setInterimTranscript(interim.trim());
-    };
-
-    recognition.onerror = (event) => {
-      setIsStarting(false);
-      setIsListening(false);
-      const code = event.error || 'unknown';
-      setSpeechErrorCode(code);
-      const messages: Record<string, string> = {
-        'not-allowed': language === 'ar' ? 'تم رفض إذن الميكروفون.' : 'Microphone permission was denied.',
-        'service-not-allowed': language === 'ar' ? 'خدمة التعرف الصوتي غير مسموح بها.' : 'Speech recognition service is not allowed.',
-        'no-speech': language === 'ar' ? 'لم يتم اكتشاف كلام.' : 'No speech was detected.',
-        'audio-capture': language === 'ar' ? 'تعذر الوصول إلى الميكروفون.' : 'Microphone capture failed.',
-        network: language === 'ar' ? 'تعذر الوصول إلى خدمة التعرف الصوتي.' : 'Speech recognition service is unavailable.',
-      };
-      setError(messages[code] || (language === 'ar' ? `فشل التعرف الصوتي: ${code}` : `Speech recognition failed: ${code}`));
-    };
-
-    recognition.onend = () => {
-      setIsStarting(false);
-      setIsListening(false);
-      setInterimTranscript('');
-    };
-
-    recognitionRef.current = recognition;
-    setIsStarting(true);
+    setIsProcessing(true);
+    setError(null);
+    setSpeechErrorCode(null);
 
     try {
-      recognition.start();
+      const audioBase64 = await blobToBase64(blob);
+      const response = await fetch(apiUrl('/api/ai/stt'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
+        body: JSON.stringify({
+          audioBase64,
+          mimeType: blob.type || 'audio/webm',
+          language: language === 'ar' ? 'ar' : 'en',
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const code = response.status === 401
+          ? 'authentication-required'
+          : response.status === 413
+            ? 'audio-too-large'
+            : response.status === 429
+              ? 'rate-limit'
+              : 'provider-network';
+        showError(
+          code,
+          String(payload?.error || (language === 'ar'
+            ? 'تعذر تحويل التسجيل إلى نص.'
+            : 'Speech transcription failed.')),
+        );
+        return;
+      }
+
+      const next = String(payload?.transcript || '').trim();
+      if (!next) {
+        showError('empty-transcript', language === 'ar' ? 'لم يتم اكتشاف كلام واضح.' : 'No clear speech was detected.');
+        return;
+      }
+
+      setTranscript(next);
+      onTranscriptRef.current?.(next);
+      setIsProcessing(false);
     } catch {
-      setIsStarting(false);
-      setError(language === 'ar' ? 'تعذر بدء الميكروفون.' : 'Could not start microphone capture.');
+      showError(
+        'provider-network',
+        language === 'ar' ? 'تعذر الوصول إلى خدمة تحويل الكلام إلى نص.' : 'Speech transcription service is unavailable.',
+      );
+    }
+  };
+
+  const stopListening = () => {
+    clearStopTimer();
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+    setIsListening(false);
+    setIsProcessing(true);
+    recorder.stop();
+  };
+
+  const startListening = async () => {
+    setIsStarting(true);
+    setError(null);
+    setSpeechErrorCode(null);
+    setTranscript('');
+    chunksRef.current = [];
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      showError(
+        'unsupported',
+        language === 'ar' ? 'تسجيل الصوت الحقيقي غير مدعوم في هذا المتصفح.' : 'Real audio recording is not supported in this browser.',
+      );
+      return;
     }
 
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    } catch (cause) {
+      const name = cause instanceof DOMException ? cause.name : 'UnknownError';
+      const code = name === 'NotAllowedError' ? 'not-allowed' : name === 'NotFoundError' ? 'audio-capture' : 'microphone-error';
+      showError(
+        code,
+        code === 'not-allowed'
+          ? (language === 'ar' ? 'تم رفض إذن الميكروفون.' : 'Microphone permission was denied.')
+          : (language === 'ar' ? 'تعذر الوصول إلى الميكروفون.' : 'Microphone capture failed.'),
+      );
+      return;
+    }
+
+    streamRef.current = stream;
+    const mimeType = SUPPORTED_MIME_TYPES.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
+    let recorder: MediaRecorder;
+    try {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64_000 }) : new MediaRecorder(stream);
+    } catch {
+      releaseStream();
+      showError(
+        'recorder-error',
+        language === 'ar' ? 'تعذر بدء تسجيل الصوت.' : 'Could not start audio recording.',
+      );
+      return;
+    }
+
+    chunksRef.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onerror = () => {
+      showError(
+        'recorder-error',
+        language === 'ar' ? 'حدث خطأ أثناء تسجيل الصوت.' : 'An error occurred while recording audio.',
+      );
+      resetRecorder();
+    };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
+      resetRecorder();
+      await transcribeBlob(blob);
+    };
+
+    recorderRef.current = recorder;
+    setIsStarting(false);
+    setIsListening(true);
+
+    try {
+      recorder.start();
+      stopTimerRef.current = window.setTimeout(stopListening, RECORDING_MAX_MS);
+    } catch {
+      resetRecorder();
+      showError(
+        'recorder-start',
+        language === 'ar' ? 'تعذر بدء تسجيل الصوت.' : 'Could not start audio recording.',
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setTranscript('');
+    setError(null);
+    setSpeechErrorCode(null);
+    setIsProcessing(false);
+    void startListening();
+
     return () => {
-      recognition.abort();
-      recognitionRef.current = null;
+      clearStopTimer();
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try { recorder.stop(); } catch {}
+      }
+      resetRecorder();
     };
   }, [isOpen, language]);
-
-  const stopListening = () => recognitionRef.current?.stop();
 
   if (!isOpen) return null;
 
@@ -159,14 +256,25 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
       <div className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl max-w-md w-full p-8 text-center space-y-6 overflow-hidden">
         <div className="flex justify-end -mt-2 -me-2">
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl" aria-label="Close">
+          <button
+            onClick={() => {
+              stopListening();
+              onClose();
+            }}
+            className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl"
+            aria-label="Close"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="relative flex items-center justify-center">
           <div className={`w-24 h-24 rounded-full bg-gradient-to-tr from-accent-500 via-accent-600 to-yellow-500 text-white flex items-center justify-center shadow-xl shadow-accent-500/30 transition-transform ${isListening ? 'animate-pulse scale-110' : ''}`}>
-            {isStarting ? <Loader2 className="w-10 h-10 animate-spin" /> : isListening ? <Mic className="w-10 h-10" /> : <MicOff className="w-10 h-10" />}
+            {isStarting || isProcessing
+              ? <Loader2 className="w-10 h-10 animate-spin" />
+              : isListening
+                ? <Mic className="w-10 h-10" />
+                : <MicOff className="w-10 h-10" />}
           </div>
           {isListening && <div className="absolute inset-0 rounded-full border-4 border-accent-400/40 animate-ping" />}
         </div>
@@ -175,22 +283,24 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
           <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">
             {isStarting
               ? language === 'ar' ? 'جاري تشغيل الميكروفون...' : 'Starting microphone...'
-              : isListening
-                ? language === 'ar' ? 'اتكلم دلوقتي...' : 'Speak now...'
-                : language === 'ar' ? 'انتهى الاستماع' : 'Listening ended'}
+              : isProcessing
+                ? language === 'ar' ? 'جاري تحويل الكلام إلى نص...' : 'Transcribing speech...'
+                : isListening
+                  ? language === 'ar' ? 'اتكلم دلوقتي...' : 'Speak now...'
+                  : language === 'ar' ? 'انتهى الاستماع' : 'Listening ended'}
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            {language === 'ar' ? 'التعرف الحقيقي مضبوط على العربية المصرية (ar-EG)' : 'Real recognition is configured for the selected locale'}
+            {language === 'ar' ? 'تحويل الكلام يتم عبر Groq Whisper مع الحفاظ على العربية المصرية.' : 'Speech is transcribed by Groq Whisper.'}
           </p>
           <p className="text-[10px] text-slate-400 mt-2">
             {language === 'ar'
-              ? 'حسب المتصفح، قد تتم معالجة الصوت عبر خدمة التعرف الخاصة به. SMART TIME لا يحفظ التسجيل الصوتي في التطبيق.'
-              : 'Depending on the browser, speech may be processed by its recognition service. SMART TIME does not persist the recording.'}
+              ? 'التسجيل يُرسل للتحويل فقط ولا يتم حفظ ملف الصوت في SMART TIME.'
+              : 'Audio is sent for transcription only and is not persisted by SMART TIME.'}
           </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-arabic font-bold text-slate-800 dark:text-slate-100 min-h-[76px] flex items-center justify-center">
-          <span>{transcript || interimTranscript || (language === 'ar' ? 'في انتظار كلامك...' : 'Waiting for speech...')}</span>
+          <span>{transcript || (language === 'ar' ? 'في انتظار كلامك...' : 'Waiting for speech...')}</span>
         </div>
 
         {error && (
@@ -208,7 +318,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
         <div className="flex gap-2 pt-2">
           {isListening && (
             <button onClick={stopListening} className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs">
-              {language === 'ar' ? 'إيقاف الاستماع' : 'Stop listening'}
+              {language === 'ar' ? 'إيقاف التسجيل' : 'Stop recording'}
             </button>
           )}
           <button
