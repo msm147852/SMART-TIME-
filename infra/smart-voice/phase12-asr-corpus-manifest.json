@@ -27,7 +27,8 @@
       "audio": "WAV PCM, 16 kHz, 16-bit, mono",
       "transcript": "UTF-8 TXT",
       "license": "CC BY-NC-ND 4.0",
-      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED"
+      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
+      "source_url": "https://magichub.com/datasets/egyptian-arabic-conversational-speech-corpus/"
     },
     {
       "id": "arzen",
@@ -38,7 +39,8 @@
       "hours": 12,
       "utterances": 6216,
       "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
-      "license_status": "VERIFY_BEFORE_ACQUISITION"
+      "license_status": "VERIFY_BEFORE_ACQUISITION",
+      "source_url": "https://sites.google.com/view/arzen-corpus/resources"
     },
     {
       "id": "a-speechdb",
@@ -50,7 +52,8 @@
       "speakers": 205,
       "audio": "16 kHz, 16-bit PCM",
       "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
-      "license_status": "ELRA_LICENSE_REQUIRED"
+      "license_status": "ELRA_LICENSE_REQUIRED",
+      "source_url": "https://www.catalogue.elra.info/en-us/repository/browse/ELRA-S0315/"
     },
     {
       "id": "egyptian-speecon",
@@ -62,7 +65,8 @@
       "child_speakers": 50,
       "audio": "16 kHz, 16-bit",
       "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
-      "license_status": "ELRA_LICENSE_REQUIRED"
+      "license_status": "ELRA_LICENSE_REQUIRED",
+      "source_url": "https://catalogue.elra.info/en-us/repository/browse/ELRA-S0308/"
     }
   ],
   "closure_requirements": {
