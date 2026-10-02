@@ -34,7 +34,7 @@ const checks = [
   ["provider_no_remote_audio_url_input", !/referenceAudioUrl|audioUrl/.test(provider)],
   ["provider_timeout", /AbortController/.test(provider)],
   ["synthesis_no_store_response", /Cache-Control.*no-store/.test(server)],
-  ["client_revoke_endpoint", /profiles\\/.*\\/revoke/.test(client) || /profiles\//.test(client) && /revoke/.test(client)],
+  ["client_revoke_endpoint", /profiles\/.*\/revoke/.test(client) || /profiles\//.test(client) && /revoke/.test(client)],
 ];
 
 const failures = checks.filter(([, ok]) => !ok).map(([name]) => name);
