@@ -152,9 +152,11 @@ app.post("/api/ai/stt", async (req, res) => {
   try {
     const rawAudio = String(req.body?.audioBase64 || "").trim();
     const language = String(req.body?.language || "ar").trim().toLowerCase();
+    const locale = String(req.body?.locale || (language === "ar" ? "ar-EG" : "en-US")).trim();
     const mimeType = String(req.body?.mimeType || "audio/webm").split(";")[0].trim().toLowerCase();
     if (!rawAudio) return res.status(400).json({ error: "audioBase64 is required." });
     if (!["ar", "en"].includes(language)) return res.status(400).json({ error: "language must be ar or en." });
+    if (!["ar-EG", "en-US"].includes(locale)) return res.status(400).json({ error: "Unsupported STT locale." });
     const allowedMimeTypes = new Set(["audio/webm", "audio/mp4", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac"]);
     if (!allowedMimeTypes.has(mimeType)) return res.status(415).json({ error: "Unsupported audio format." });
 
@@ -185,6 +187,7 @@ app.post("/api/ai/stt", async (req, res) => {
       model: transcription.model,
       transcript: transcription.text,
       requestId: transcription.requestId,
+      locale,
       persisted: false,
     });
   } catch (error) {
