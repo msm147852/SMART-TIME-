@@ -1,0 +1,31 @@
+{
+  "phase": 12,
+  "name": "Real STT + ASR Corpus",
+  "branch": "feat/v3-next",
+  "status": "IN_PROGRESS",
+  "technical_gate": "NOT_YET_VERIFIED",
+  "training_run_started": false,
+  "training_authorized_by_phase": false,
+  "next_phase_authorized": false,
+  "next_phase_number": 13,
+  "evidence": {
+    "contract": "docs/PHASE_12_REAL_STT_ASR_CORPUS.md",
+    "corpus_manifest": "infra/smart-voice/phase12-asr-corpus-manifest.json",
+    "verifier": "scripts/verify-phase12-stt-corpus.mjs",
+    "ci_workflow": ".github/workflows/phase12-stt-corpus-verify.yml",
+    "real_microphone_test": null,
+    "behavioral_evidence": null,
+    "security_evidence": null,
+    "reproducibility_evidence": null
+  },
+  "blockers": [
+    "real_microphone behavioral evidence not yet captured",
+    "corpus acquisition/validation evidence not yet complete",
+    "security/reproducibility closure evidence not yet complete"
+  ],
+  "owner_signoff": {
+    "status": "NOT_REQUESTED",
+    "approved_by_owner": false
+  },
+  "closure_rule": "Phase 13 remains unauthorized until every Phase 12 gate is PASS and owner sign-off is recorded."
+}
