@@ -113,3 +113,21 @@ Phase 12 remains blocked until authoritative Phase 7, Phase 8, and Phase 9 closu
 6. Obtain owner sign-off for each repaired phase.
 7. Only then authorize the next sequential phase.
 
+
+## Technical repair result — 2026-10-02
+
+The historical chain is now technically reconciled for governance:
+
+- **Phase 7:** historical V1 training execution is formally represented as a diagnostic baseline. It is explicitly **not a release** and training loss is not treated as a release gate.
+- **Phase 8:** historical V1 artifact/rollback identity is formally represented as an immutable historical reference. Missing remote checksum/location details are explicitly marked unknown rather than fabricated.
+- **Phase 9:** the recovered Run #3 failure and later Fix1 correction are formally represented. Run #3 = 0/120; later Fix1 = 119/120; unsupported = 14/32. The forensic root-cause class is training-text/completion-mask alignment, with the chat-template generation-marker mismatch and completion-only masking boundary identified as the corrective target.
+- The historical 113/120 claim is **not silently reused** as the active gate because its authoritative raw 120-case artifact was not recovered. Active governance uses the stronger recovered Run #3/Fix1 evidence instead.
+- The failed/limited unsupported behavior remains a downstream training requirement; it is not erased by the 119/120 general gate.
+
+### Owner-signoff boundary
+
+The technical closure records are present on the active branch, but they remain **pending explicit owner sign-off**. No phase authorization is implied by these records.
+
+### No retraining performed during this repair
+
+This reconciliation changed governance/evidence records only. It did not retrain, regenerate, rewrite the dataset, activate an adapter, or authorize Phase 12.
