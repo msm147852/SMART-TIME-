@@ -3,10 +3,14 @@ import fs from 'node:fs';
 const manifestPath = 'infra/smart-voice/phase12-asr-corpus-manifest.json';
 const docPath = 'docs/PHASE_12_REAL_STT_ASR_CORPUS.md';
 const voicePath = 'src/components/VoiceSearchModal.tsx';
+const appPath = 'src/App.tsx';
+const aiPath = 'src/components/AiCenterView.tsx';
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const doc = fs.readFileSync(docPath, 'utf8');
 const voice = fs.readFileSync(voicePath, 'utf8');
+const app = fs.readFileSync(appPath, 'utf8');
+const ai = fs.readFileSync(aiPath, 'utf8');
 
 if (manifest.phase !== 12) throw new Error('Phase 12 manifest mismatch');
 if (manifest.status !== 'IN_PROGRESS') throw new Error('Phase 12 must remain IN_PROGRESS until every gate passes');
@@ -23,6 +27,11 @@ if (!voice.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is mis
 if (voice.includes('setTimeout')) throw new Error('Timer-driven fake voice path is still present');
 if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
 if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
+if (!voice.includes('onTranscript')) throw new Error('Voice modal must expose the final transcript boundary');
+if (!app.includes('onTranscript={(finalTranscript)')) throw new Error('App must consume the final STT transcript');
+if (!app.includes('initialInputText={voiceTranscript}')) throw new Error('Final STT transcript must reach the AI input boundary');
+if (!ai.includes('initialInputText?: string')) throw new Error('AI input boundary prop is missing');
+if (!ai.includes('setInputText(initialInputText.trim())')) throw new Error('AI input does not consume the final transcript');
 
 for (const required of [
   'Real STT capture',
