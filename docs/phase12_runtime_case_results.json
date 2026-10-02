@@ -88,9 +88,23 @@
       "artifact": "1000318854.jpg",
       "artifact_sha256": "f94f05cd8fb920a4b63b809b8065454274a2a0ec0685f3bb59933c2adafe8899",
       "notes": "Runtime screenshot shows a real final Arabic transcript under the AI conversation as a user message. No automatic AI reply/action is shown. An unrelated SMART_AI_LOCAL_URL configuration error is visible."
+    },
+    {
+      "id": "smart-ai-voice-conversation",
+      "status": "NOT_RUN",
+      "observed": {
+        "listening_until_speech_end": false,
+        "final_transcript_forwarded_to_ai": false,
+        "ai_response_spoken": false,
+        "returned_to_listening": false,
+        "automatic_action": false
+      },
+      "notes": "Implementation added on feat/v3-next; real browser evidence is still required before this gate can PASS."
     }
   ],
-  "remaining_cases": [],
+  "remaining_cases": [
+    "smart-ai-voice-conversation"
+  ],
   "phase12_closed": false,
   "next_phase_authorized": false
 }
