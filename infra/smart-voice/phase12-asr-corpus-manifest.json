@@ -100,6 +100,7 @@
     "sha256_manifest_complete": false,
     "security_reproducibility_pass": false,
     "owner_signoff": false,
-    "noisy_ambiguous_test": true
+    "noisy_ambiguous_test": true,
+    "smart_ai_voice_conversation_test": false
   }
 }
