@@ -50,6 +50,11 @@ if (!ai.includes('onSubmit')) throw new Error('AI input form boundary is missing
 if (!smartAiDemo.includes('SmartAiVoiceConversationModal')) throw new Error('SMART AI service demo is missing the voice conversation modal');
 if (!smartAiDemo.includes('setVoiceConversationOpen(true)')) throw new Error('SMART AI service demo voice conversation entry button is missing');
 if (!smartAiDemo.includes('sendMessage(undefined, transcript)')) throw new Error('SMART AI service demo must route final voice turns into its AI send boundary');
+const inferRoute = fs.readFileSync('app/api/ai/infer/route.ts', 'utf8');
+if (!inferRoute.includes('SMART_AI_LOCAL_URL is not configured; app-owned rules response used.')) throw new Error('SMART AI demo fallback response contract is missing');
+if (!inferRoute.includes('answerWithRules(input, "ar", appData)')) throw new Error('SMART AI demo must use the verified app-owned rules fallback when local model is absent');
+if (!voiceConversation.includes("if (activeRef.current) startListening();")) throw new Error('voice conversation restart contract is missing');
+if (!voiceConversation.includes("SMART AI did not return a response.")) throw new Error('voice conversation must surface AI backend failure instead of silently restarting');
 if (smartAiDemo.includes('webkitSpeechRecognition') || smartAiDemo.includes('continuous = false')) throw new Error('SMART AI service demo still contains the legacy one-shot STT path');
 if (!ai.includes('SmartAiVoiceConversationModal')) throw new Error('SMART AI voice conversation modal is not wired into the AI view');
 if (!ai.includes('setIsVoiceConversationOpen(true)')) throw new Error('SMART AI voice conversation entry button is missing');
