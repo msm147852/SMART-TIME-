@@ -19,11 +19,11 @@
       "completed_cases": [
         "ar-eg",
         "code-switch",
-        "numbers-dates"
+        "numbers-dates",
+        "permission-denial",
+        "provider-network-failure"
       ],
       "remaining_cases": [
-        "permission-denial",
-        "provider-network-failure",
         "noisy-ambiguous"
       ]
     },
@@ -49,7 +49,6 @@
   },
   "blockers": [
     "audio artifact integrity verified; transcript/audio pairing remains unverified",
-    "provider/network failure runtime test not yet captured",
     "noisy/ambiguous runtime test not yet captured",
     "final security/reproducibility closure evidence not yet complete",
     "owner sign-off not yet recorded"
@@ -65,10 +64,10 @@
       "ar-eg",
       "code-switch",
       "numbers-dates",
-      "permission-denial"
+      "permission-denial",
+      "provider-network-failure"
     ],
     "remaining": [
-      "provider-network-failure",
       "noisy-ambiguous"
     ]
   },
