@@ -22,12 +22,21 @@ for (const term of requiredSpecTerms) {
 }
 
 if (manifest.phase !== 11) throw new Error('Manifest phase must be 11');
+if (manifest.status !== 'FORMALLY_CLOSED') throw new Error('Phase 11 manifest must be formally closed');
+if (manifest.sample_package.status !== 'APPROVED_OWNER_SIGNOFF') throw new Error('Approved sample package sign-off is required for closure');
+if (!Array.isArray(manifest.sample_package.samples) || manifest.sample_package.samples.length !== 4) throw new Error('Exactly four approved Phase 11 samples are required');
 if (manifest.profile_contract.locale !== 'ar-EG') throw new Error('Locale must be ar-EG');
 if (manifest.profile_contract.dialect !== 'Egyptian/Shubra') throw new Error('Dialect must be Egyptian/Shubra');
 if (manifest.profile_contract.owner_consent_required !== true) throw new Error('Owner consent must be required');
 if (manifest.profile_contract.guardian_consent_required_for_child !== true) throw new Error('Guardian consent must be required for child profiles');
 if (manifest.training_authorized_by_phase !== false) throw new Error('Phase 11 must not authorize training');
 if (manifest.raw_audio_commit_policy !== 'FORBIDDEN') throw new Error('Raw audio Git policy must be FORBIDDEN');
+for (const sample of manifest.sample_package.samples) {
+  if (!sample.sha256 || !sample.duration_ms || !sample.mime_type || sample.speaker_count !== 1) {
+    throw new Error(`Incomplete Phase 11 sample metadata: ${sample.sample_id}`);
+  }
+  if (sample.approval_status !== 'APPROVED_OWNER_SIGNOFF') throw new Error(`Unapproved Phase 11 sample: ${sample.sample_id}`);
+}
 
 const requiredTypes = new Set(manifest.sample_package.required_sample_types);
 for (const type of [
@@ -58,4 +67,5 @@ for (const item of [
 }
 
 console.log('PHASE 11 VOICE FOUNDATION SPEC: PASS');
-console.log('APPROVED SAMPLE PACKAGE: NOT PRESENT — FORMAL CLOSURE BLOCKED');
+console.log('APPROVED SAMPLE PACKAGE: PASS');
+console.log('PHASE 11 CLOSURE CONTRACT: PASS');
