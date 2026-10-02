@@ -147,18 +147,18 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
 
       try {
         await onTurnRef.current(text);
-      } catch {
-        if (activeRef.current) {
-          setStatus('error');
-          setError(language === 'ar'
-            ? 'تعذر الحصول على رد SMART AI.'
-            : 'SMART AI could not return a response.');
-        }
-      } finally {
         finalTranscriptRef.current = '';
         setTranscript('');
         processingRef.current = false;
         if (activeRef.current) startListening();
+      } catch {
+        processingRef.current = false;
+        if (activeRef.current) {
+          setStatus('error');
+          setError(language === 'ar'
+            ? 'تعذر الحصول على رد SMART AI. أصلحت مسار المحادثة، لكن الخدمة نفسها غير متاحة حاليًا.'
+            : 'SMART AI did not return a response. The voice flow is working, but the AI service is currently unavailable.');
+        }
       }
     };
 
