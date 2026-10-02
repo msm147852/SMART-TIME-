@@ -14,7 +14,13 @@
     "primary_locale": "ar-EG",
     "final_transcript_only_for_downstream": true,
     "fake_transcript_forbidden": true,
-    "timer_driven_transcript_forbidden": true
+    "timer_driven_transcript_forbidden": true,
+    "privacy_disclosure_required": true,
+    "browser_provider_may_process_audio_remotely": true,
+    "raw_microphone_audio_logged": false,
+    "raw_microphone_audio_persisted_by_app": false,
+    "provider_identity_recorded_per_runtime_test": true,
+    "on_device_mode_not_claimed_by_default": true
   },
   "sources": [
     {
