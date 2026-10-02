@@ -16,6 +16,7 @@ Phase 12 establishes a real speech-to-text boundary and a provenance-controlled 
 - Phase 11 explicitly left real microphone STT out of scope.
 - No Phase 12 closure record existed before this implementation.
 - The approved Phase 11 voice samples remain private voice-profile assets and are not automatically training data.
+- Final STT text is now routed into the SMART AI input field; no AI action is executed automatically from speech.
 
 ## Phase 12 gate
 
@@ -34,7 +35,8 @@ All items below must PASS before closure:
 
 3. Transcript integrity
    - interim and final transcript states are distinct;
-   - final transcript is the only value passed to downstream intent processing;
+   - final transcript is the only value passed to the SMART AI input boundary;
+   - no AI action is executed automatically from speech;
    - empty/error/cancel states are represented explicitly;
    - no fabricated transcript is generated on provider failure.
 
@@ -91,3 +93,8 @@ The first implementation may use an external/restricted corpus as a provenance r
 ## Closure invariant
 
 Phase 13 cannot be authorized until this document, the corpus manifest, real-STT verifier, behavioral evidence, security/reproducibility evidence, CI, and owner sign-off are all PASS.
+
+
+## Runtime evidence policy
+
+The repository verifier proves the implementation contract and transcript boundary. It does not manufacture microphone evidence. Closure requires a real browser session with microphone permission and documented results for the required utterance/error cases. If the current execution environment cannot provide microphone access, Phase 12 remains open.
