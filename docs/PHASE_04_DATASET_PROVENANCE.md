@@ -1,5 +1,9 @@
 # Phase 4 — Historical Dataset Provenance
 
+Status: FORMALLY_CLOSED
+Closure gate: PASS
+Owner sign-off: APPROVED
+
 Date: 2026-10-01
 Branch: `phase/04-dataset-provenance`
 
