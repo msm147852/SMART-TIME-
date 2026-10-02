@@ -212,17 +212,21 @@ Closure gate:
 - real voice E2E evidence
 - owner sign-off
 
-## 3. Status at plan creation
+## 3. Current status
 
-- A0: READY TO CLOSE after architecture/doc alignment and CI.
-- A1: PARTIAL PREPARATION — Groq provider adapter exists, Railway staging secret exists, deployment `7b2918bc-f60f-42b5-8888-8c558b8279bb` is SUCCESS; full provider gateway/runtime proof is not yet closed.
-- A2: NOT STARTED — existing browser Web Speech implementation is evidence/work to be superseded as production STT.
+- A0: CLOSURE CANDIDATE — architecture contracts and asset disposition are frozen; final closure is waiting for the phase-closing CI run on the asset-disposition commit.
+- A1: PASS — server-side AIProvider contract, Groq adapter, structured output/tool transport, error taxonomy, Railway staging secret, runtime healthcheck, fail-closed health route, and automated provider tests are implemented and verified. Closure record: `docs/phase_a1_closure_record.json`.
+- A2: IN PROGRESS — authenticated Groq Whisper STT endpoint, client MediaRecorder capture, shared STT transport, payload/rate limits, non-persistence contract, and static CI contract are implemented. Real microphone/runtime evidence is still required before closure.
 - A3: NOT CLOSED — retrieval architecture needs a verified production loop.
-- A4: PARTIAL — V2 structured validation exists but is coupled to the local inference route.
-- A5: PARTIAL — typed tools and verified mutations exist; Groq integration is missing.
+- A4: PARTIAL — V2 structured validation exists but remains coupled to the local inference route; it must be connected to the Groq gateway.
+- A5: PARTIAL — typed tools and verified mutations exist; Groq tool-call integration is missing.
 - A6: PARTIAL — context/memory exists but must be provider-independent and connected to RAG.
 - A7: NOT CLOSED — TTS/voice components exist but complete real E2E is not proven.
 - A8: NOT STARTED.
+
+### Evidence note
+
+A2 static CI is currently green on the latest branch commit, but this is not runtime closure. The required real-browser microphone cases remain an explicit gate.
 
 ## 4. Asset policy
 
