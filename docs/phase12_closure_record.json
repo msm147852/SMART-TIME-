@@ -40,8 +40,8 @@
     "security_evidence": null,
     "reproducibility_evidence": null,
     "static_verification": {
-      "workflow_run_id": 36998750292,
-      "commit": "015c7ad8a10fcc1ea610d8d8617d2baf1f78ce4a",
+      "workflow_run_id": 37009267231,
+      "commit": "6dcf65330e016bc6d1d01cff5f56c4190b231b98",
       "conclusion": "success"
     },
     "runtime_evidence_schema": "docs/PHASE_12_RUNTIME_EVIDENCE_SCHEMA.json",
@@ -51,13 +51,21 @@
       "artifact": "docs/phase12_user_audio_evidence.json",
       "verifier": "scripts/verify-phase12-user-audio.py",
       "raw_audio_in_git": false
+    },
+    "voice_conversation_implementation": {
+      "status": "IMPLEMENTED",
+      "commit": "6dcf65330e016bc6d1d01cff5f56c4190b231b98",
+      "service_route": "/services/smart-ai",
+      "component": "src/components/SmartAiVoiceConversationModal.tsx",
+      "entry_component": "components/smart-ai/SmartAIDemo.tsx",
+      "runtime_test_status": "OPEN"
     }
   },
   "blockers": [
     "audio artifact integrity verified; transcript/audio pairing remains unverified",
-    "SMART AI voice conversation runtime test not yet captured",
+    "SMART AI voice conversation runtime test not yet captured on the deployed /services/smart-ai route",
+    "SMART_AI_LOCAL_URL is not configured in the Phase 12 preview environment, so end-to-end SMART AI reply/audio runtime evidence cannot be marked PASS yet",
     "final security/reproducibility closure evidence not yet complete",
-    "CI/preview gate must be green for the final phase closure",
     "owner sign-off not yet recorded"
   ],
   "owner_signoff": {
