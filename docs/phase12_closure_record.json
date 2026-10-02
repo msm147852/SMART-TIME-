@@ -14,21 +14,20 @@
     "verifier": "scripts/verify-phase12-stt-corpus.mjs",
     "ci_workflow": ".github/workflows/phase12-stt-corpus-verify.yml",
     "real_microphone_test": {
-      "status": "PARTIAL",
+      "status": "PASS",
       "artifact": "docs/phase12_runtime_case_results.json",
       "completed_cases": [
         "ar-eg",
         "code-switch",
         "numbers-dates",
         "permission-denial",
-        "provider-network-failure"
-      ],
-      "remaining_cases": [
+        "provider-network-failure",
         "noisy-ambiguous"
-      ]
+      ],
+      "remaining_cases": []
     },
     "behavioral_evidence": {
-      "status": "PARTIAL",
+      "status": "PASS",
       "artifact": "docs/phase12_runtime_case_results.json"
     },
     "security_evidence": null,
@@ -59,17 +58,16 @@
   },
   "closure_rule": "Phase 13 remains unauthorized until every Phase 12 gate is PASS and owner sign-off is recorded.",
   "real_microphone_test": {
-    "status": "PARTIAL",
+    "status": "PASS",
     "completed_cases": [
       "ar-eg",
       "code-switch",
       "numbers-dates",
       "permission-denial",
-      "provider-network-failure"
-    ],
-    "remaining": [
+      "provider-network-failure",
       "noisy-ambiguous"
-    ]
+    ],
+    "remaining": []
   },
-  "behavioral_evidence": "PARTIAL"
+  "behavioral_evidence": "PASS"
 }
