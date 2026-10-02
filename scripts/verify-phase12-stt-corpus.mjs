@@ -24,6 +24,10 @@ if (manifest.corpus_policy.user_recordings_added_to_corpus_by_default !== false)
 if (manifest.stt_contract.primary_locale !== 'ar-EG') throw new Error('Primary STT locale must be ar-EG');
 if (manifest.stt_contract.fake_transcript_forbidden !== true) throw new Error('Fake transcript path must be forbidden');
 if (manifest.stt_contract.timer_driven_transcript_forbidden !== true) throw new Error('Timer transcript path must be forbidden');
+if (manifest.stt_contract.privacy_disclosure_required !== true) throw new Error('STT privacy disclosure must be required');
+if (manifest.stt_contract.raw_microphone_audio_logged !== false) throw new Error('Raw microphone logging must remain disabled');
+if (manifest.stt_contract.raw_microphone_audio_persisted_by_app !== false) throw new Error('Raw microphone persistence must remain disabled');
+if (!voice.includes('قد تتم معالجة الصوت عبر خدمة التعرف')) throw new Error('Arabic STT privacy disclosure is missing');
 if (!voice.includes('SpeechRecognition')) throw new Error('Real SpeechRecognition implementation is missing');
 if (!voice.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is missing');
 if (voice.includes('setTimeout')) throw new Error('Timer-driven fake voice path is still present');
