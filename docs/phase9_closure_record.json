@@ -1,7 +1,7 @@
 {
   "phase": 9,
   "title": "V1 Gate Failure Diagnosis",
-  "status": "FORMALLY_CLOSED_DIAGNOSTICALLY",
+  "status": "READY_FOR_OWNER_SIGNOFF_DIAGNOSTICALLY",
   "technical_gate": "PASS_DIAGNOSIS",
   "release_gate": "NOT_RELEASED",
   "evidence": {
