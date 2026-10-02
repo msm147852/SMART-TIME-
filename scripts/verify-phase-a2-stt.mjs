@@ -11,7 +11,9 @@ assert.match(server, /app\.post\("\/api\/ai\/stt"/);
 assert.match(server, /authUser\(req\)/);
 assert.match(server, /audioBase64/);
 assert.match(server, /STT_MAX_AUDIO_BYTES/);
-assert.match(server, /maxBase64Chars/);\nassert.match(server, /rawAudio\.replace\(\/\^data:\[\^,\]\*;base64,\/i/);\n
+assert.match(server, /maxBase64Chars/);
+assert.match(server, /rawAudio\.replace\(\/\^data:\[\^,\]\*;base64,\/i/);
+
 assert.match(server, /persisted: false/);
 assert.match(server, /consumeSttQuota/);
 assert.match(server, /groqProvider\.transcribeAudio/);
