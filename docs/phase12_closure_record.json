@@ -3,7 +3,7 @@
   "name": "Real STT + ASR Corpus",
   "branch": "feat/v3-next",
   "status": "IN_PROGRESS",
-  "technical_gate": "NOT_YET_VERIFIED",
+  "technical_gate": "STATIC_IMPLEMENTATION_PASS_RUNTIME_CORPUS_GATES_OPEN",
   "training_run_started": false,
   "training_authorized_by_phase": false,
   "next_phase_authorized": false,
@@ -16,12 +16,26 @@
     "real_microphone_test": null,
     "behavioral_evidence": null,
     "security_evidence": null,
-    "reproducibility_evidence": null
+    "reproducibility_evidence": null,
+    "static_verification": {
+      "workflow_run_id": 36998750292,
+      "commit": "015c7ad8a10fcc1ea610d8d8617d2baf1f78ce4a",
+      "conclusion": "success"
+    },
+    "runtime_evidence_schema": "docs/PHASE_12_RUNTIME_EVIDENCE_SCHEMA.json",
+    "egyspeak_acquisition_validator": "scripts/acquire_validate_egyspeak_phase12.py"
   },
   "blockers": [
-    "real_microphone behavioral evidence not yet captured",
-    "corpus acquisition/validation evidence not yet complete",
-    "security/reproducibility closure evidence not yet complete"
+    "authorized real corpus acquisition and checksum manifest not yet executed",
+    "audio/transcript pairing validation on acquired corpus not yet executed",
+    "real microphone behavioral evidence not yet captured",
+    "Egyptian Arabic runtime test not yet captured",
+    "code-switch runtime test not yet captured",
+    "numbers/date runtime test not yet captured",
+    "permission-denial runtime test not yet captured",
+    "provider/network failure runtime test not yet captured",
+    "final security/reproducibility closure evidence not yet complete",
+    "owner sign-off not yet recorded"
   ],
   "owner_signoff": {
     "status": "NOT_REQUESTED",
