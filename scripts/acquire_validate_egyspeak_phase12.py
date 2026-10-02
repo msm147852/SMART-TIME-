@@ -33,9 +33,15 @@ snapshot_download(
     local_dir=str(DATASET_DIR),
 )
 
+extract_root = (DATASET_DIR / "train").resolve()
 for shard in sorted((DATASET_DIR / "train").glob("audio_shard_*.tar")):
     with tarfile.open(shard, "r:*") as tf:
-        tf.extractall(DATASET_DIR / "train")
+        members = tf.getmembers()
+        for member in members:
+            target = (extract_root / member.name).resolve()
+            if target != extract_root and extract_root not in target.parents:
+                raise RuntimeError(f"Unsafe archive member: {member.name}")
+        tf.extractall(extract_root, members=members)
 
 metadata = DATASET_DIR / "metadata.csv"
 if not metadata.exists():
