@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, X, Navigation, AlertCircle, Loader2 } from 'lucide-react';
-import { Language, AppView } from '../types';
+import { Language } from '../types';
 import { translations } from '../services/i18n';
 
 interface VoiceSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   language: Language;
-  onNavigate: (view: AppView) => void;
   onTranscript?: (transcript: string) => void;
 }
 
@@ -46,7 +45,6 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
   isOpen,
   onClose,
   language,
-  onNavigate,
   onTranscript,
 }) => {
   const [isListening, setIsListening] = useState(false);
@@ -193,8 +191,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
           )}
           <button
             onClick={() => {
-              if (transcript.trim()) onNavigate('trips');
-              onClose();
+              if (transcript.trim()) onClose();
             }}
             disabled={!transcript.trim()}
             className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-accent-500 to-yellow-600 hover:from-accent-600 hover:to-yellow-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md shadow-accent-500/25 transition-all flex items-center justify-center gap-2"
