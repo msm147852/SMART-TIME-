@@ -13,12 +13,14 @@ import { StorageAdapter } from '../services/storageAdapter';
 interface AiCenterViewProps {
   language: Language;
   onOpenVoiceSearch: () => void;
+  initialInputText?: string;
   appContext: Parameters<typeof buildSmartAiContext>[0];
 }
 
 export const AiCenterView: React.FC<AiCenterViewProps> = ({
   language,
   onOpenVoiceSearch,
+  initialInputText,
   appContext,
 }) => {
   const selectedModel: AiModelType = 'smart-time-core';
@@ -60,6 +62,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       void refreshVoiceDnaProviderStatus();
     }
   }, [isVoiceDnaOpen]);
+
+  useEffect(() => {
+    if (initialInputText?.trim()) setInputText(initialInputText.trim());
+  }, [initialInputText]);
 
   useEffect(() => {
     const saved = ChatRepository.getAiChatHistory();
