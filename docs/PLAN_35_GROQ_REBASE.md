@@ -1,6 +1,8 @@
 # SMART TIME — Plan 35 Replacement: Groq-First AI Architecture
 
-Status: PROPOSED BASELINE FOR IMPLEMENTATION
+Status: SUPERSEDED — HISTORICAL REFERENCE
+
+The active execution plan is `docs/AI_EXECUTION_PLAN_GROQ.md`. The old 35.x sequence is retained only for traceability and asset disposition; its phase numbering is no longer authoritative.
 Branch: `feat/v3-next`
 Decision: Replace the old Plan 35 execution architecture with a Groq-first production path while preserving all historical training/model/dataset assets.
 
