@@ -19,4 +19,5 @@ jobs:
       - run: npm run lint
       - run: npm run test:open-mind
       - run: npm run test:groq-provider
+      - run: npm run verify:phase-a2-stt
       - run: npm run build
