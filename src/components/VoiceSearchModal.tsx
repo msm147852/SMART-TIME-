@@ -52,6 +52,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [speechErrorCode, setSpeechErrorCode] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef('');
   const onTranscriptRef = useRef(onTranscript);
@@ -67,6 +68,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
     setTranscript('');
     setInterimTranscript('');
     setError(null);
+    setSpeechErrorCode(null);
 
     const Recognition = getSpeechRecognition();
     if (!Recognition) {
@@ -86,6 +88,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
       setIsStarting(false);
       setIsListening(true);
       setError(null);
+      setSpeechErrorCode(null);
     };
 
     recognition.onresult = (event) => {
@@ -115,6 +118,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
       setIsStarting(false);
       setIsListening(false);
       const code = event.error || 'unknown';
+      setSpeechErrorCode(code);
       const messages: Record<string, string> = {
         'not-allowed': language === 'ar' ? 'تم رفض إذن الميكروفون.' : 'Microphone permission was denied.',
         'service-not-allowed': language === 'ar' ? 'خدمة التعرف الصوتي غير مسموح بها.' : 'Speech recognition service is not allowed.',
@@ -192,7 +196,12 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
         {error && (
           <div className="p-3 rounded-xl border border-red-300 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 text-xs font-bold flex items-center justify-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+            <div>
+              <span>{error}</span>
+              <div className="mt-1 text-[10px] font-mono opacity-80" data-testid="speech-recognition-error-code">
+                {language === 'ar' ? `رمز خطأ التعرف: ${speechErrorCode || 'unknown'}` : `Speech recognition error: ${speechErrorCode || 'unknown'}`}
+              </div>
+            </div>
           </div>
         )}
 
