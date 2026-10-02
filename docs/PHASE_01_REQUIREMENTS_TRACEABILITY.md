@@ -1,6 +1,8 @@
 # SMART-TIME Phase 1 — Requirements, Traceability & Test Matrix
 
-Status: CLOSURE CANDIDATE — pending owner sign-off
+Status: FORMALLY_CLOSED
+Closure gate: PASS
+Owner sign-off: APPROVED
 Branch: `phase/01-requirements-traceability`
 Baseline: `feat/v3-next@731d7b25ecda61aae2f012545ceb51025a6cba85`
 Date: 2026-10-01
