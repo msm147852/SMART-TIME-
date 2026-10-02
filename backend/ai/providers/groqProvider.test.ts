@@ -39,6 +39,22 @@ const structuredResult = await structured.generateStructured({
 });
 assert.equal(structuredResult.content, '{"tool":"clarification"}');
 
+const stt = new GroqProvider({
+  apiKey: "test-secret",
+  fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
+    assert.equal(init?.method, "POST");
+    assert.equal(init?.body instanceof FormData, true);
+    return response(200, { text: "أنا بتكلم مصري", x_groq: { id: "req_stt" } });
+  }) as typeof fetch,
+});
+const sttResult = await stt.transcribeAudio({
+  audio: new Uint8Array([1, 2, 3]),
+  mimeType: "audio/webm",
+  language: "ar",
+});
+assert.equal(sttResult.text, "أنا بتكلم مصري");
+assert.equal(sttResult.model, "whisper-large-v3-turbo");
+
 const unauthorized = new GroqProvider({ apiKey: "test-secret", fetchImpl: fakeFetch(401, { error: { message: "invalid api key" } }) as typeof fetch });
 await assert.rejects(() => unauthorized.chat({ messages: [{ role: "user", content: "x" }] }), (error: unknown) => error instanceof GroqProviderError && error.code === "unauthorized");
 
