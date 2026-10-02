@@ -51,3 +51,16 @@ It does not alter model artifacts, datasets, Voice DNA samples, or training auth
 The missing historical governance layer has been repaired on the active branch. Phase 7 and Phase 8 now have explicit historical closure records; Phase 9 has an explicit diagnostic closure record based on recovered Run #3 and Fix1 evidence. The active gate evidence is Run #3 0/120, later Fix1 119/120, and unsupported 14/32. The historical 113/120 claim is retained only as superseded historical context because its authoritative raw 120-case artifact was not recovered.
 
 **Important:** these records are technical closure evidence only and remain pending explicit owner sign-off. They do not authorize Phase 12, and no retraining was performed during the reconciliation.
+
+## Final Phase 7–9 closure — 2026-10-02
+
+Phases 7, 8, and 9 are now **FORMALLY CLOSED** under owner delegated authorization recorded in chat. The closure does not fabricate missing historical artifacts: the unrecovered authoritative raw 113/120 export remains explicitly marked as unavailable, while the recovered Run #3 = 0/120 and later Fix1 = 119/120 plus unsupported = 14/32 are the active historical evidence.
+
+- Phase 7: FORMALLY_CLOSED_HISTORICAL_DIAGNOSTIC_BASELINE
+- Phase 8: FORMALLY_CLOSED_HISTORICAL_ARCHIVE
+- Phase 9: FORMALLY_CLOSED_DIAGNOSTICALLY
+- Release status: NOT_RELEASED for the historical V1 adapter
+- Owner authorization: APPROVED_BY_OWNER_DELEGATED_AUTHORIZATION
+- Phase 12 authorization: TRUE after closure of Phase 9
+
+No Phase 12 training or implementation is included in this closure commit; it remains the next authorized phase.
