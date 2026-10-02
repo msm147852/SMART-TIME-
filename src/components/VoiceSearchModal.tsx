@@ -3,7 +3,7 @@ import { Mic, MicOff, X, Navigation, AlertCircle, Loader2 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../services/i18n';
 import { apiUrl } from '../services/apiConfig';
-import { authHeaders } from '../services/authService';
+import { transcribeVoiceBlob } from '../services/groqSttService';
 
 interface VoiceSearchModalProps {
   isOpen: boolean;
@@ -89,51 +89,22 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
     setSpeechErrorCode(null);
 
     try {
-      const audioBase64 = await blobToBase64(blob);
-      const response = await fetch(apiUrl('/api/ai/stt'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders(),
-        },
-        body: JSON.stringify({
-          audioBase64,
-          mimeType: blob.type || 'audio/webm',
-          language: language === 'ar' ? 'ar' : 'en',
-        }),
-      });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const code = response.status === 401
-          ? 'authentication-required'
-          : response.status === 413
-            ? 'audio-too-large'
-            : response.status === 429
-              ? 'rate-limit'
-              : 'provider-network';
-        showError(
-          code,
-          String(payload?.error || (language === 'ar'
-            ? 'تعذر تحويل التسجيل إلى نص.'
-            : 'Speech transcription failed.')),
-        );
-        return;
-      }
-
-      const next = String(payload?.transcript || '').trim();
+      const result = await transcribeVoiceBlob(blob, language === 'ar' ? 'ar' : 'en');
+      const next = result.transcript.trim();
       if (!next) {
         showError('empty-transcript', language === 'ar' ? 'لم يتم اكتشاف كلام واضح.' : 'No clear speech was detected.');
         return;
       }
-
       setTranscript(next);
       onTranscriptRef.current?.(next);
       setIsProcessing(false);
-    } catch {
+    } catch (cause) {
+      const code = cause instanceof Error ? String((cause as Error & { code?: string }).code || 'provider-network') : 'provider-network';
       showError(
-        'provider-network',
-        language === 'ar' ? 'تعذر الوصول إلى خدمة تحويل الكلام إلى نص.' : 'Speech transcription service is unavailable.',
+        code,
+        cause instanceof Error
+          ? cause.message
+          : (language === 'ar' ? 'تعذر الوصول إلى خدمة تحويل الكلام إلى نص.' : 'Speech transcription service is unavailable.'),
       );
     }
   };
