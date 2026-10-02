@@ -961,6 +961,50 @@ app.get("/api/voice-dna/status", async (req, res) => {
   }
 });
 
+app.post("/api/ai/egyptian-tts", async (req, res) => {
+  try {
+    if (!smartVoiceDnaProvider.isAvailable()) {
+      return res.status(503).json({ error: "محرك الصوت المصري غير موصل حاليًا." });
+    }
+
+    const ipKey = "public-tts:" + clientIp(req);
+    if (!consumeVoiceDnaQuota(ipKey)) {
+      return res.status(429).json({ error: "طلبات الصوت كثيرة حاليًا. حاول بعد قليل." });
+    }
+
+    const text = String(req.body?.text || "").trim();
+    const speaker = String(req.body?.speaker || "Mohamed").trim();
+    if (!text) return res.status(400).json({ error: "النص الصوتي مطلوب." });
+    if (text.length > 800) return res.status(413).json({ error: "النص الصوتي طويل جدًا." });
+
+    const allowedSpeakers = new Set([
+      "Abdelrahman", "Abdullah", "Kamal", "Hossam", "Mohamed",
+      "Omar", "Sayed", "Zaki", "Aly", "Essam", "Ahmed",
+      "Asmaa", "Esraa", "Hanan", "Sarah", "Yasmin", "Omnia",
+    ]);
+    if (!allowedSpeakers.has(speaker)) {
+      return res.status(400).json({ error: "الصوت المصري المطلوب غير متاح." });
+    }
+
+    const result = await smartVoiceDnaProvider.synthesize({
+      text,
+      language: "ar",
+      locale: "ar-EG",
+      profileId: "smart-ai-egyptian-default",
+      speaker,
+      speakingStyle: "natural",
+    });
+
+    res.setHeader("Content-Type", result.contentType || "audio/wav");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-SMART-VOICE-PROVIDER", result.provider);
+    return res.send(Buffer.from(result.audio));
+  } catch (error: any) {
+    console.error("Egyptian TTS error:", error?.message || error);
+    return res.status(502).json({ error: "تعذر توليد الصوت المصري حاليًا." });
+  }
+});
+
 app.post("/api/voice-dna/synthesize", async (req, res) => {
   try {
     const user = authUser(req);
