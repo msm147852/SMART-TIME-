@@ -1,19 +1,47 @@
 # SMART AI V2 GPU inference provider
 
-This service is the runtime bridge between the trained Kaggle LoRA artifact and the Node/Railway app.
+This runtime keeps the trained SMART AI V2 LoRA on a CUDA GPU and exposes an OpenAI-compatible endpoint to the Railway/Node application.
 
-It serves Qwen/Qwen3-4B plus the smart-ai-v2-super LoRA through the OpenAI-compatible /v1/chat/completions API. The adapter is downloaded at container startup from explicit artifact URLs; no placeholder weights are accepted.
+## Verified training artifact
 
-## Required environment
-- SMART_AI_ADAPTER_CONFIG_URL — raw URL for the trained adapter_config.json.
-- SMART_AI_ADAPTER_WEIGHTS_URL — raw URL for the trained adapter_model.safetensors.
-- SMART_AI_BASE_MODEL — defaults to Qwen/Qwen3-4B.
-- SMART_AI_GPU_MEMORY_UTILIZATION — optional, defaults to 0.90.
-- SMART_AI_MAX_MODEL_LEN — optional, defaults to 4096.
+The committed `infra/smart-ai/training/output/adapter_config.json` verifies:
+- base model: `Qwen/Qwen3-4B`
+- PEFT type: `LORA`
+- LoRA rank: `16`
+- model name exposed to the app: `smart-ai-v2-super`
 
-The repository artifact is Git LFS-backed, so the URLs must resolve to the real binary, not the LFS pointer text.
+The actual `adapter_model.safetensors` is Git LFS-backed. The runtime must receive the real binary artifact, never the LFS pointer text.
 
-## Contract
-Use model name smart-ai-v2-super. The server exposes /v1/chat/completions expected by backend/ai/inference/localInference.ts.
+## Two supported GPU runtimes
 
-Qwen3-4B is an 8.06 GB base model on Hugging Face, so this service requires a GPU deployment rather than Railway's CPU runtime.
+### 1. Container GPU provider
+`Dockerfile` + `bootstrap.sh` use vLLM and download the adapter at startup.
+
+Required:
+- `SMART_AI_ADAPTER_CONFIG_URL`
+- `SMART_AI_ADAPTER_WEIGHTS_URL`
+- `SMART_AI_BASE_MODEL=Qwen/Qwen3-4B`
+- `SMART_AI_GPU_MEMORY_UTILIZATION` (optional, default 0.90)
+- `SMART_AI_MAX_MODEL_LEN` (optional, default 4096)
+
+### 2. Kaggle GPU bridge
+`kaggle_gpu_bridge.py` loads the same Qwen3-4B + LoRA adapter directly inside a Kaggle CUDA session using Transformers/PEFT.
+
+Set:
+- `SMART_AI_BASE_MODEL=Qwen/Qwen3-4B`
+- `SMART_AI_ADAPTER_DIR` to the Kaggle dataset/output directory containing the real `adapter_config.json` and `adapter_model.safetensors`
+- `SMART_AI_LOCAL_TOKEN` to a private bearer token
+
+Then expose the Kaggle port through a secure, authenticated tunnel and set the Railway application's `SMART_AI_LOCAL_URL` to that endpoint. The Node app does not load the adapter locally; it forwards inference requests to the GPU runtime.
+
+**Important:** a Kaggle notebook/session is not a permanent production server. When the Kaggle session stops, the application must receive a clear AI-unavailable state. For permanent production uptime, move the same container/bridge to a persistent GPU host.
+
+## API contract
+
+`POST /v1/chat/completions`
+with model `smart-ai-v2-super`.
+
+`GET /health` reports CUDA and the loaded base model.
+
+The application sends the final user prompt to this endpoint. The GPU runtime performs the actual model inference with the trained LoRA adapter; the Railway service remains the CPU/API layer.
+
