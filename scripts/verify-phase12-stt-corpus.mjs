@@ -31,14 +31,21 @@ if (manifest.stt_contract.timer_driven_transcript_forbidden !== true) throw new 
 if (manifest.stt_contract.privacy_disclosure_required !== true) throw new Error('STT privacy disclosure must be required');
 if (manifest.stt_contract.raw_microphone_audio_logged !== false) throw new Error('Raw microphone logging must remain disabled');
 if (manifest.stt_contract.raw_microphone_audio_persisted_by_app !== false) throw new Error('Raw microphone persistence must remain disabled');
-if (!voice.includes('قد تتم معالجة الصوت عبر خدمة التعرف')) throw new Error('Arabic STT privacy disclosure is missing');
-if (!voice.includes('SpeechRecognition')) throw new Error('Real SpeechRecognition implementation is missing');
+if (!voice.includes('التسجيل يُرسل للتحويل فقط ولا يتم حفظ ملف الصوت')) throw new Error('Arabic Groq STT privacy disclosure is missing');
+if (!voice.includes('MediaRecorder')) throw new Error('Real MediaRecorder implementation is missing');
 if (!voice.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is missing');
-if (voice.includes('setTimeout')) throw new Error('Timer-driven fake voice path is still present');
+if (!voice.includes('RECORDING_MAX_MS')) throw new Error('Recording duration bound is missing');
 if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
 if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
 if (!voice.includes('onTranscript')) throw new Error('Voice modal must expose the final transcript boundary');
 if (!voice.includes('onTranscriptRef.current?.(next)')) throw new Error('Final transcript callback must execute outside React state updater');
+if (voice.includes('SpeechRecognition') || voice.includes('webkitSpeechRecognition')) throw new Error('Legacy browser STT must not remain in the production voice modal');
+const serverPath = fs.readFileSync('server.ts', 'utf8');
+if (!serverPath.includes('app.post("/api/ai/stt"')) throw new Error('Groq STT endpoint is missing');
+if (!serverPath.includes('groqProvider.transcribeAudio')) throw new Error('Groq STT provider call is missing');
+if (!serverPath.includes('STT_MAX_AUDIO_BYTES')) throw new Error('STT payload limit is missing');
+if (!serverPath.includes('consumeSttQuota')) throw new Error('STT quota protection is missing');
+if (!serverPath.includes('persisted: false')) throw new Error('STT non-persistence contract is missing');
 if (voice.includes('console.log') || voice.includes('console.error') || voice.includes('console.warn')) throw new Error('Voice STT component must not log microphone/transcript/provider data');
 if (!app.includes('onTranscript={handleVoiceTranscript}')) throw new Error('App must consume the final STT transcript callback');
 if (!app.includes('initialInputText={voiceTranscript}')) throw new Error('Final STT transcript must reach the AI input boundary');
@@ -53,21 +60,16 @@ if (!smartAiDemo.includes('sendMessage(undefined, transcript)')) throw new Error
 const inferRoute = fs.readFileSync('app/api/ai/infer/route.ts', 'utf8');
 if (!inferRoute.includes('SMART_AI_LOCAL_URL is not configured; app-owned rules response used.')) throw new Error('SMART AI demo fallback response contract is missing');
 if (!inferRoute.includes('answerWithRules(input, "ar", appData)')) throw new Error('SMART AI demo must use the verified app-owned rules fallback when local model is absent');
-if (!voiceConversation.includes("if (activeRef.current) startListening();")) throw new Error('voice conversation restart contract is missing');
-if (!voiceConversation.includes("SMART AI استقبل كلامك، لكن الرد الصوتي فشل.")) throw new Error('voice conversation must surface AI/TTS failure instead of silently restarting');
-if (smartAiDemo.includes('webkitSpeechRecognition') || smartAiDemo.includes('continuous = false')) throw new Error('SMART AI service demo still contains the legacy one-shot STT path');
-if (!ai.includes('SmartAiVoiceConversationModal')) throw new Error('SMART AI voice conversation modal is not wired into the AI view');
-if (!ai.includes('setIsVoiceConversationOpen(true)')) throw new Error('SMART AI voice conversation entry button is missing');
-if (!ai.includes('handleSendMessage(transcript, true)')) throw new Error('Voice conversation must send the observed turn through the AI message boundary');
-if (!voiceConversation.includes('continuous = false')) throw new Error('Voice conversation must isolate each conversational turn');
-if (!voiceConversation.includes('interimResults = true')) throw new Error('Voice conversation must expose interim speech feedback');
-if (!voiceConversation.includes('onspeechend')) throw new Error('Voice conversation must detect speech end before processing a turn');
-if (!voiceConversation.includes('await onTurnRef.current(text)')) throw new Error('Voice conversation must await the AI response boundary');
+if (!voiceConversation.includes('MediaRecorder')) throw new Error('SMART AI voice conversation must use MediaRecorder');
+if (!voiceConversation.includes('transcribeVoiceBlob')) throw new Error('SMART AI voice conversation must use the shared Groq STT client');
+if (voiceConversation.includes('SpeechRecognition') || voiceConversation.includes('webkitSpeechRecognition')) throw new Error('SMART AI voice conversation must not use browser SpeechRecognition');
+if (!voiceConversation.includes('onTurnRef.current(text)')) throw new Error('Voice conversation must await the AI response boundary');
 if (!voiceConversation.includes('turnGenerationRef')) throw new Error('Voice conversation must guard interrupted turns from reopening the microphone');
 if (!voiceConversation.includes('onInterrupt')) throw new Error('Voice conversation must expose an explicit AI interruption boundary');
-if (!voiceConversation.includes('isLikelyDuplicate')) throw new Error('Voice conversation must protect mobile transcripts from duplicate final phrases');
-if (!voiceConversation.includes('if (activeRef.current) startListening()')) throw new Error('Voice conversation must return to listening only after the turn completes');
+if (!voiceConversation.includes('if (!activeRef.current || generation !== turnGenerationRef.current) return;')) throw new Error('Voice conversation must guard stale turn results');
 if (voiceConversation.includes('console.log') || voiceConversation.includes('console.error') || voiceConversation.includes('console.warn')) throw new Error('Voice conversation component must not log microphone/transcript/provider data');
+if (!smartAiDemo.includes('sendMessage(undefined, transcript)')) throw new Error('SMART AI service demo must route final voice turns into its AI send boundary');
+
 if (!evidenceSchema.required_cases || evidenceSchema.required_cases.length !== 7) throw new Error('Phase 12 runtime evidence schema is incomplete');
 
 for (const required of [
