@@ -46,10 +46,24 @@
       },
       "artifact": "conversation screenshot 1000318834.jpg",
       "notes": "Rerun after the prior 2023 mismatch. Screenshot shows the microphone privacy indicator and the final transcript with the target year 2026, date 15 October, and times 7:30 and 6:45."
+    },
+    {
+      "id": "permission-denial",
+      "status": "OBSERVED_PASS",
+      "observed": {
+        "permission_prompt_shown": true,
+        "user_selected_denial": true,
+        "final_transcript_visible": false,
+        "app_error_visible": true,
+        "error_text": "حصلت مشكلة في الميكروفون. جرّب تاني.",
+        "microphone_control_inactive_after_denial": true
+      },
+      "artifact": "conversation screenshot 1000318840.jpg",
+      "artifact_sha256": "d54bc97bb1f58d4ea80c75c08d2426ba2f4fbf4156f0640b45bff97b9ea48206",
+      "notes": "Screenshot-backed runtime evidence: Chrome microphone permission prompt was presented, denial was selected, and the subsequent SMART TIME state showed the microphone problem message with no new transcript; microphone control was inactive."
     }
   ],
   "remaining_cases": [
-    "permission-denial",
     "provider-network-failure",
     "noisy-ambiguous"
   ],
