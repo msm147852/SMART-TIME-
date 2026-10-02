@@ -1,7 +1,7 @@
 {
   "phase": 11,
   "name": "Voice Foundation — Shubra Voice Specification",
-  "status": "IN_PROGRESS_BLOCKED_ON_APPROVED_SAMPLE_PACKAGE",
+  "status": "IN_PROGRESS_PENDING_OWNER_SIGNOFF",
   "branch": "feat/v3-next",
   "profile_contract": {
     "locale": "ar-EG",
@@ -11,7 +11,7 @@
     "guardian_consent_required_for_child": true
   },
   "sample_package": {
-    "status": "MISSING_OWNER_APPROVED_SAMPLES",
+    "status": "PRESENT_PENDING_OWNER_SIGNOFF",
     "raw_audio_in_git": false,
     "required_sample_types": [
       "neutral_conversational",
@@ -26,6 +26,60 @@
       "mime_type",
       "speaker_count",
       "approval_status"
+    ],
+    "samples": [
+      {
+        "sample_id": "phase11-neutral-01",
+        "type": "neutral_conversational",
+        "filename": "كلام عادى.wav",
+        "sha256": "c9bc2d1153f382ba124d0d8de76a6489b4dc56f508aca992ba43eaf0187197a3",
+        "duration_ms": 27990,
+        "mime_type": "audio/wav",
+        "codec": "PCM_S16LE",
+        "sample_rate_hz": 48000,
+        "channels": 1,
+        "speaker_count": 1,
+        "approval_status": "PENDING_OWNER_SIGNOFF"
+      },
+      {
+        "sample_id": "phase11-shubra-01",
+        "type": "natural_shubra_conversation",
+        "filename": "مصراوى.wav",
+        "sha256": "3b1f1b156e179e5ac7dafa37938a9a2250fafe20fba280ebdee4878471d75153",
+        "duration_ms": 22530,
+        "mime_type": "audio/wav",
+        "codec": "PCM_S16LE",
+        "sample_rate_hz": 48000,
+        "channels": 1,
+        "speaker_count": 1,
+        "approval_status": "PENDING_OWNER_SIGNOFF"
+      },
+      {
+        "sample_id": "phase11-numbers-01",
+        "type": "numbers_dates_names_code_switching",
+        "filename": "ارقام وتواريخ.wav",
+        "sha256": "6a26ffe9eccbc522dee9789b6ded16ac45f69b36d33d7a3de46e7da3b5d2de73",
+        "duration_ms": 29820,
+        "mime_type": "audio/wav",
+        "codec": "PCM_S16LE",
+        "sample_rate_hz": 48000,
+        "channels": 1,
+        "speaker_count": 1,
+        "approval_status": "PENDING_OWNER_SIGNOFF"
+      },
+      {
+        "sample_id": "phase11-spontaneous-01",
+        "type": "spontaneous_conversation",
+        "filename": "عفوى.wav",
+        "sha256": "2328a730a3f532252031c10f913363f45b2b9630940a5f0eef8df47833d26049",
+        "duration_ms": 58710,
+        "mime_type": "audio/wav",
+        "codec": "PCM_S16LE",
+        "sample_rate_hz": 48000,
+        "channels": 1,
+        "speaker_count": 1,
+        "approval_status": "PENDING_OWNER_SIGNOFF"
+      }
     ]
   },
   "acceptance_suite": {
@@ -48,9 +102,17 @@
       "profile_id_required_for_personalized_synthesis"
     ]
   },
+  "technical_quality_evidence": {
+    "format_verified": true,
+    "pcm_s16le": true,
+    "sample_rate_hz": 48000,
+    "channels": 1,
+    "clipping_detected": false,
+    "quality_status": "PASS_WITH_NATURAL_SILENCE_RETAINED"
+  },
   "training_authorized_by_phase": false,
   "raw_audio_commit_policy": "FORBIDDEN",
-  "closure_blocker": "OWNER_APPROVED_SAMPLE_PACKAGE_REQUIRED",
+  "closure_blocker": "OWNER_SIGNOFF_AND_RAW_AUDIO_SECURITY_EVIDENCE_REQUIRED",
   "downstream_not_claimed_as_done": [
     "real STT",
     "production TTS runtime validation",
