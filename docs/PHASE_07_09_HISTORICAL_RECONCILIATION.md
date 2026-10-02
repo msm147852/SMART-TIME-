@@ -95,13 +95,11 @@ The following cannot currently be independently verified from GitHub history:
 
 **Audit result: NOT VERIFIABLE AS FORMALLY CLOSED.**
 
-## Governance decision
+## Governance decision — SUPERSEDED BY FINAL CLOSURE
 
-Phases 7–9 remain **historically evidenced but not formally closed**.
+The earlier statement that Phases 7–9 remained unclosed was the pre-repair audit state. It is superseded by the final closure records now present on `feat/v3-next` and the delegated owner authorization recorded in chat. The missing historical raw artifacts remain explicitly unknown; they are not fabricated or promoted to evidence.
 
-No existing model artifact is deleted or retrained by this reconciliation. No historical metric is rewritten as PASS.
-
-Phase 12 remains blocked until authoritative Phase 7, Phase 8, and Phase 9 closure evidence is recovered and recorded on the active branch, or the phases are explicitly re-run under the current closure protocol.
+Phase 12 is not authorized by Phase 7–9 closure alone; the canonical sequence requires Phase 10 and Phase 11 closure first. The next authorized phase after Phase 9 is Phase 10.
 
 ## Recovery order
 
@@ -126,7 +124,7 @@ The historical chain is now technically reconciled for governance:
 
 ### Owner-signoff boundary
 
-The technical closure records are present on the active branch, but they remain **pending explicit owner sign-off**. No phase authorization is implied by these records.
+The technical closure records are present on the active branch and owner authorization is recorded through delegated continuation authority. The sequential authorization is explicit: Phase 7 -> 8, Phase 8 -> 9, Phase 9 -> 10. No later phase is authorized by these records.
 
 ### No retraining performed during this repair
 
