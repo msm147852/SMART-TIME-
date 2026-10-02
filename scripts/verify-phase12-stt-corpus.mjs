@@ -43,7 +43,7 @@ if (!ai.includes('setInputText(initialInputText.trim())')) throw new Error('AI i
 if (!app.includes('handleVoiceTranscript')) throw new Error('App voice transcript handler is missing');
 if (!app.includes('setIsVoiceOpen(false)')) throw new Error('Voice modal must close without auto-executing an AI action');
 if (!ai.includes('onSubmit')) throw new Error('AI input form boundary is missing');
-if (!evidenceSchema.required_cases || evidenceSchema.required_cases.length !== 5) throw new Error('Phase 12 runtime evidence schema is incomplete');
+if (!evidenceSchema.required_cases || evidenceSchema.required_cases.length !== 6) throw new Error('Phase 12 runtime evidence schema is incomplete');
 
 for (const required of [
   'Real STT capture',
