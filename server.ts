@@ -108,7 +108,8 @@ const groqHealthHandler = async (_req: express.Request, res: express.Response) =
   }
   try {
     const health = await getGroqHealth();
-    return res.json({
+    const status = health.configured && health.reachable ? 200 : 503;
+    return res.status(status).json({
       provider: "groq",
       configured: health.configured,
       reachable: health.reachable,
