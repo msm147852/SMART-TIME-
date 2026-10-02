@@ -95,6 +95,16 @@ The first implementation may use an external/restricted corpus as a provenance r
 Phase 13 cannot be authorized until this document, the corpus manifest, real-STT verifier, behavioral evidence, security/reproducibility evidence, CI, and owner sign-off are all PASS.
 
 
+## Runtime evidence artifact
+
+`docs/PHASE_12_RUNTIME_EVIDENCE_SCHEMA.json` is the canonical structure for the required runtime and corpus-validation evidence. It intentionally records metadata/results rather than raw microphone audio.
+
+## STT provider capability note
+
+The current implementation uses the browser Web Speech API `SpeechRecognition` / `webkitSpeechRecognition` boundary. Browser support is limited and provider behavior is user-agent dependent; `start()` listens to microphone input when no audio track is supplied, and documented error classes include `not-allowed`, `audio-capture`, `network`, `no-speech`, and service-denial cases. citeturn0search5turn0search6turn0search10
+
+For Egyptian Arabic the runtime request is explicitly `ar-EG`. The project does not claim universal browser/provider support for that locale; the real runtime test must record the actual browser and observed result.
+
 ## Runtime evidence policy
 
 The repository verifier proves the implementation contract and transcript boundary. It does not manufacture microphone evidence. Closure requires a real browser session with microphone permission and documented results for the required utterance/error cases. If the current execution environment cannot provide microphone access, Phase 12 remains open.
