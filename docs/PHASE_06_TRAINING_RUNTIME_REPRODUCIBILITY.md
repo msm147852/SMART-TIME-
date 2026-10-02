@@ -1,5 +1,9 @@
 # Phase 6 — Training Runtime + Reproducibility
 
+Status: FORMALLY_CLOSED
+Closure gate: PASS
+Owner sign-off: APPROVED
+
 Date: 2026-10-01
 Branch: `phase/06-training-runtime-reproducibility`
 
