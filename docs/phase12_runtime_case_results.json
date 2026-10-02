@@ -4,8 +4,8 @@
   "evidence_policy": "screenshot-backed runtime observation; raw audio is not stored",
   "source_artifact": {
     "type": "conversation-uploaded-screenshot",
-    "filename": "1000318853.jpg",
-    "sha256": "fe874720e6ff41fc86e7b6dc20a682eab58169c886584041f5542368f98dd676"
+    "filename": "1000318854.jpg",
+    "sha256": "f94f05cd8fb920a4b63b809b8065454274a2a0ec0685f3bb59933c2adafe8899"
   },
   "cases": [
     {
@@ -74,11 +74,23 @@
       "artifact": "1000318853.jpg",
       "artifact_sha256": "fe874720e6ff41fc86e7b6dc20a682eab58169c886584041f5542368f98dd676",
       "notes": "Runtime screenshot shows Android no-internet state and SMART TIME displaying recognition error code network with no new transcript. No AI action was triggered."
+    },
+    {
+      "id": "noisy-ambiguous",
+      "status": "OBSERVED_PASS",
+      "observed": {
+        "microphone_used": true,
+        "final_transcript_visible": true,
+        "observed_transcript_excerpt": "انا رايح الشغل بكره الصبح وعندي ميعاد بكره الساعه 10:30",
+        "automatic_ai_action": false,
+        "transcript_displayed_as_user_message": true
+      },
+      "artifact": "1000318854.jpg",
+      "artifact_sha256": "f94f05cd8fb920a4b63b809b8065454274a2a0ec0685f3bb59933c2adafe8899",
+      "notes": "Runtime screenshot shows a real final Arabic transcript under the AI conversation as a user message. No automatic AI reply/action is shown. An unrelated SMART_AI_LOCAL_URL configuration error is visible."
     }
   ],
-  "remaining_cases": [
-    "noisy-ambiguous"
-  ],
+  "remaining_cases": [],
   "phase12_closed": false,
   "next_phase_authorized": false
 }
