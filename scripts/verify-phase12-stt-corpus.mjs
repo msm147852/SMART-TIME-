@@ -2,9 +2,11 @@ import fs from 'node:fs';
 
 const manifestPath = 'infra/smart-voice/phase12-asr-corpus-manifest.json';
 const docPath = 'docs/PHASE_12_REAL_STT_ASR_CORPUS.md';
+const voicePath = 'src/components/VoiceSearchModal.tsx';
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const doc = fs.readFileSync(docPath, 'utf8');
+const voice = fs.readFileSync(voicePath, 'utf8');
 
 if (manifest.phase !== 12) throw new Error('Phase 12 manifest mismatch');
 if (manifest.status !== 'IN_PROGRESS') throw new Error('Phase 12 must remain IN_PROGRESS until every gate passes');
@@ -16,6 +18,11 @@ if (manifest.corpus_policy.user_recordings_added_to_corpus_by_default !== false)
 if (manifest.stt_contract.primary_locale !== 'ar-EG') throw new Error('Primary STT locale must be ar-EG');
 if (manifest.stt_contract.fake_transcript_forbidden !== true) throw new Error('Fake transcript path must be forbidden');
 if (manifest.stt_contract.timer_driven_transcript_forbidden !== true) throw new Error('Timer transcript path must be forbidden');
+if (!voice.includes('SpeechRecognition')) throw new Error('Real SpeechRecognition implementation is missing');
+if (!voice.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is missing');
+if (voice.includes('setTimeout')) throw new Error('Timer-driven fake voice path is still present');
+if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
+if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
 
 for (const required of [
   'Real STT capture',
