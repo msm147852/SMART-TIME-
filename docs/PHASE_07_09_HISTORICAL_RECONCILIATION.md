@@ -1,0 +1,115 @@
+# Phase 7–9 Historical Evidence Reconciliation
+
+Date: 2026-10-02
+Branch under repair: `feat/v3-next`
+
+## Purpose
+
+This record separates historical implementation evidence from formal phase-closure evidence. A training artifact, runtime smoke test, or narrative claim is not treated as a phase gate unless the required closure evidence is independently recoverable.
+
+## Phase 7 — V1 Training Baseline
+
+### Historical evidence recovered
+
+The repository history contains a real SMART AI training workflow and a Qwen3-4B LoRA artifact:
+
+- `a202ba7` — reproducible SMART AI training script.
+- `c7dd4df` — training workflow documentation.
+- `4159735` — held-out evaluation runner.
+- `edd776c` — dataset validation.
+- `82201d9` — training-data secret/overlap audit.
+- `07d6710` — train/eval isolation and dataset-size validation.
+- `e259aa1` — GPU training runbook.
+- `96ce320` — Kaggle GPU smoke-training notebook.
+- `09e6b35` — Qwen3-4B LoRA adapter added to repository history.
+- `3a28bbc` — runtime verification record for the adapter.
+
+The historical training contract identifies:
+- base model: Qwen/Qwen3-4B
+- SFT + LoRA
+- LoRA rank 16 / alpha 32
+- 3 epochs
+- learning rate 2e-4
+- max length 1024
+- held-out evaluation set kept separate from training
+
+### Missing closure evidence
+
+The current repository does not provide a recoverable Phase 7 closure record containing all of:
+- authoritative training-run ID;
+- exact run commit;
+- exact dataset hash;
+- exact base-model revision/hash;
+- exact runtime dependency lock;
+- recorded training metrics/loss from the authoritative run;
+- held-out behavioral gate result;
+- security/reproducibility gate result;
+- owner sign-off tied to the Phase 7 gate.
+
+**Audit result: NOT VERIFIABLE AS FORMALLY CLOSED.**
+
+The existence of the adapter is therefore retained as historical implementation evidence, not promoted to a Phase 7 PASS.
+
+## Phase 8 — V1 Artifact Archive + Rollback Record
+
+### Historical evidence recovered
+
+The repository history contains:
+- LoRA adapter artifact metadata;
+- model-card metadata;
+- adapter SHA-256 identifier `44ed6b07...`;
+- local runtime integration;
+- a dated runtime verification record;
+- Qwen3-4B base-model identification.
+
+### Missing closure evidence
+
+No authoritative Phase 8 closure record was recovered that establishes all of:
+- immutable artifact archive location;
+- complete artifact manifest;
+- model hash and adapter hash in one closure record;
+- dataset hash tied to the artifact;
+- rollback reference;
+- activation/rollback procedure verified against the archived artifact;
+- owner sign-off for the Phase 8 gate.
+
+**Audit result: NOT VERIFIABLE AS FORMALLY CLOSED.**
+
+## Phase 9 — V1 Gate Failure Diagnosis
+
+### Historical claim found outside the current Git evidence
+
+The project history previously described a corrected gate of 113/120 (94.2%) with seven semantic failures and a corrective-action specification.
+
+### Repository recovery result
+
+A repository/issue/commit search did not recover an authoritative Phase 9 closure record, gate output, or corrective-action artifact containing the seven-case diagnosis.
+
+The following cannot currently be independently verified from GitHub history:
+- the authoritative 120-case evaluator input;
+- the exact evaluator version used for the corrected result;
+- the exact raw output;
+- the corrected 113/120 calculation;
+- the seven failure records;
+- the Phase 9 closure/sign-off record.
+
+**Audit result: NOT VERIFIABLE AS FORMALLY CLOSED.**
+
+## Governance decision
+
+Phases 7–9 remain **historically evidenced but not formally closed**.
+
+No existing model artifact is deleted or retrained by this reconciliation. No historical metric is rewritten as PASS.
+
+Phase 12 remains blocked until authoritative Phase 7, Phase 8, and Phase 9 closure evidence is recovered and recorded on the active branch, or the phases are explicitly re-run under the current closure protocol.
+
+## Recovery order
+
+1. Recover Phase 7 authoritative run metadata and gate evidence.
+2. Recover Phase 8 artifact/rollback manifest and verify hashes.
+3. Recover Phase 9 gate input/output, evaluator version, seven failure records, and remediation record.
+4. Record formal closure documents on `feat/v3-next`.
+5. Run current-branch CI and security/reproducibility verification.
+6. Obtain owner sign-off for each repaired phase.
+7. Only then authorize the next sequential phase.
+
