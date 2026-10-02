@@ -25,7 +25,7 @@ const checks = [
   ["synthesis_requires_consent", /consentConfirmed !== true/.test(server)],
   ["synthesis_requires_profile", /!profileId \|\| !text \|\| !referenceAudioBase64/.test(server)],
   ["synthesis_revocation_check", /FROM voice_dna_profiles WHERE id=\? AND revoked_at IS NULL/.test(server)],
-  ["synthesis_owner_or_active_share", /owns = String\(profile\.ownerUserId\).*shared/.test(server)],
+  ["synthesis_owner_or_active_share", /owns = String\(profile\.ownerUserId\)/.test(server) && /const shared = Boolean/.test(server) && /status='active'/.test(server) && /if \(!owns && !shared\)/.test(server)],
   ["profile_revoke_invalidates_shares", /UPDATE voice_dna_shares SET status='revoked'/.test(server)],
   ["profile_revoke_invalidates_sync", /UPDATE voice_dna_sync_packages SET revoked_at=/.test(server)],
   ["profile_revoke_deletes_recovery_copy", /DELETE FROM voice_dna_recovery_samples WHERE user_id=\? AND profile_id=\?/.test(server)],
