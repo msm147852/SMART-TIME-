@@ -67,6 +67,20 @@
       "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
       "license_status": "ELRA_LICENSE_REQUIRED",
       "source_url": "https://catalogue.elra.info/en-us/repository/browse/ELRA-S0308/"
+    },
+    {
+      "id": "egyspeak",
+      "name": "EGYSpeak",
+      "language": "Egyptian Arabic",
+      "dialect": "Egyptian Arabic",
+      "style": "single-speaker speech clips",
+      "samples": 147979,
+      "audio": "WAV PCM_16, 16 kHz, mono",
+      "transcript": "metadata.csv / metadata.jsonl",
+      "license": "CC-BY-4.0",
+      "acquisition_status": "SOURCE_VERIFIED_NOT_ACQUIRED",
+      "source_url": "https://huggingface.co/datasets/MohamedGomaa30/EGYSpeak",
+      "verification_note": "Public dataset page reports 147,979 clips and CC-BY-4.0; no project copy is claimed until acquisition and checksum validation are performed."
     }
   ],
   "closure_requirements": {
