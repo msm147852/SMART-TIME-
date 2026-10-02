@@ -90,15 +90,16 @@
     }
   ],
   "closure_requirements": {
-    "real_microphone_test": false,
-    "ar_eg_transcription_test": false,
-    "code_switch_test": false,
-    "numbers_dates_test": false,
-    "permission_denial_test": false,
-    "provider_failure_test": false,
+    "real_microphone_test": true,
+    "ar_eg_transcription_test": true,
+    "code_switch_test": true,
+    "numbers_dates_test": true,
+    "permission_denial_test": true,
+    "provider_failure_test": true,
     "corpus_pair_validation": false,
     "sha256_manifest_complete": false,
     "security_reproducibility_pass": false,
-    "owner_signoff": false
+    "owner_signoff": false,
+    "noisy_ambiguous_test": true
   }
 }
