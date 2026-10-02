@@ -4,8 +4,8 @@
   "evidence_policy": "screenshot-backed runtime observation; raw audio is not stored",
   "source_artifact": {
     "type": "conversation-uploaded-screenshot",
-    "filename": "1000318834.jpg",
-    "sha256": "verified-from-conversation-upload"
+    "filename": "1000318853.jpg",
+    "sha256": "fe874720e6ff41fc86e7b6dc20a682eab58169c886584041f5542368f98dd676"
   },
   "cases": [
     {
@@ -61,10 +61,22 @@
       "artifact": "conversation screenshot 1000318840.jpg",
       "artifact_sha256": "d54bc97bb1f58d4ea80c75c08d2426ba2f4fbf4156f0640b45bff97b9ea48206",
       "notes": "Screenshot-backed runtime evidence: Chrome microphone permission prompt was presented, denial was selected, and the subsequent SMART TIME state showed the microphone problem message with no new transcript; microphone control was inactive."
+    },
+    {
+      "id": "provider-network-failure",
+      "status": "OBSERVED_PASS",
+      "observed": {
+        "internet_available": false,
+        "final_transcript_visible": false,
+        "recognition_error_code": "network",
+        "app_error_visible": true
+      },
+      "artifact": "1000318853.jpg",
+      "artifact_sha256": "fe874720e6ff41fc86e7b6dc20a682eab58169c886584041f5542368f98dd676",
+      "notes": "Runtime screenshot shows Android no-internet state and SMART TIME displaying recognition error code network with no new transcript. No AI action was triggered."
     }
   ],
   "remaining_cases": [
-    "provider-network-failure",
     "noisy-ambiguous"
   ],
   "phase12_closed": false,
