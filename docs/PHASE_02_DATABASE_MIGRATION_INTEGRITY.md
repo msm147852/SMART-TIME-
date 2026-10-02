@@ -1,6 +1,8 @@
 # SMART-TIME Phase 2 — Database + Migration Integrity
 
-Status: CLOSED
+Status: FORMALLY_CLOSED
+Closure gate: PASS
+Owner sign-off: APPROVED
 Branch: `phase/02-database-migration-integrity`
 Baseline: `feat/v3-next@d27504fd43fcbb5d97ca1f466f7e72da030c75de`
 Date: 2026-10-01
