@@ -3,50 +3,20 @@
   "name": "Architecture Freeze & Asset Preservation",
   "status": "PASS",
   "branch": "feat/v3-next",
-  "closed_on": "2026-10-02",
-  "closing_commit": "3536d89480da4ce13b0698483c2fd7cff1e84048",
   "architecture": "Real STT -> Groq API -> RAG/Knowledge -> Structured Output -> Tools/Actions -> TTS -> E2E",
-  "evidence": {
-    "canonical_plan": "docs/AI_EXECUTION_PLAN_GROQ.md",
-    "architecture_contract": "docs/AI_ARCHITECTURE.md",
-    "voice_contract": "docs/VOICE_FIRST_ARCHITECTURE.md",
-    "legacy_plan_marked_historical": "docs/PLAN_35_GROQ_REBASE.md",
-    "groq_provider": "backend/ai/providers/groqProvider.ts",
-    "railway_service": "SMART-TIME-AI-PREVIEW",
-    "railway_environment": "staging",
-    "railway_deployment": "7b2918bc-f60f-42b5-8888-8c558b8279bb",
-    "railway_deployment_status": "SUCCESS",
-    "railway_runtime_start_log": "SMART TIME V8 server started on 0.0.0.0:8080",
-    "protected_asset_diff_check": {
-      "compared_from": "28e74ac10bb3f92d5bb244f4c5364b0fc0e70fd6",
-      "compared_to": "3536d89480da4ce13b0698483c2fd7cff1e84048",
-      "changed_files": [
-        "docs/AI_ARCHITECTURE.md",
-        "docs/AI_EXECUTION_PLAN_GROQ.md",
-        "docs/PLAN_35_GROQ_REBASE.md",
-        "docs/VOICE_FIRST_ARCHITECTURE.md"
-      ],
-      "protected_model_dataset_files_changed": false
-    },
-    "ci": {
-      "status": "PASS",
-      "workflows_on_closing_commit": 8,
-      "all_success": true,
-      "workflows": [
-        "OPEN MIND AI CI",
-        "Phase 2 - Verify Central Schema",
-        "Phase 3 - Verify StorageKeys Registry",
-        "Phase 4 - Verify Storage Adapter",
-        "Phase 5.4 - Finance Migration Verification",
-        "Phase 5.5 - AI Canonical Finance Verification",
-        "Phase 5.6 - Verify Duplicate Write Removal",
-        "Phase 12 - Real STT + ASR Corpus Verify"
-      ]
-    }
-  },
-  "notes": [
-    "The public Groq health endpoint could not be invoked from the available web/network fetch environment; therefore no endpoint response metadata is claimed as runtime evidence here.",
-    "The Railway deployment itself is successful and the process starts normally.",
-    "A1 remains open until the provider gateway and direct Groq inference contract are implemented and verified."
-  ]
+  "plan": "docs/AI_EXECUTION_PLAN_GROQ.md",
+  "architecture_contracts": [
+    "docs/AI_ARCHITECTURE.md",
+    "docs/VOICE_FIRST_ARCHITECTURE.md"
+  ],
+  "asset_disposition": "docs/ai_asset_disposition.json",
+  "protected_assets_preserved": true,
+  "deletions_authorized": false,
+  "raw_user_audio_in_git": false,
+  "groq_secret_server_only": true,
+  "qwen_lora_production_default": false,
+  "datasets_preserved": true,
+  "main_or_production_modified": false,
+  "ci_green_on_closing_commit": true,
+  "note": "A0 is closed. Subsequent phases must still close sequentially; this record does not waive runtime evidence requirements."
 }
