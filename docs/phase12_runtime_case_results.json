@@ -1,0 +1,34 @@
+{
+  "phase": 12,
+  "branch": "feat/v3-next",
+  "evidence_policy": "screenshot-backed runtime observation; raw audio is not stored",
+  "source_artifact": {
+    "type": "conversation-uploaded-screenshot",
+    "filename": "1000318819.jpg",
+    "sha256": "ea60014ba12bbf9f60ba30419b32d1805249203324cfd41cb578729112c650c6"
+  },
+  "cases": [
+    {
+      "id": "ar-eg",
+      "status": "OBSERVED_PASS",
+      "observed": {
+        "microphone_used": true,
+        "android_microphone_privacy_indicator_visible": true,
+        "final_transcript_visible": true,
+        "observed_transcript_excerpt": "انا رايح الشغل بكره بدري وعايز اصحى الساعه 7:30 الصبح",
+        "language": "ar-EG"
+      },
+      "artifact": "conversation screenshot 1000318819.jpg",
+      "notes": "Screenshot shows microphone active/used and a resulting Arabic utterance in the app. Raw audio is not retained."
+    }
+  ],
+  "remaining_cases": [
+    "code-switch",
+    "numbers-dates",
+    "permission-denial",
+    "provider-network-failure",
+    "noisy-ambiguous"
+  ],
+  "phase12_closed": false,
+  "next_phase_authorized": false
+}
