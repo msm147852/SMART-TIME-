@@ -178,6 +178,11 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
           <p className="text-xs text-slate-400 mt-1">
             {language === 'ar' ? 'التعرف الحقيقي مضبوط على العربية المصرية (ar-EG)' : 'Real recognition is configured for the selected locale'}
           </p>
+          <p className="text-[10px] text-slate-400 mt-2">
+            {language === 'ar'
+              ? 'حسب المتصفح، قد تتم معالجة الصوت عبر خدمة التعرف الخاصة به. SMART TIME لا يحفظ التسجيل الصوتي في التطبيق.'
+              : 'Depending on the browser, speech may be processed by its recognition service. SMART TIME does not persist the recording.'}
+          </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-arabic font-bold text-slate-800 dark:text-slate-100 min-h-[76px] flex items-center justify-center">
