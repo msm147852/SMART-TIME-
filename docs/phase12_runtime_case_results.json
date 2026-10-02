@@ -4,8 +4,8 @@
   "evidence_policy": "screenshot-backed runtime observation; raw audio is not stored",
   "source_artifact": {
     "type": "conversation-uploaded-screenshot",
-    "filename": "1000318819.jpg",
-    "sha256": "ea60014ba12bbf9f60ba30419b32d1805249203324cfd41cb578729112c650c6"
+    "filename": "1000318834.jpg",
+    "sha256": "verified-from-conversation-upload"
   },
   "cases": [
     {
@@ -36,20 +36,19 @@
     },
     {
       "id": "numbers-dates",
-      "status": "OBSERVED_FAIL",
+      "status": "OBSERVED_PASS",
       "observed": {
         "microphone_used": true,
         "android_microphone_privacy_indicator_visible": true,
         "final_transcript_visible": true,
-        "observed_transcript_excerpt": "انا عندي ميعاد يوم 15 اكتوبر 2023 الساعه 7:30 الصبح وهتحرك من البيت الساعه 6:45",
+        "observed_transcript_excerpt": "انا عندي ميعاد يوم 15 اكتوبر 2026 الساعه 7:30 الصبح وهتحرك من البيت الساعه 6:45",
         "spoken_target": "أنا عندي ميعاد يوم 15 أكتوبر 2026 الساعة 7:30 الصبح، وهتحرك من البيت الساعة 6:45."
       },
-      "artifact": "conversation screenshot 1000318821.jpg",
-      "notes": "Runtime microphone path is evidenced, but the recognized year is 2023 while the spoken target for this case is 2026. Therefore the numbers/date behavioral case does not pass and must be rerun."
+      "artifact": "conversation screenshot 1000318834.jpg",
+      "notes": "Rerun after the prior 2023 mismatch. Screenshot shows the microphone privacy indicator and the final transcript with the target year 2026, date 15 October, and times 7:30 and 6:45."
     }
   ],
   "remaining_cases": [
-    "numbers-dates",
     "permission-denial",
     "provider-network-failure",
     "noisy-ambiguous"
