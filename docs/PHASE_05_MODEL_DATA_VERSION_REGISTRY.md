@@ -1,5 +1,9 @@
 # Phase 5 — Model / Data / Version Registry + Objective Metrics
 
+Status: FORMALLY_CLOSED
+Closure gate: PASS
+Owner sign-off: APPROVED
+
 Date: 2026-10-01
 Branch: `phase/05-model-data-version-registry`
 
