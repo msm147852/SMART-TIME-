@@ -118,6 +118,7 @@ export default function App() {
   // Modals
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -558,6 +559,7 @@ export default function App() {
             <AiCenterView
               language={language}
               onOpenVoiceSearch={() => setIsVoiceOpen(true)}
+              initialInputText={voiceTranscript}
               appContext={{
                 profile: userProfile,
                 expenses,
@@ -649,9 +651,13 @@ export default function App() {
           isOpen={isVoiceOpen}
           onClose={() => setIsVoiceOpen(false)}
           language={language}
+          onTranscript={(finalTranscript) => {
+            setVoiceTranscript(finalTranscript);
+            setIsVoiceOpen(false);
+          }}
         />
 
-        {/* Settings & Backup Modal */}
+        {/* Settings & Backup Modal */
         <SettingsAndBackupModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
