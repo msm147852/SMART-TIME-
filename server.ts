@@ -33,6 +33,21 @@ const smartVoiceDnaProvider = SMART_VOICE_DNA_PROVIDER_URL
   : new DisabledVoiceDnaProvider();
 const SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE || 8));
 const voiceDnaRequestWindow = new Map<string, { startedAt: number; count: number }>();
+const sttRequestWindow = new Map<string, { startedAt: number; count: number }>();
+const STT_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.STT_MAX_REQUESTS_PER_MINUTE || 12));
+const STT_MAX_AUDIO_BYTES = Math.max(256 * 1024, Number(process.env.STT_MAX_AUDIO_BYTES || 8 * 1024 * 1024));
+function consumeSttQuota(userId: string): boolean {
+  const now = Date.now();
+  const current = sttRequestWindow.get(userId);
+  if (!current || now - current.startedAt >= 60_000) {
+    sttRequestWindow.set(userId, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= STT_MAX_REQUESTS_PER_MINUTE) return false;
+  current.count += 1;
+  return true;
+}
+
 let voiceDnaProviderHealth = { checkedAt: 0, healthy: false };
 
 async function checkVoiceDnaProviderHealth(): Promise<boolean> {
@@ -128,6 +143,60 @@ const groqHealthHandler = async (_req: express.Request, res: express.Response) =
 
 app.get("/api/ai/groq-health", groqHealthHandler);
 app.get("/api/ai/groq_health", groqHealthHandler);
+
+app.post("/api/ai/stt", async (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "Authentication is required for voice transcription." });
+  if (!consumeSttQuota(String(user.id))) return res.status(429).json({ error: "Voice transcription rate limit exceeded. Try again shortly." });
+
+  try {
+    const rawAudio = String(req.body?.audioBase64 || "").trim();
+    const language = String(req.body?.language || "ar").trim().toLowerCase();
+    const mimeType = String(req.body?.mimeType || "audio/webm").split(";")[0].trim().toLowerCase();
+    if (!rawAudio) return res.status(400).json({ error: "audioBase64 is required." });
+    if (!["ar", "en"].includes(language)) return res.status(400).json({ error: "language must be ar or en." });
+    const allowedMimeTypes = new Set(["audio/webm", "audio/mp4", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac"]);
+    if (!allowedMimeTypes.has(mimeType)) return res.status(415).json({ error: "Unsupported audio format." });
+
+    const normalizedBase64 = rawAudio.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
+    let audio: Buffer;
+    try {
+      audio = Buffer.from(normalizedBase64, "base64");
+    } catch {
+      return res.status(400).json({ error: "Invalid base64 audio payload." });
+    }
+    if (!audio.length) return res.status(400).json({ error: "Audio payload is empty." });
+    if (audio.length > STT_MAX_AUDIO_BYTES) return res.status(413).json({ error: "Audio payload is too large." });
+
+    const prompt = language === "ar"
+      ? "Egyptian Arabic speech. Preserve Egyptian words, names, numbers, dates, and common English code-switching. Transcribe only what is actually spoken."
+      : "Transcribe only what is actually spoken. Preserve numbers, dates, names, and code-switching.";
+
+    const transcription = await groqProvider.transcribeAudio({
+      audio,
+      mimeType,
+      language,
+      filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
+      prompt,
+    });
+
+    return res.json({
+      provider: transcription.provider,
+      model: transcription.model,
+      transcript: transcription.text,
+      requestId: transcription.requestId,
+      persisted: false,
+    });
+  } catch (error) {
+    if (error instanceof Error && /authentication failed/i.test(error.message)) {
+      return res.status(502).json({ error: "Speech provider authentication failed." });
+    }
+    if (error instanceof Error && /rate limit/i.test(error.message)) {
+      return res.status(429).json({ error: "Speech provider rate limit reached." });
+    }
+    return res.status(502).json({ error: "Speech transcription provider failed." });
+  }
+});
 
 app.post("/api/ai/infer", async (req, res) => {
   try {
