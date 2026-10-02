@@ -72,3 +72,22 @@ The previously known 113/120 claim therefore remains a separate historical claim
 ## Next recovery target
 
 Recover the actual 120-case raw generation output and evaluator implementation/version used for the diagnostic run. Then determine whether the 113/120 correction can be reproduced from those raw outputs. Do not retrain before this recovery attempt is exhausted.
+
+## Further forensic recovery — 2026-10-02
+
+Additional Library evidence was inspected without training or generation:
+
+1. The Run #3 diagnostic record is confirmed as the 0/120 generation gate run. Its metadata contains generated failures for indices 0–49, while the available pasted artifact is not a complete 120-row raw-output export. Therefore the complete raw 120 outputs are still not recovered.
+2. A later Fix1 run is separately evidenced at the notebook level. The project records 119/120 (99.2%) on the general gate, with the remaining scope weakness documented as 14/32 on the unsupported subset and the example `delete_account` hallucination. This is a later corrective run, not the Run #3 Phase 9 gate.
+3. The forensic notebook reconstructs the Run #3 → Fix1 patch and identifies the technical bug class as **training-text / completion-mask alignment**: the original path used different `add_generation_prompt` behavior for prompt-only versus with-answer construction; Fix1 normalizes the generation marker before target concatenation.
+4. The same forensic decision explicitly keeps training/generation blocked and requires freezing script hash, dataset SHA-256, model revision, and runtime before any corrective training.
+
+### Audit conclusion after this recovery
+
+The historical chain is now materially better established:
+
+`Run #3 (0/120) -> forensic root-cause analysis -> Fix1 -> later 119/120 baseline`
+
+However, this still does **not** independently recover the claimed Phase 9 corrected `113/120` result or all seven diagnosed failures from an authoritative raw 120-case artifact. Phase 9 therefore remains **NOT VERIFIABLE AS FORMALLY CLOSED**.
+
+No retraining is authorized by this audit update.
