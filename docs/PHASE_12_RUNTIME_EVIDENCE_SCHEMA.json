@@ -8,11 +8,42 @@
     "record_only_metadata_and_transcript_excerpt": true
   },
   "required_cases": [
-    {"id":"ar-eg","type":"microphone","input":"Egyptian Arabic utterance","expected":"final non-empty transcript; ar-EG"},
-    {"id":"code-switch","type":"microphone","input":"Egyptian Arabic with common English code-switch","expected":"final non-empty transcript; no fabricated text"},
-    {"id":"numbers-dates","type":"microphone","input":"Egyptian Arabic containing numbers and dates","expected":"final transcript preserves the spoken numeric/date content as returned by STT"},
-    {"id":"permission-denial","type":"permission","input":"deny microphone permission","expected":"not-allowed error is surfaced; no transcript is fabricated; no action executes"},
-    {"id":"provider-network-failure","type":"provider_failure","input":"force/observe STT network failure","expected":"network/service error is surfaced; no transcript is fabricated; no action executes"}
+    {
+      "id": "ar-eg",
+      "type": "microphone",
+      "input": "Egyptian Arabic utterance",
+      "expected": "final non-empty transcript; ar-EG"
+    },
+    {
+      "id": "code-switch",
+      "type": "microphone",
+      "input": "Egyptian Arabic with common English code-switch",
+      "expected": "final non-empty transcript; no fabricated text"
+    },
+    {
+      "id": "numbers-dates",
+      "type": "microphone",
+      "input": "Egyptian Arabic containing numbers and dates",
+      "expected": "final transcript preserves the spoken numeric/date content as returned by STT"
+    },
+    {
+      "id": "permission-denial",
+      "type": "permission",
+      "input": "deny microphone permission",
+      "expected": "not-allowed error is surfaced; no transcript is fabricated; no action executes"
+    },
+    {
+      "id": "provider-network-failure",
+      "type": "provider_failure",
+      "input": "force/observe STT network failure",
+      "expected": "network/service error is surfaced; no transcript is fabricated; no action executes"
+    },
+    {
+      "id": "noisy-ambiguous",
+      "type": "microphone",
+      "input": "Egyptian Arabic utterance under realistic noise/ambiguity",
+      "expected": "observed final transcript is recorded as returned by STT; no fabricated text or automatic action"
+    }
   ],
   "corpus_validation": {
     "required": [
