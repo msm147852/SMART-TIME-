@@ -1,60 +1,72 @@
 # SMART-TIME V3 Next — AI Architecture
 
-## Target architecture
+## Canonical production target
 
 Mobile/Web UI
   -> Railway SMART-TIME API
-  -> AI Orchestrator
-  -> authenticated private GPU inference
-  -> Qwen3-4B + LoRA + vLLM
-  -> structured tool calls
+  -> AI Provider Gateway
+  -> Groq API
+  -> RAG / Knowledge / Memory context
+  -> structured output / tool calls
+  -> Policy + Schema Validator
   -> Tool Registry / Executor
-  -> validated artifacts / application data
-  -> streamed response to UI
+  -> verified application data / artifacts
+  -> grounded response
+  -> TTS
+  -> streamed response / audio to UI
+
+Voice path:
+  Microphone -> server-side STT (Groq Whisper) -> Groq reasoning -> RAG/Knowledge -> structured output -> Tools/Actions -> verified response -> TTS -> playback.
 
 ## Provider boundary
 
-The application should depend on an AIProvider abstraction:
+The application depends on an AIProvider abstraction:
 - chat
 - streamChat
 - generateStructured
 - health
 - models
 
-Current provider:
-LocalQwenProvider via SMART_AI_LOCAL_URL.
+Production provider:
+- Groq, configured server-side.
 
-No OpenAI/Gemini/Claude dependency is required for primary intelligence.
+Preserved non-production provider:
+- Local Qwen3-4B + LoRA/vLLM implementation remains available as a historical/experimental/future provider asset. It is not the production default under the current plan.
+
+The provider key must never be exposed to the browser or embedded in VITE_* variables.
 
 ## Agent loop
 
-1. Receive user message + relevant context.
-2. Ask local model for response or structured tool call.
-3. Validate tool name and arguments against schema.
-4. Check permissions and confirmation policy.
-5. Execute tool.
-6. Validate tool result.
-7. Feed verified result back to the model.
-8. Stream final Egyptian-Arabic response.
-9. Persist only required conversation/memory state.
+1. Receive user text or verified STT transcript.
+2. Normalize and attach permitted context.
+3. Retrieve relevant knowledge/memory/application context.
+4. Ask the configured provider for grounded text or a structured tool proposal.
+5. Validate schema/tool name/arguments.
+6. Apply permission and confirmation policy.
+7. Execute approved tool.
+8. Read back and verify authoritative state.
+9. Feed verified result back when a final response needs it.
+10. Produce a grounded response.
+11. Synthesize TTS when the interaction is voice.
+12. Persist only required conversation/memory state.
 
-The current code does not yet implement this complete loop; this document defines the target.
+No free-text model response is treated as an executable action.
 
 ## Infrastructure separation
 
 Railway:
-- frontend
 - API
 - authentication
 - application database/integrations
+- server-side AI provider gateway
+- server-side STT request handling
 
-GPU service:
-- vLLM
-- Qwen3-4B
-- LoRA adapter
-- streaming inference
+Groq:
+- production LLM inference
+- production speech-to-text
 
-The GPU endpoint must be private or authenticated and replaceable.
+Preserved GPU/local stack:
+- vLLM/Qwen/LoRA assets remain isolated and non-production by default.
 
 ## Artifact architecture
 
@@ -66,26 +78,7 @@ Natural language
  -> preview
  -> download/share
 
-Artifact classes:
-- PDF
-- DOCX
-- XLSX
-- SVG
-- DXF
-- later STEP/3D
-
-## Voice architecture
-
-Microphone
- -> real STT
- -> AI orchestrator
- -> streamed/complete response
- -> TTS
- -> playback
-
-Egyptian Arabic target locale: ar-EG.
-
-Voice DNA remains a separate optional personalization layer and must not be required for basic AI voice operation.
+Every generated artifact must be validated by its actual engine/parser before success is reported.
 
 ## Memory
 
@@ -94,16 +87,20 @@ Separate:
 - summarized conversation
 - user preferences
 - application state
-- tool results
+- verified tool results
+- retrieved knowledge
 
-Do not inject the whole database into every model request.
+Do not inject the whole database into model requests.
 
 ## Security
 
-- no secrets in prompts
+- provider secrets server-side only
+- no secrets in prompts or browser bundles
 - no customer data in training
 - per-user authorization for tools
 - confirmation for destructive actions
+- request size/duration limits for STT
+- raw user audio not persisted by default
 - file type/size validation
 - isolated file processing
 - no arbitrary code execution from uploads
