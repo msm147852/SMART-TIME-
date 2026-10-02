@@ -214,7 +214,7 @@ Closure gate:
 
 ## 3. Current status
 
-- A0: CLOSURE CANDIDATE — architecture contracts and asset disposition are frozen; final closure is waiting for the phase-closing CI run on the asset-disposition commit.
+- A0: PASS — architecture contracts and asset disposition are frozen; protected model/dataset assets are preserved and the phase-closing CI baseline is green.
 - A1: PASS — server-side AIProvider contract, Groq adapter, structured output/tool transport, error taxonomy, Railway staging secret, runtime healthcheck, fail-closed health route, and automated provider tests are implemented and verified. Closure record: `docs/phase_a1_closure_record.json`.
 - A2: IN PROGRESS — authenticated Groq Whisper STT endpoint, client MediaRecorder capture, shared STT transport, payload/rate limits, non-persistence contract, and static CI contract are implemented. Real microphone/runtime evidence is still required before closure.
 - A3: NOT CLOSED — retrieval architecture needs a verified production loop.
