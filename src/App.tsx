@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   AppView,
   Language,
@@ -119,6 +119,10 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
+  const handleVoiceTranscript = useCallback((finalTranscript: string) => {
+    setVoiceTranscript(finalTranscript);
+    setIsVoiceOpen(false);
+  }, []);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -651,10 +655,7 @@ export default function App() {
           isOpen={isVoiceOpen}
           onClose={() => setIsVoiceOpen(false)}
           language={language}
-          onTranscript={(finalTranscript) => {
-            setVoiceTranscript(finalTranscript);
-            setIsVoiceOpen(false);
-          }}
+          onTranscript={handleVoiceTranscript}
         />
 
         {/* Settings & Backup Modal */
