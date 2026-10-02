@@ -124,7 +124,7 @@ app.get("/api/ai/groq-health", async (_req, res) => {
   }
 });
 
-app.post("/api/ai/infer", async (req, res) =>
+app.post("/api/ai/infer", async (req, res) => {
   try {
     const request = new Request("http://localhost/api/ai/infer", {
       method: "POST",
