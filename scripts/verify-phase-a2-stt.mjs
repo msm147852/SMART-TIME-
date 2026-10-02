@@ -21,8 +21,10 @@ assert.match(provider, /language/);
 
 assert.match(modal, /navigator\.mediaDevices\.getUserMedia/);
 assert.match(modal, /MediaRecorder/);
-assert.match(modal, /apiUrl\('\/api\/ai\/stt'\)/);
-assert.match(modal, /authHeaders\(\)/);
+const sharedStt = read("src/services/groqSttService.ts");
+assert.match(sharedStt, /apiUrl\('\/api\/ai\/stt'\)/);
+assert.match(sharedStt, /authHeaders\(\)/);
+assert.match(sharedStt, /audioBase64/);
 assert.doesNotMatch(modal, /SpeechRecognition|webkitSpeechRecognition/);
 assert.doesNotMatch(modal, /setTimeout\([^)]*transcript|fake transcript/i);
 
