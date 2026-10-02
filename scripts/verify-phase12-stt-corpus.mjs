@@ -35,7 +35,7 @@ if (manifest.stt_contract.raw_microphone_audio_persisted_by_app !== false) throw
 if (!voice.includes('التسجيل يُرسل للتحويل فقط ولا يتم حفظ ملف الصوت')) throw new Error('Arabic Groq STT privacy disclosure is missing');
 if (!voice.includes('MediaRecorder')) throw new Error('Real MediaRecorder implementation is missing');
 const sttClient = fs.readFileSync(sttClientPath, 'utf8');
-if (!sttClient.includes("ar-EG")) throw new Error('Egyptian Arabic STT locale is missing');
+if (!sttClient.includes("language: 'ar'")) throw new Error('Arabic STT language routing is missing');
 if (!voice.includes('RECORDING_MAX_MS')) throw new Error('Recording duration bound is missing');
 if (voice.includes('Simulated Voice recognition speech stream')) throw new Error('Simulated voice recognition path is still present');
 if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded fake transcript is still present');
