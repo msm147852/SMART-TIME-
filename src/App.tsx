@@ -658,7 +658,7 @@ export default function App() {
           onTranscript={handleVoiceTranscript}
         />
 
-        {/* Settings & Backup Modal */
+        {/* Settings & Backup Modal */}
         <SettingsAndBackupModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
