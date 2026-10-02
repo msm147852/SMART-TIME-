@@ -19,6 +19,7 @@ import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventRemin
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
 import { POST as smartAiV2Infer } from "./app/api/ai/infer/route.js";
+import { getGroqHealth } from "./backend/ai/providers/groqProvider.js";
 
 dotenv.config();
 
@@ -99,7 +100,31 @@ seedDefaultChatRooms();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-app.post("/api/ai/infer", async (req, res) => {
+app.get("/api/ai/groq-health", async (_req, res) => {
+  // Preparation-only endpoint: never expose provider diagnostics from production.
+  if (process.env.VERCEL_ENV !== "preview" && process.env.NODE_ENV === "production") {
+    return res.status(404).json({ error: "preview-only" });
+  }
+  try {
+    const health = await getGroqHealth();
+    return res.json({
+      provider: "groq",
+      configured: health.configured,
+      reachable: health.reachable,
+      modelCount: health.models.length,
+      models: health.models.map(({ id, active, ownedBy }) => ({ id, active, ownedBy })),
+    });
+  } catch (error) {
+    return res.status(502).json({
+      provider: "groq",
+      configured: true,
+      reachable: false,
+      error: error instanceof Error ? error.message : "Groq health check failed",
+    });
+  }
+});
+
+app.post("/api/ai/infer", async (req, res) =>
   try {
     const request = new Request("http://localhost/api/ai/infer", {
       method: "POST",
