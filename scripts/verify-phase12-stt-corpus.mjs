@@ -32,7 +32,7 @@ if (voice.includes('Compare ride prices to work')) throw new Error('Hard-coded f
 if (!voice.includes('onTranscript')) throw new Error('Voice modal must expose the final transcript boundary');
 if (!voice.includes('onTranscriptRef.current?.(next)')) throw new Error('Final transcript callback must execute outside React state updater');
 if (voice.includes('console.log') || voice.includes('console.error') || voice.includes('console.warn')) throw new Error('Voice STT component must not log microphone/transcript/provider data');
-if (!app.includes('onTranscript={(finalTranscript)')) throw new Error('App must consume the final STT transcript');
+if (!app.includes('onTranscript={handleVoiceTranscript}')) throw new Error('App must consume the final STT transcript callback');
 if (!app.includes('initialInputText={voiceTranscript}')) throw new Error('Final STT transcript must reach the AI input boundary');
 if (!ai.includes('initialInputText?: string')) throw new Error('AI input boundary prop is missing');
 if (!ai.includes('setInputText(initialInputText.trim())')) throw new Error('AI input does not consume the final transcript');
