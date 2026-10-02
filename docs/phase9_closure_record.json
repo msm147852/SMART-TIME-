@@ -48,5 +48,7 @@
     "approved_in_chat": true,
     "authorization_basis": "User instructed the assistant to continue autonomously with all necessary permissions and complete all repairs in Phases 7-9."
   },
-  "next_phase_authorized": true
+  "next_phase_authorized": true,
+  "next_phase_number": 10,
+  "next_phase_rule": "Authorizes only Phase 10 after this closure; Phase 12 is not authorized by Phase 9 alone."
 }
