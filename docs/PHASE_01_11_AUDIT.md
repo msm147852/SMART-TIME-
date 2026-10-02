@@ -1,66 +1,91 @@
-# SMART-TIME Phases 1–11 Audit
+# SMART-TIME Phases 1–11 — Canonical Plan Alignment Audit
 
 Date: 2026-10-02
 Branch: `feat/v3-next`
+Canonical plan source: `docs/AI_EVALUATION.md`
+Governance rule: Phase N+1 is not authorized until Phase N is formally closed.
 
-## Purpose
+## Canonical 35-phase alignment
 
-This audit reconciles the historical phase documentation with the current repository state. It does not convert missing evidence into a PASS.
+| Phase | Canonical plan title | Repository closure evidence | Status | Next authorization |
+|---|---|---|---|---|
+| 1 | Requirements + Traceability + Test Matrix | `docs/PHASE_01_REQUIREMENTS_TRACEABILITY.md`, verifier/CI | FORMALLY_CLOSED / PASS | 2 |
+| 2 | Database + Migration Integrity | `docs/PHASE_02_DATABASE_MIGRATION_INTEGRITY.md`, DB gates/CI | FORMALLY_CLOSED / PASS | 3 |
+| 3 | Real Backend API | `docs/PHASE_03_REAL_BACKEND_API.md`, API gates/CI | FORMALLY_CLOSED / PASS | 4 |
+| 4 | Historical Dataset Provenance | `docs/PHASE_04_DATASET_PROVENANCE.md`, provenance manifest/verifier | FORMALLY_CLOSED / PASS | 5 |
+| 5 | Model/Data/Version Registry + Objective Metrics | `docs/PHASE_05_MODEL_DATA_VERSION_REGISTRY.md`, registry/verifier | FORMALLY_CLOSED / PASS | 6 |
+| 6 | Training Runtime + Reproducibility | `docs/PHASE_06_TRAINING_RUNTIME_REPRODUCIBILITY.md`, runtime verifier/CI | FORMALLY_CLOSED / PASS | 7 |
+| 7 | V1 Training Baseline | `docs/phase7_closure_record.json` + recovered training evidence | FORMALLY_CLOSED / HISTORICAL DIAGNOSTIC BASELINE | 8 |
+| 8 | V1 Artifact Archive + Rollback Record | `docs/phase8_closure_record.json` + artifact metadata/recovery snapshot | FORMALLY_CLOSED / HISTORICAL ARCHIVE | 9 |
+| 9 | V1 Gate Failure Diagnosis | `docs/phase9_closure_record.json` + forensic recovery | FORMALLY_CLOSED / DIAGNOSTIC | 10 |
+| 10 | Voice-First Architecture + Execution Order | `docs/phase10_closure_record.json`, architecture/security/repro CI | FORMALLY_CLOSED / PASS | 11 |
+| 11 | Voice Foundation — Shubra Voice Specification | `docs/phase11_closure_record.json`, voice manifest/security CI | FORMALLY_CLOSED / PASS | 12 |
 
-## Findings
+## Phase-by-phase reconciliation
 
-| Phase | Current repository evidence | Audit result | Action |
-|---|---|---|---|
-| 1 | Requirements/test matrix, sign-off PASS, historical CI evidence | PASS / formally closed | Documentation status reconciled |
-| 2 | Database closure document, technical gates PASS, owner sign-off | PASS / formally closed | No functional change |
-| 3 | API closure document, sign-off PASS, historical CI evidence | PASS / formally closed | Documentation status reconciled |
-| 4 | Dataset provenance document, verifier/evidence, owner sign-off | PASS / formally closed | Documentation status reconciled |
-| 5 | Model/data registry document, verifier/evidence, owner sign-off | PASS / formally closed | Documentation status reconciled |
-| 6 | Training runtime reproducibility document, verifier/evidence, owner sign-off | PASS / formally closed | Documentation status reconciled |
-| 7 | Historical training workflow + Qwen3-4B LoRA evidence recovered, but no complete Phase 7 run/gate/closure record | NOT VERIFIABLE | See `docs/PHASE_07_09_HISTORICAL_RECONCILIATION.md` |
-| 8 | Historical adapter metadata/runtime verification recovered, but no complete archive + rollback closure record | NOT VERIFIABLE | See `docs/PHASE_07_09_HISTORICAL_RECONCILIATION.md` |
-| 9 | Historical 113/120 claim is known, but authoritative gate input/output and closure record were not recovered from GitHub | NOT VERIFIABLE | See `docs/PHASE_07_09_HISTORICAL_RECONCILIATION.md` |
-| 10 | Formal closure record, architecture/security/reproducibility evidence, owner sign-off | PASS / formally closed | No functional change |
-| 11 | Formal closure record, voice manifest, sample evidence, security/reproducibility CI, owner sign-off | PASS / formally closed | No functional change |
+### Phase 1
+Requirements, traceability, test matrix, scope boundaries, and canonical sequential order are frozen. Owner authorization is recorded. No future implementation is incorrectly claimed as complete.
 
-## Important governance finding
+### Phase 2
+Database/migration gates are documented as PASS, including schema ownership, bootstrap completeness, idempotence, SQLite integrity, indexes, read/write rollback, regression, and clean-run reproducibility. The document status has been normalized from `CLOSED` to `FORMALLY_CLOSED` so it matches the canonical governance vocabulary.
 
-The current branch contains a documented Phase 11 authorization for Phase 12, but the audited 35-phase rule requires every immediately preceding phase to be formally closed. Because Phases 7–9 still lack complete, independently recoverable closure evidence on the active branch, this audit does **not** promote their historical claims to PASS.
+### Phase 3
+Real Express/TypeScript HTTP boundary is closed with health, database health, authentication, AI chat, finance CRUD/read-back, regression, reproducibility, and security evidence.
 
-No Phase 12 implementation or training is authorized by this audit until the Phase 7–9 evidence gap is reconciled.
+### Phase 4
+Historical dataset provenance is closed. The 746-row structured-tool dataset retains source branch, source commit, blob SHA, counts, and category distribution. No training was started by Phase 4.
 
-## Historical recovery finding\n\nHistorical implementation evidence is now stronger: the model/data registry records the Kaggle diagnostic artifact, exact train/eval split and losses, and an explicit generation gate result of 0/120 with release status `blocked_generation_gate`. This proves a real failed diagnostic training run, but does not establish Phase 7 PASS. The 113/120 Phase 9 correction remains unrecovered as an authoritative raw gate artifact. See `docs/PHASE_07_09_EVIDENCE_RECOVERY.md`.\n\n## CI finding
+### Phase 5
+Model/data/version registry and objective metrics are closed. The historical Kaggle artifact is explicitly `blocked_generation_gate`; loss is not used as a release decision.
 
-A real unrelated TypeScript failure was found in the Open Mind CI on the previous closure commit. It was corrected in:
-- `app/services/page.tsx`
-- `backend/ai/training/v2StructuredOutput.ts`
+### Phase 6
+Training runtime reproducibility is closed. Runtime versions, seed, deterministic settings, dataset/script/dependency hashes, model revision requirement, hardware/dtype, run fingerprint, and rerun procedure are defined. This phase does not imply model quality.
 
-The resulting current-head CI run must be green before the audit is considered technically clean.
+### Phase 7
+Historical V1 training execution is preserved as a diagnostic baseline, not a release. The recovered chain includes Qwen3-4B + LoRA evidence and the later diagnostic artifact. The failed generation result is not hidden.
 
-## Scope rule
+### Phase 8
+The historical adapter is preserved as an immutable reference with rollback identity. Missing historical remote archive location/checksum is explicitly marked unknown; no value is fabricated. The failed adapter is not activated.
 
-This document distinguishes:
-- verified evidence present in the current branch;
-- historical claims recorded in documentation;
-- evidence that is currently missing and therefore cannot be promoted to PASS.
+### Phase 9
+The active forensic evidence is Run #3 = 0/120, later Fix1 = 119/120, unsupported = 14/32. Root cause is training-text/completion-mask alignment. The historical 113/120 raw export was not independently recovered and is therefore not used as current authoritative evidence. The diagnostic phase is closed without declaring the failed adapter releasable.
 
-It does not alter model artifacts, datasets, Voice DNA samples, or training authorization.
+### Phase 10
+The canonical voice-first execution and evaluation order is closed. The architecture explicitly keeps real STT, production TTS validation, central validator, general agent loop, and Voice E2E in later phases.
 
-## Phase 7–9 technical repair update — 2026-10-02
+### Phase 11
+The Shubra/Egyptian voice profile contract, consent boundary, approved sample metadata, raw-audio exclusion policy, security/reproducibility checks, and owner approval are closed. The specification document has been reconciled from `IN PROGRESS` to `FORMALLY_CLOSED`.
 
-The missing historical governance layer has been repaired on the active branch. Phase 7 and Phase 8 now have explicit historical closure records; Phase 9 has an explicit diagnostic closure record based on recovered Run #3 and Fix1 evidence. The active gate evidence is Run #3 0/120, later Fix1 119/120, and unsupported 14/32. The historical 113/120 claim is retained only as superseded historical context because its authoritative raw 120-case artifact was not recovered.
+## Sequential authorization invariant
 
-**Important:** these records are technical closure evidence only and remain pending explicit owner sign-off. They do not authorize Phase 12, and no retraining was performed during the reconciliation.
+The repository now encodes the immediate transition only:
 
-## Final Phase 7–9 closure — 2026-10-02
+`1→2→3→4→5→6→7→8→9→10→11→12`
 
-Phases 7, 8, and 9 are now **FORMALLY CLOSED** under owner delegated authorization recorded in chat. The closure does not fabricate missing historical artifacts: the unrecovered authoritative raw 113/120 export remains explicitly marked as unavailable, while the recovered Run #3 = 0/120 and later Fix1 = 119/120 plus unsupported = 14/32 are the active historical evidence.
+- Phase 7 authorizes Phase 8 only.
+- Phase 8 authorizes Phase 9 only.
+- Phase 9 authorizes Phase 10 only.
+- Phase 10 authorizes Phase 11 only.
+- Phase 11 authorizes Phase 12 only.
 
-- Phase 7: FORMALLY_CLOSED_HISTORICAL_DIAGNOSTIC_BASELINE
-- Phase 8: FORMALLY_CLOSED_HISTORICAL_ARCHIVE
-- Phase 9: FORMALLY_CLOSED_DIAGNOSTICALLY
-- Release status: NOT_RELEASED for the historical V1 adapter
-- Owner authorization: APPROVED_BY_OWNER_DELEGATED_AUTHORIZATION
-- Phase 12 authorization: TRUE after closure of Phase 9
+No Phase 7–9 record authorizes Phase 12 directly.
 
-No Phase 12 training or implementation is included in this closure commit; it remains the next authorized phase.
+## Historical-evidence integrity rule
+
+The audit intentionally preserves uncertainty:
+- the authoritative raw historical 113/120 export is not present;
+- missing remote archive details for the historical V1 adapter are not invented;
+- Run #3/Fix1 forensic evidence is distinguished from the historical 113/120 claim;
+- the diagnostic V1 adapter remains `NOT_RELEASED`.
+
+Therefore the repository's governance state is corrected without falsifying historical evidence.
+
+## Owner authorization
+
+The user explicitly instructed the assistant to continue autonomously, repair all necessary issues, and approve owner-level continuation decisions through Phase 11. This delegated authorization is recorded in the phase closure records. It does not override technical gates or convert unknown historical evidence into known facts.
+
+## Final result
+
+Phases **1–11 are aligned with the canonical 35-phase plan and formally closed at their respective scopes**.
+
+Phase 12 is the **only immediate next authorized phase**. It must not be started until the current closure/CI checks for the final reconciliation commits are green.
