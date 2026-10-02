@@ -1,6 +1,8 @@
 # SMART-TIME Phase 3 — Real Backend API Closure
 
-Status: CLOSURE CANDIDATE — technical gates passed
+Status: FORMALLY_CLOSED
+Closure gate: PASS
+Owner sign-off: APPROVED
 Branch: `phase/03-real-backend-api`
 Baseline: `feat/v3-next@852b87f5ce4ac3b2678d0de80c777f185da0c67e`
 Date: 2026-10-01
