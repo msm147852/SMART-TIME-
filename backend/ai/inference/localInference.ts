@@ -31,6 +31,8 @@ export async function runLocalInference(input: RunLocalInferenceInput): Promise<
   const modelPath = input.modelPath || process.env.SMART_AI_V2_MODEL_PATH || DEFAULT_MODEL_PATH;
   assertAdapterPresent(modelPath);
   const model = String(process.env.SMART_AI_V2_MODEL || process.env.SMART_AI_LOCAL_MODEL || modelPath);
+  const adapterUrl = String(process.env.SMART_AI_V2_ADAPTER_URL || "").trim();
+  const adapterRevision = String(process.env.SMART_AI_V2_ADAPTER_REVISION || "").trim();
   const token = String(process.env.SMART_AI_LOCAL_TOKEN || "");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60000);
@@ -40,7 +42,7 @@ export async function runLocalInference(input: RunLocalInferenceInput): Promise<
     const response = await fetch(url + "/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-      body: JSON.stringify({ model, stream: false, temperature: 0.2, max_tokens: 700, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: input.input }] }),
+      body: JSON.stringify({ model, stream: false, temperature: 0.2, max_tokens: 700, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: input.input }], ...(adapterUrl ? { extra_body: { smart_time_adapter: { name: model, url: adapterUrl, revision: adapterRevision || undefined } } } : {}) }),
       signal: controller.signal
     });
     if (!response.ok) throw new Error("Local SMART AI HTTP " + response.status);
