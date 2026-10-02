@@ -53,10 +53,17 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const transcriptRef = useRef('');
+  const onTranscriptRef = useRef(onTranscript);
+
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   useEffect(() => {
     if (!isOpen) return;
 
+    transcriptRef.current = '';
     setTranscript('');
     setInterimTranscript('');
     setError(null);
@@ -94,11 +101,12 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
 
       if (finalText.trim()) {
         const normalized = finalText.trim();
-        setTranscript((previous) => {
-          const next = previous ? `${previous} ${normalized}` : normalized;
-          onTranscript?.(next);
-          return next;
-        });
+        const next = transcriptRef.current
+          ? transcriptRef.current + ' ' + normalized
+          : normalized;
+        transcriptRef.current = next;
+        setTranscript(next);
+        onTranscriptRef.current?.(next);
       }
       setInterimTranscript(interim.trim());
     };
@@ -137,7 +145,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
       recognition.abort();
       recognitionRef.current = null;
     };
-  }, [isOpen, language, onTranscript]);
+  }, [isOpen, language]);
 
   const stopListening = () => recognitionRef.current?.stop();
 
