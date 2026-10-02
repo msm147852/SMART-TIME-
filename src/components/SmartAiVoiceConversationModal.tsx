@@ -15,7 +15,7 @@ type Recognition = {
   onerror: ((event: { error?: string }) => void) | null;
   onresult: ((event: {
     resultIndex: number;
-    results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
+    results: ArrayLike<{ isFinal: boolean; 0: { transcript: string; confidence?: number } }>;
   }) => void) | null;
   onspeechend: (() => void) | null;
 };
@@ -30,11 +30,28 @@ const getRecognition = (): RecognitionCtor | null => {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 };
 
+const normalizeTranscript = (value: string) =>
+  value
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+const isLikelyDuplicate = (previous: string, next: string) => {
+  const a = normalizeTranscript(previous);
+  const b = normalizeTranscript(next);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+};
+
 interface Props {
   isOpen: boolean;
   language: Language;
   onClose: () => void;
   onTurn: (transcript: string) => Promise<void>;
+  onInterrupt?: () => void;
 }
 
 export const SmartAiVoiceConversationModal: React.FC<Props> = ({
@@ -42,6 +59,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   language,
   onClose,
   onTurn,
+  onInterrupt,
 }) => {
   const [status, setStatus] = useState<'starting' | 'listening' | 'processing' | 'error'>('starting');
   const [transcript, setTranscript] = useState('');
@@ -49,13 +67,17 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<Recognition | null>(null);
   const finalTranscriptRef = useRef('');
+  const lastFinalCandidateRef = useRef('');
   const activeRef = useRef(false);
   const processingRef = useRef(false);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTurnRef = useRef(onTurn);
+  const onInterruptRef = useRef(onInterrupt);
 
   useEffect(() => {
     onTurnRef.current = onTurn;
-  }, [onTurn]);
+    onInterruptRef.current = onInterrupt;
+  }, [onTurn, onInterrupt]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -72,59 +94,98 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     activeRef.current = true;
     processingRef.current = false;
     finalTranscriptRef.current = '';
+    lastFinalCandidateRef.current = '';
     setTranscript('');
     setInterimTranscript('');
     setError(null);
     setStatus('starting');
 
     const recognition = new Ctor();
+
+    // One recognition session = one user turn.
+    // This is intentional: Android Chrome has known duplication/continuous-mode
+    // inconsistencies, so the conversation itself is continuous while each turn
+    // is isolated and committed exactly once.
     recognition.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
+    const clearSilenceTimer = () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+    };
+
     const startListening = () => {
       if (!activeRef.current || processingRef.current) return;
+      clearSilenceTimer();
+      finalTranscriptRef.current = '';
+      lastFinalCandidateRef.current = '';
+      setTranscript('');
+      setInterimTranscript('');
+      setError(null);
+      setStatus('starting');
       try {
         recognition.start();
       } catch {
-        // A browser may reject a duplicate start while a session is closing.
+        // Browser can reject a duplicate start while the previous session closes.
       }
     };
 
     recognition.onstart = () => {
-      if (!activeRef.current) return;
+      if (!activeRef.current || processingRef.current) return;
       setStatus('listening');
       setError(null);
     };
 
     recognition.onresult = (event) => {
-      let interim = '';
-      let finalChunk = '';
+      let latestInterim = '';
 
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
-        const text = result[0]?.transcript ?? '';
-        if (result.isFinal) finalChunk += text;
-        else interim += text;
+        const candidate = String(result[0]?.transcript || '').trim();
+        if (!candidate) continue;
+
+        if (result.isFinal) {
+          // Mobile recognizers can emit the same final phrase more than once.
+          // Keep one best candidate for this turn instead of concatenating echoes.
+          if (!isLikelyDuplicate(lastFinalCandidateRef.current, candidate)) {
+            if (
+              !finalTranscriptRef.current ||
+              candidate.length >= finalTranscriptRef.current.length
+            ) {
+              finalTranscriptRef.current = candidate;
+              lastFinalCandidateRef.current = candidate;
+            }
+          }
+          setTranscript(finalTranscriptRef.current);
+          setInterimTranscript('');
+        } else {
+          latestInterim = candidate;
+        }
       }
 
-      if (finalChunk.trim()) {
-        finalTranscriptRef.current = [finalTranscriptRef.current, finalChunk.trim()]
-          .filter(Boolean)
-          .join(' ');
-        setTranscript(finalTranscriptRef.current);
-      }
-      setInterimTranscript(interim.trim());
+      if (latestInterim) setInterimTranscript(latestInterim);
     };
 
     recognition.onspeechend = () => {
-      if (activeRef.current && !processingRef.current) recognition.stop();
+      if (!activeRef.current || processingRef.current) return;
+      clearSilenceTimer();
+
+      // Give the recognizer a short settling window so the last Arabic words
+      // can become final before the session is stopped.
+      silenceTimerRef.current = setTimeout(() => {
+        if (activeRef.current && !processingRef.current) recognition.stop();
+      }, 650);
     };
 
     recognition.onerror = (event) => {
       const code = event.error || 'unknown';
-      if (!activeRef.current || code === 'aborted') return;
+      clearSilenceTimer();
+      if (!activeRef.current || code === 'aborted' || code === 'no-speech') return;
+
       processingRef.current = false;
       setStatus('error');
       setError(language === 'ar'
@@ -133,6 +194,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     };
 
     recognition.onend = async () => {
+      clearSilenceTimer();
       setInterimTranscript('');
       if (!activeRef.current || processingRef.current) return;
 
@@ -146,8 +208,12 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
       setStatus('processing');
 
       try {
+        // IMPORTANT: onTurn resolves only after the AI response has finished
+        // speaking. We do not reopen the microphone while SMART AI is talking.
         await onTurnRef.current(text);
+
         finalTranscriptRef.current = '';
+        lastFinalCandidateRef.current = '';
         setTranscript('');
         processingRef.current = false;
         if (activeRef.current) startListening();
@@ -156,8 +222,8 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
         if (activeRef.current) {
           setStatus('error');
           setError(language === 'ar'
-            ? 'تعذر الحصول على رد SMART AI. أصلحت مسار المحادثة، لكن الخدمة نفسها غير متاحة حاليًا.'
-            : 'SMART AI did not return a response. The voice flow is working, but the AI service is currently unavailable.');
+            ? 'SMART AI استقبل كلامك، لكن الرد الصوتي فشل. المحادثة متوقفة لحد ما تبدأ الدور التالي.'
+            : 'SMART AI received your turn, but the voice reply failed. The conversation is paused.');
         }
       }
     };
@@ -168,18 +234,43 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     return () => {
       activeRef.current = false;
       processingRef.current = false;
+      clearSilenceTimer();
       recognition.abort();
       recognitionRef.current = null;
     };
   }, [isOpen, language]);
 
-  if (!isOpen) return null;
-
   const stopConversation = () => {
     activeRef.current = false;
+    processingRef.current = false;
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     recognitionRef.current?.abort();
+    onInterruptRef.current?.();
     onClose();
   };
+
+  const interruptAi = () => {
+    if (!activeRef.current || !processingRef.current) return;
+    processingRef.current = false;
+    onInterruptRef.current?.();
+    setStatus('starting');
+    setError(null);
+    finalTranscriptRef.current = '';
+    setTranscript('');
+    setInterimTranscript('');
+    // The current recognition session has already ended; startListening is
+    // reached by the next effect cycle after the AI interruption.
+    const recognition = recognitionRef.current;
+    if (recognition) {
+      try {
+        recognition.start();
+      } catch {
+        // If the browser still considers it active, its existing session wins.
+      }
+    }
+  };
+
+  if (!isOpen) return null;
 
   const displayedTranscript = [transcript, interimTranscript].filter(Boolean).join(' ');
 
@@ -223,17 +314,17 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
         <div>
           <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
             {status === 'listening'
-              ? (language === 'ar' ? 'أنا سامعك… اتكلم براحتك' : 'I’m listening… take your time')
+              ? (language === 'ar' ? 'أنا سامعك… خد وقتك' : 'I’m listening… take your time')
               : status === 'processing'
-                ? (language === 'ar' ? 'لحظة… SMART AI بيرد عليك' : 'One moment… SMART AI is replying')
+                ? (language === 'ar' ? 'سمعتك… بفهم وبجهز الرد' : 'I heard you… preparing a reply')
                 : status === 'starting'
-                  ? (language === 'ar' ? 'جاري تشغيل المحادثة الصوتية…' : 'Starting voice conversation…')
-                  : (language === 'ar' ? 'المحادثة الصوتية توقفت' : 'Voice conversation stopped')}
+                  ? (language === 'ar' ? 'جاهز… اتكلم لما تسمعني' : 'Ready… speak when you are')
+                  : (language === 'ar' ? 'المحادثة الصوتية متوقفة' : 'Voice conversation paused')}
           </h3>
           <p className="text-xs text-slate-400 mt-1">
             {language === 'ar'
-              ? 'هستنى لحد ما تخلص كلامك، وبعدها SMART AI هيرد عليك صوتيًا.'
-              : 'I’ll wait until you finish, then SMART AI will answer by voice.'}
+              ? 'كل دور صوتي بيتقفل لوحده؛ SMART AI مش هيفتح الميكروفون وهو بيتكلم.'
+              : 'Each turn is isolated; the microphone stays closed while SMART AI speaks.'}
           </p>
         </div>
 
@@ -245,6 +336,17 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
           <div className="p-3 rounded-xl border border-red-300 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 text-xs font-bold">
             {error}
           </div>
+        )}
+
+        {status === 'processing' && (
+          <button
+            type="button"
+            onClick={interruptAi}
+            className="w-full py-3 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-sm flex items-center justify-center gap-2"
+          >
+            <Mic className="w-4 h-4" />
+            {language === 'ar' ? 'قاطع الرد واتكلم' : 'Interrupt and speak'}
+          </button>
         )}
 
         <button
