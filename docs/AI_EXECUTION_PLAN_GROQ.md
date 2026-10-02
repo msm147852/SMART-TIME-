@@ -1,259 +1,297 @@
-# SMART TIME — Groq-First AI Execution Plan
+# SMART TIME — Groq-First Egyptian Voice AI Execution Plan
 
 Status: ACTIVE CANONICAL PLAN
 Branch: `feat/v3-next`
-Replaces: the previous Plan 35 sequence and any phase numbering inherited from it.
+Replaces: previous 35-phase execution sequence and the earlier 8-phase Groq draft.
 
-## 0. Architecture decision
+## 0. Product objective
 
-Production runtime is fixed to:
+SMART AI is not a generic chatbot. The target is a voice-first Egyptian-Arabic assistant inside SMART TIME that can:
 
-`Real STT -> Groq API -> RAG/Knowledge -> Structured Output -> Tools/Actions -> TTS -> E2E`
+- understand Egyptian colloquial Arabic and Arabic/English code-switching;
+- understand the structure, sections, fields and capabilities of SMART TIME;
+- answer questions from authorized application data;
+- generate grounded reports and summaries;
+- fill data-entry forms from voice after the user selects the target section;
+- execute only validated and authorized actions;
+- speak the resulting answer using an Egyptian-capable TTS path.
 
-Non-negotiable rules:
-1. Groq is the primary production AI provider for this plan.
-2. All provider access is server-side behind a provider abstraction.
-3. The existing Qwen3-4B + LoRA model, adapters, training outputs, datasets, provenance, evaluation assets and notebooks are preserved. They are not deleted and are not the production default for this plan.
-4. Raw user/customer data is never added to training by this plan.
-5. Existing verified Tool Registry, executors, canonical data layer, memory/context work, TTS assets and regression checks are reused where technically sound.
-6. Browser Web Speech is not the production STT architecture. It may remain only as a clearly labeled fallback if it is retained.
-7. A phase closes only after implementation, automated tests, runtime evidence where applicable, security/reproducibility evidence and CI pass.
-8. Phase N+1 cannot start until Phase N is explicitly closed.
-9. Main/production are not modified as part of this branch work.
+The target voice loop is:
 
-## 1. Gap analysis: old architecture vs actual repository vs new target
+`Microphone -> Groq Whisper -> Egyptian Language/Behavior Layer -> SMART TIME Knowledge/RAG -> Groq LLM -> Structured Intent -> Validator/Policy -> Tools/Reports -> Verified Result -> Egyptian TTS -> Playback`
 
-| Capability | Actual state on `feat/v3-next` | Target | Disposition |
-|---|---|---|---|
-| Production LLM | `app/api/ai/infer/route.ts` is still Local-Qwen-first; `SMART_AI_LOCAL_URL` controls it | Groq-first provider gateway | REIMPLEMENT PRODUCTION ROUTING |
-| Groq | `backend/ai/providers/groqProvider.ts` exists; Railway staging has `GROQ_API_KEY`; deployment `7b2918bc...` is SUCCESS | Full provider contract + inference path | KEEP + EXTEND |
-| Structured output | V2 validator and mutation confirmation boundaries already exist | Provider-independent structured/tool contract | REUSE + HARDEN |
-| Tools/actions | Typed V3 registry/executor and verified finance/task mutations exist; calendar create still reports not implemented in the current infer route | Groq tool calling -> validator -> permission -> confirmation -> executor -> verification | REUSE + INTEGRATE |
-| STT | Browser Web Speech API is implemented and Phase 12 static gates pass, but real runtime evidence remains open | Server-side Groq Whisper STT | REIMPLEMENT PRODUCTION STT |
-| User audio evidence | Five real recordings validated locally; raw audio remains outside Git; Phase 12 runtime evidence is still incomplete | External runtime/evaluation evidence only | KEEP |
-| RAG/knowledge | Context/memory infrastructure exists, but no verified end-to-end production retrieval loop is established | Retrieval before reasoning with provenance and limits | NEW/REWORK |
-| Memory/context | Conversation/memory/context modules exist and are used by parts of the V3 AI stack | Provider-independent context layer connected to retrieval | REUSE + HARDEN |
-| TTS | Browser/system TTS and Voice DNA/provider boundary exist; full production voice E2E is not verified | Verified Egyptian-Arabic TTS after grounded response | REUSE + INTEGRATE |
-| E2E voice | Canonical order is documented; full real STT -> AI -> TTS evidence is not closed | Real end-to-end voice proof | NEW/REWORK |
-| Security | Server-side secret pattern and mutation confirmation exist; Groq key has been staged on Railway without exposing it | Secret isolation, auth, rate/payload limits, privacy and cost controls | HARDEN |
-| CI | Existing phase-specific workflows are green on commit `28e74ac`; Groq-specific full contract is not yet complete | Coherent Groq architecture/regression gate | EXTEND |
-| Training/model assets | Qwen/LoRA/training/dataset artifacts exist | Preserve as research/evaluation/future provider asset | KEEP/ARCHIVE, DO NOT DELETE |
+## 1. Critical model decision
 
-## 2. Phase sequence
+The Kaggle-trained Qwen/LoRA model is NOT the free Groq production model.
 
-### Phase A0 — Architecture Freeze & Asset Preservation
-Objective: make the new architecture the single source of truth without deleting existing model/data assets.
+It remains preserved as:
+- research/evaluation asset;
+- future self-hosted model;
+- future provider candidate;
+- benchmark/reference for Egyptian behavior.
 
-Deliverables:
-- this plan
-- updated AI architecture contracts
-- asset disposition record
-- explicit separation of production Groq path from preserved Qwen/LoRA path
-- CI baseline
+The free/low-cost production strategy is:
+1. Groq-hosted general LLM for inference;
+2. Egyptian behavior layer using system instructions, few-shot examples, terminology/glossary, normalization and evaluation;
+3. SMART TIME product knowledge and live application data supplied through RAG/tools;
+4. deterministic business logic for calculations and mutations.
 
-Closure gate:
-- docs agree with the target pipeline
-- no protected model/dataset/training asset was deleted
-- Groq staging secret remains server-side
-- CI is green on the phase-closing commit
+This is deliberate: Groq currently documents LoRA inference as an Enterprise-only capability, so the plan must not depend on uploading the Kaggle LoRA to a free/developer Groq account.
 
-### Phase A1 — Provider Gateway & Groq Runtime
-Objective: replace provider-specific assumptions with one server-side AIProvider boundary.
+## 2. Cost rule
 
-Required:
-- chat/streaming/structured-output/health/model metadata contract
-- Groq adapter
-- model selection by server configuration
-- timeout/retry/error taxonomy
-- secret isolation and bundle scan
-- runtime health verification
+“Free” means using the currently available Groq free/developer quota, not unlimited free compute.
 
-Closure gate:
-- automated provider contract tests
-- auth/timeout/rate/error handling tests
-- real Railway staging Groq connectivity evidence
-- CI green
+The application must therefore:
+- track RPM/RPD/TPM and audio usage;
+- bound retries/timeouts;
+- avoid unnecessary context;
+- cache safe reusable knowledge;
+- rate-limit users;
+- expose usage/error telemetry without sensitive content;
+- keep a provider abstraction so a future paid/local provider can be added without redesign.
 
-### Phase A2 — Real Groq STT
-Objective: make Groq Whisper the production STT path.
+## 3. Canonical architecture
 
-Required:
-- authenticated server transcription endpoint
-- client microphone capture only
-- ar-EG default
-- Egyptian Arabic, code-switch, numbers/dates
-- no fabricated transcript
-- size/duration/content-type limits
-- no raw audio persistence by default
-- provider failure and permission-denial behavior
+Browser/mobile
+ -> Railway API
+ -> authentication + authorization
+ -> AI Provider Gateway
+ -> Groq
+ -> Egyptian behavior layer
+ -> SMART TIME Product Knowledge / RAG / Memory
+ -> structured intent
+ -> schema + permission + confirmation policy
+ -> Tool Registry / deterministic report engine
+ -> authoritative read-back
+ -> grounded response
+ -> Egyptian-capable TTS
+ -> playback
 
-Closure gate:
-- real microphone/browser evidence
-- all required runtime cases from the preserved Phase 12 evidence set
-- privacy/security evidence
-- CI green
+No model receives direct database access.
+No free-text response is executable.
+No mutation occurs before validation and policy checks.
 
-### Phase A3 — RAG / Knowledge / Context
-Objective: make retrieval a first-class deterministic input to reasoning.
+## 4. Phase sequence
 
-Required:
-- source/provenance registry
-- chunking/indexing
-- vector-store interface (existing Chroma work may be reused)
-- metadata filters and retrieval budget
-- no-source/no-match behavior
-- source identifiers/citations where applicable
-- application context and memory integrated without database dumping
+### A0 — Goal, Architecture & Asset Freeze — PASS
+Lock the product goal, provider boundary and asset policy.
 
-Closure gate:
-- deterministic retrieval tests
-- empty/stale/conflicting source tests
-- per-user isolation/privacy tests
-- CI green
+Closure:
+- architecture docs agree;
+- Qwen/LoRA/datasets are preserved;
+- Groq secret is server-side;
+- CI baseline is green.
 
-### Phase A4 — Groq Structured Reasoning Contract
-Objective: connect Groq responses to application-owned structured output.
+### A1 — Groq Provider & Runtime — PASS
+Server-side Groq gateway with health, model discovery, streaming, structured output and tool transport.
 
-Required:
-- structured response schema
-- tool-call normalization
-- invalid/malformed response handling
-- bounded recovery
-- explicit clarification/unsupported states
-- no free-text action execution
-- preserve confirmation boundaries
+Closure:
+- provider contract tests;
+- Railway runtime evidence;
+- error/timeout handling;
+- CI green.
 
-Closure gate:
-- representative Arabic/English reasoning tests
-- schema-invalid tests
-- confirmation tests
-- provider failure tests
-- CI green
-
-### Phase A5 — Tools & Actions
-Objective: connect structured Groq tool calls to verified SMART TIME actions.
-
-Pipeline:
-`understand -> structured call -> validate -> permission -> confirm -> execute -> read-back -> respond`
-
-Required:
-- reuse existing registry/executors
-- strict argument schemas
-- read/mutation separation
-- idempotency where needed
-- finance/task/calendar representative coverage
-- no success claim without authoritative verification
-
-Closure gate:
-- positive and negative action tests
-- confirmation denial
-- unauthorized access
-- execution failure
-- persistence/read-back verification
-- CI green
-
-### Phase A6 — Memory & Conversation Continuity
-Objective: make multi-turn behavior provider-independent and retrieval-aware.
-
-Required:
-- recent conversation
-- persistent memory
-- application state
-- verified tool results
-- retrieval budget
-- memory write/update policy
-- user isolation
-- no sensitive prompt leakage
-
-Closure gate:
-- multi-turn tests
-- stale/conflicting memory tests
-- per-user isolation
-- CI green
-
-### Phase A7 — TTS + Voice E2E
-Objective: close the complete production voice loop.
-
+### A2 — Real Groq Whisper STT — IN PROGRESS
 Target:
-`Microphone -> Groq STT -> RAG/Knowledge -> Groq reasoning -> structured tool/action -> verified result -> Egyptian TTS -> playback`
+`MediaRecorder -> /api/ai/stt -> whisper-large-v3-turbo -> transcript`
 
 Required:
-- existing Egyptian TTS/Voice DNA boundaries reused
-- turn-taking/interruption protection
-- no duplicate mic reopen
-- STT/Groq/tool/TTS failure handling
-- grounded read-back
+- ar-EG language hint;
+- Egyptian colloquial speech;
+- code-switching;
+- names/numbers/dates;
+- authentication;
+- MIME/size/duration limits;
+- rate limits;
+- no raw audio persistence by default;
+- real microphone evidence.
 
-Closure gate:
-- real browser/mobile conversation
-- interruption and failure cases
-- tool confirmation in voice
-- end-to-end artifact/evidence package
-- CI green
+Closure:
+- all required runtime cases;
+- security/privacy evidence;
+- CI green.
 
-### Phase A8 — Security, Cost, Regression & Release Candidate
-Objective: prove the new path is safe, reproducible and does not regress completed product work.
+### A3 — Egyptian Behavior + SMART TIME Product Knowledge — NOT STARTED
+This is the key replacement for relying on a custom free fine-tune.
+
+Build:
+- Egyptian Arabic normalization;
+- colloquial variants and common spelling variants;
+- SMART TIME terminology/glossary;
+- few-shot demonstrations;
+- response-style contract;
+- clarification rules;
+- unsupported-intent boundaries;
+- intent taxonomy;
+- product ontology covering every supported SMART TIME section, field and operation;
+- evaluation set for Egyptian language + product understanding.
+
+Important:
+The model should learn product behavior from controlled context, not from direct database exposure.
+
+Closure:
+- Egyptian language evaluation;
+- product coverage evaluation;
+- ambiguity/clarification tests;
+- unsupported-action tests;
+- no hallucinated section/field/tool names.
+
+### A4 — Grounded RAG + Reports — NOT STARTED
+Build the actual retrieval loop:
+
+user question
+ -> intent
+ -> authorized retrieval
+ -> provenance
+ -> deterministic calculation/aggregation
+ -> report object/artifact
+ -> grounded natural-language/voice summary
 
 Required:
-- secret scan and server-only key proof
-- auth/rate/payload abuse controls
-- privacy/data-minimization audit
-- provider usage/error telemetry without sensitive content
-- bounded retries/timeouts
-- full regression CI
-- performance baseline
-- preserved asset audit
-- production activation checklist
+- product knowledge registry;
+- application-data retrieval;
+- metadata filters;
+- per-user isolation;
+- provenance;
+- empty-result handling;
+- context budget;
+- deterministic report calculations;
+- report validation before success.
 
-Closure gate:
-- all A0-A7 closed
-- no unresolved security/privacy/reproducibility blocker
-- final full CI green
-- real voice E2E evidence
-- owner sign-off
+### A5 — Groq Reasoning + Structured Intent + Tools — NOT STARTED
+Groq must produce a validated structured intent such as:
 
-## 3. Current status
+- ANSWER_QUERY
+- SEARCH_DATA
+- GENERATE_REPORT
+- CREATE_RECORD
+- UPDATE_RECORD
+- DELETE_RECORD
+- CLARIFY
+- UNSUPPORTED
 
-- A0: PASS — architecture contracts and asset disposition are frozen; protected model/dataset assets are preserved and the phase-closing CI baseline is green.
-- A1: PASS — server-side AIProvider contract, Groq adapter, structured output/tool transport, error taxonomy, Railway staging secret, runtime healthcheck, fail-closed health route, and automated provider tests are implemented and verified. Closure record: `docs/phase_a1_closure_record.json`.
-- A2: IN PROGRESS — authenticated Groq Whisper STT endpoint, client MediaRecorder capture, shared STT transport, payload/rate limits, non-persistence contract, and static CI contract are implemented. Real microphone/runtime evidence is still required before closure.
-- A3: NOT CLOSED — retrieval architecture needs a verified production loop.
-- A4: PARTIAL — V2 structured validation exists but remains coupled to the local inference route; it must be connected to the Groq gateway.
-- A5: PARTIAL — typed tools and verified mutations exist; Groq tool-call integration is missing.
-- A6: PARTIAL — context/memory exists but must be provider-independent and connected to RAG.
-- A7: NOT CLOSED — TTS/voice components exist but complete real E2E is not proven.
-- A8: NOT STARTED.
+For data entry:
 
-### Evidence note
+voice
+ -> transcript
+ -> intent
+ -> selected section
+ -> structured field draft
+ -> schema validation
+ -> permission
+ -> confirmation when required
+ -> executor
+ -> authoritative read-back
+ -> response
 
-A2 static CI is currently green on the latest branch commit, but this is not runtime closure. The required real-browser microphone cases remain an explicit gate.
+The model never writes directly to the database.
 
-## 4. Asset policy
+Closure:
+- Arabic/English reasoning tests;
+- malformed JSON/tool-call tests;
+- authorization tests;
+- confirmation-denial tests;
+- mutation/read-back tests;
+- CI green.
+
+### A6 — Memory + Conversation Continuity — NOT STARTED
+Separate:
+- recent conversation;
+- persistent memory;
+- verified application state;
+- verified tool results;
+- retrieved knowledge.
+
+Required:
+- multi-turn context;
+- user isolation;
+- retention policy;
+- stale/conflicting memory handling;
+- no sensitive prompt leakage.
+
+### A7 — Egyptian TTS + Full Voice E2E — NOT STARTED
+The TTS requirement is specifically Egyptian Arabic.
+
+Do NOT assume Groq Orpheus Arabic satisfies this: Groq currently documents its hosted Arabic Orpheus model as Saudi Arabic, not Egyptian.
+
+Therefore TTS is a provider-independent slot:
+- first choice: free/local Egyptian-capable TTS if quality is acceptable;
+- optional paid provider later;
+- Groq remains the STT/LLM inference provider.
+
+E2E target:
+
+`Microphone -> Groq STT -> Egyptian behavior -> RAG -> Groq LLM -> tool/report -> verified result -> Egyptian TTS -> playback`
+
+Closure:
+- real browser/mobile conversation;
+- interruptions;
+- duplicate/stale turn protection;
+- provider failure;
+- tool confirmation by voice;
+- Egyptian TTS quality evaluation.
+
+### A8 — Security + Cost + Observability + Regression — NOT STARTED
+Required:
+- secret isolation;
+- auth/authorization;
+- rate/payload limits;
+- user isolation;
+- raw-audio minimization;
+- PII/data minimization;
+- usage telemetry;
+- RPM/RPD/TPM/ASH budget controls;
+- timeout/retry limits;
+- latency/failure dashboards;
+- full regression CI;
+- preserved-asset audit.
+
+### A9 — Production Gate — NOT STARTED
+Production is allowed only when A0-A8 are PASS.
+
+Required evidence:
+- all CI green;
+- real voice E2E;
+- Egyptian language gate;
+- product knowledge gate;
+- RAG gate;
+- report gate;
+- tool/action gate;
+- security/privacy gate;
+- cost/usage gate;
+- no unresolved blocker;
+- closure records complete.
+
+## 5. Asset policy
 
 KEEP:
-- all Qwen3-4B + LoRA model/adapters/evaluation artifacts
-- all training datasets and provenance
-- training scripts/notebooks/runbooks
-- user audio evidence metadata
-- verified Tool Registry/executors
-- canonical data layer
-- TTS/VoiceTuT/Voice DNA assets and contracts
-- existing CI/regression workflows unless explicitly superseded by a documented replacement
+- Qwen3-4B;
+- LoRA adapters;
+- Kaggle training outputs;
+- datasets and provenance;
+- evaluation scripts;
+- notebooks/runbooks;
+- existing Tool Registry/executors;
+- canonical SMART TIME data layer;
+- existing voice/TTS assets.
 
-MODIFY/REIMPLEMENT:
-- Local-Qwen-first production routing
-- `backend/ai/inference/localInference.ts` as the production path
-- browser Web Speech as primary STT
-- architecture docs that name LocalQwen as the current production provider
-- any route that couples provider selection to business logic
+Do not use raw customer data as training data.
 
-DO NOT DELETE:
-- the trained model
-- datasets
-- model artifacts
-- evaluation assets
-- local provider implementation
+Do not delete the local model path merely because it is not the current production path.
 
-## 5. Global definition of done
+## 6. Global definition of done
 
-The new plan is closed only when A0 through A8 are PASS, all relevant CI is green on the final commit, Groq is the production provider, real STT -> RAG -> structured output -> tools -> TTS -> E2E evidence exists, security/privacy/reproducibility gates pass, and preserved model/dataset assets remain intact.
+The project is not Production Ready until the assistant can demonstrate, with real evidence:
+
+1. A user speaks Egyptian Arabic.
+2. Groq Whisper produces the transcript.
+3. SMART AI understands the Egyptian intent.
+4. The system retrieves only authorized SMART TIME knowledge/data.
+5. Groq produces a validated answer/report/action intent.
+6. Tools execute only after policy/permission/confirmation rules.
+7. The authoritative result is read back.
+8. The answer is spoken through an Egyptian-capable TTS path.
+9. The interaction survives interruption/failure cases.
+10. CI, security, privacy, cost and regression gates all pass.
+
