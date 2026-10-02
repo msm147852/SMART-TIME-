@@ -407,8 +407,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         language={language}
         onClose={() => setIsVoiceConversationOpen(false)}
         onTurn={async (transcript) => {
-          const reply = await handleSendMessage(transcript, true);
-          if (reply) await speakWithSelectedVoice(reply);
+          await handleSendMessage(transcript, true);
         }}
       />
 
