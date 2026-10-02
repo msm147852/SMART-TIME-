@@ -29,7 +29,7 @@ The current branch contains a documented Phase 11 authorization for Phase 12, bu
 
 No Phase 12 implementation or training is authorized by this audit until the Phase 7–9 evidence gap is reconciled.
 
-## Historical recovery finding\n\nHistorical implementation evidence for the V1 training path was recovered from Git history, including the Qwen3-4B LoRA artifact and dated runtime verification. This evidence is preserved as historical evidence only; it is not equivalent to a formal Phase 7 or Phase 8 closure. The Phase 9 113/120 claim remains unrecovered as an authoritative gate artifact.\n\n## CI finding
+## Historical recovery finding\n\nHistorical implementation evidence is now stronger: the model/data registry records the Kaggle diagnostic artifact, exact train/eval split and losses, and an explicit generation gate result of 0/120 with release status `blocked_generation_gate`. This proves a real failed diagnostic training run, but does not establish Phase 7 PASS. The 113/120 Phase 9 correction remains unrecovered as an authoritative raw gate artifact. See `docs/PHASE_07_09_EVIDENCE_RECOVERY.md`.\n\n## CI finding
 
 A real unrelated TypeScript failure was found in the Open Mind CI on the previous closure commit. It was corrected in:
 - `app/services/page.tsx`
