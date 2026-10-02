@@ -73,6 +73,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTurnRef = useRef(onTurn);
   const onInterruptRef = useRef(onInterrupt);
+  const turnGenerationRef = useRef(0);
 
   useEffect(() => {
     onTurnRef.current = onTurn;
@@ -205,12 +206,15 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
       }
 
       processingRef.current = true;
+      const turnGeneration = turnGenerationRef.current;
       setStatus('processing');
 
       try {
         // IMPORTANT: onTurn resolves only after the AI response has finished
         // speaking. We do not reopen the microphone while SMART AI is talking.
         await onTurnRef.current(text);
+
+        if (!activeRef.current || turnGeneration !== turnGenerationRef.current) return;
 
         finalTranscriptRef.current = '';
         lastFinalCandidateRef.current = '';
@@ -243,6 +247,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   const stopConversation = () => {
     activeRef.current = false;
     processingRef.current = false;
+    turnGenerationRef.current += 1;
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     recognitionRef.current?.abort();
     onInterruptRef.current?.();
@@ -251,6 +256,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
 
   const interruptAi = () => {
     if (!activeRef.current || !processingRef.current) return;
+    turnGenerationRef.current += 1;
     processingRef.current = false;
     onInterruptRef.current?.();
     setStatus('starting');
