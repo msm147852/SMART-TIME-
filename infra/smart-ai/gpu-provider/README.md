@@ -45,3 +45,19 @@ with model `smart-ai-v2-super`.
 
 The application sends the final user prompt to this endpoint. The GPU runtime performs the actual model inference with the trained LoRA adapter; the Railway service remains the CPU/API layer.
 
+
+## RunPod production layout
+
+Create a dedicated **On-Demand GPU Pod** and attach a persistent/network volume mounted at `/workspace`. The container uses `/workspace/smart-ai` for the Hugging Face cache and the downloaded LoRA adapter, so recreating the Pod does not require retraining or re-uploading the model when the volume is retained.
+
+Required Pod environment:
+- `SMART_AI_BASE_MODEL=Qwen/Qwen3-4B`
+- `SMART_AI_GPU_API_KEY=<long-random-secret>`
+- `SMART_AI_ADAPTER_CONFIG_URL=<URL resolving to real adapter_config.json>`
+- `SMART_AI_ADAPTER_WEIGHTS_URL=<URL resolving to real adapter_model.safetensors>`
+- `SMART_AI_PERSIST_ROOT=/workspace/smart-ai`
+- `HF_HOME=/workspace/smart-ai/huggingface`
+
+Expose container port `8000` through HTTPS. The application uses the same API key as `SMART_AI_LOCAL_TOKEN`.
+
+RunPod's current documentation supports GPU Pods and persistent/network storage; use On-Demand for the production runtime rather than an interruptible workload. citeturn0search0
