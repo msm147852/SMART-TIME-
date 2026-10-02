@@ -160,7 +160,7 @@ app.post("/api/ai/stt", async (req, res) => {
     const allowedMimeTypes = new Set(["audio/webm", "audio/mp4", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac"]);
     if (!allowedMimeTypes.has(mimeType)) return res.status(415).json({ error: "Unsupported audio format." });
 
-    const normalizedBase64 = rawAudio.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
+    const normalizedBase64 = rawAudio.replace(/^data:[^,]*;base64,/i, "").replace(/\s+/g, "");
     const maxBase64Chars = Math.ceil(STT_MAX_AUDIO_BYTES / 3) * 4 + 4;
     if (normalizedBase64.length > maxBase64Chars) {
       return res.status(413).json({ error: "Audio payload is too large." });
