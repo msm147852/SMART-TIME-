@@ -21,6 +21,7 @@ export async function transcribeVoiceBlob(blob: Blob, language: 'ar' | 'en'): Pr
   if (!blob.size) throw new Error('No audio was captured.');
 
   const audioBase64 = await blobToBase64(blob);
+  const locale = language === 'ar' ? 'ar-EG' : 'en-US';
   const response = await fetch(apiUrl('/api/ai/stt'), {
     method: 'POST',
     headers: {
@@ -31,6 +32,7 @@ export async function transcribeVoiceBlob(blob: Blob, language: 'ar' | 'en'): Pr
       audioBase64,
       mimeType: blob.type || 'audio/webm',
       language,
+      locale,
     }),
   });
 
