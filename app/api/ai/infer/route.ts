@@ -31,7 +31,8 @@ export async function POST(request: Request): Promise<Response> {
       "Mutation tools require explicit confirmation from the user before execution.",
     ].join("\n");
     const messages = Array.isArray(body?.messages) && body.messages.length
-      ? body.messages.map((message: any) => ({\n          role: message?.role === "assistant" ? "assistant" : "user",\n          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
+      ? body.messages.map((message: any) => ({
+          role: message?.role === "assistant" ? "assistant" : "user",\n          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
     let attempts = 0;
     let raw = "";
     try {
