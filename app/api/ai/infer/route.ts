@@ -34,7 +34,9 @@ export async function POST(request: Request): Promise<Response> {
     const messages: AIMessage[] = Array.isArray(body?.messages) && body.messages.length
       ? body.messages.map((message: any): AIMessage => ({
           role: message?.role === "assistant" ? "assistant" : "user",
-          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
+          content: String(message?.content ?? message?.text ?? "").trim(),
+        })).filter((message: { content: string }) => message.content)
+      : [{ role: "user" as const, content: input }];
     let attempts = 0;
     let raw = "";
     try {
