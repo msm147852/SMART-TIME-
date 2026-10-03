@@ -402,15 +402,6 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         <SmartVoiceDnaPanel language={language} onClose={() => setIsVoiceDnaOpen(false)} />
       )}
 
-      <SmartAiVoiceConversationModal
-        isOpen={isVoiceConversationOpen}
-        language={language}
-        onClose={() => setIsVoiceConversationOpen(false)}
-        onTurn={async (transcript) => {
-          await handleSendMessage(transcript, true);
-        }}
-      />
-
       <div className="flex-1 bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-6 overflow-y-auto space-y-4">
         {messages.map((msg, index) => {
           const isAi = msg.sender !== 'user';
@@ -528,14 +519,28 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       >
         <button
           type="button"
-          onClick={() => setIsVoiceConversationOpen(true)}
+          onClick={onOpenVoiceSearch}
           className="relative p-2.5 text-purple-600 hover:text-white rounded-xl bg-purple-50 hover:bg-gradient-to-r hover:from-purple-600 hover:to-indigo-600 dark:bg-purple-950/40 transition-all active:scale-95"
-          title={language === 'ar' ? 'تحدث مع SMART AI' : 'Talk to SMART AI'}
-          aria-label={language === 'ar' ? 'تحدث مع SMART AI' : 'Talk to SMART AI'}
+          title={language === 'ar' ? 'إرسال صوت للشات' : 'Send voice to chat'}
+          aria-label={language === 'ar' ? 'إرسال صوت للشات' : 'Send voice to chat'}
         >
           <Mic className="w-5 h-5" />
           <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-850" />
         </button>
+
+        <SmartAiVoiceConversationModal
+          inline
+          isOpen={isVoiceConversationOpen}
+          language={language}
+          onOpen={() => setIsVoiceConversationOpen(true)}
+          onClose={() => {
+            setIsVoiceConversationOpen(false);
+            stopSmartAiVoice();
+          }}
+          onTurn={async (transcript) => {
+            await handleSendMessage(transcript, true);
+          }}
+        />
 
         <input
           type="text"
