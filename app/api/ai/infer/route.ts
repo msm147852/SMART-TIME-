@@ -17,7 +17,7 @@ function meta(model: string, attempts: number) {
   return { model, runtime: { source: "groq", provider: "groq" }, retryAttempts: attempts };
 }
 
-function parseDecision(raw: string) {
+function parseDecision(raw: string): any {
   try {
     const clean = raw.replace(/^\s*\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`\s*$/i, "").trim();
     const parsed = JSON.parse(clean);
@@ -61,8 +61,8 @@ export async function POST(request: Request): Promise<Response> {
       "اعتمد على معرفة SMART TIME وسياق المستخدم المرفقين. لا تخترع بيانات غير موجودة.",
       "إذا كان السؤال عن أرقام أو سجلات المستخدم، استخدم السياق فقط. إذا كانت البيانات غير كافية، قل ذلك أو اطلب المعلومة الناقصة.",
       "لا تدّعِ تنفيذ أي إجراء قبل أن يرجع executor بنتيجة ناجحة ومتحقق منها.",
-      "في الرسالة الأولى الخاصة بالطلب، أعد JSON واحدًا فقط بالشكل: {"tool":"...","arguments":{},"reply":"..."}.",
-      "الأدوات المسموحة: clarification, unsupported, add_expense, add_daily_task, calendar.event.create.",
+      "في الرسالة الأولى الخاصة بالطلب، أعد JSON واحدًا فقط يحتوي tool وarguments وneeds_clarification، ويمكن إضافة reply.",
+      "الأدوات المسموحة: clarification, unsupported, add_expense, add_daily_task, calendar.event.create, finance.summary, finance.compare, finance.income.summary, finance.fuel.summary.",
       "clarification للطلبات التي تحتاج معلومة ناقصة. unsupported لما هو خارج قدرات التطبيق الحالية.",
       "أي عملية تغيير بيانات تحتاج تأكيدًا صريحًا من المستخدم.",
       "معرفة SMART TIME:",
@@ -89,6 +89,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const parsed = parseDecision(raw);
     const parsedReply = String(parsed?.reply || parsed?.ask || "").trim();
+
     if (parsed.tool === "clarification" || parsed.tool === "unsupported") {
       return json({
         result: { tool: parsed.tool, arguments: {}, reply: parsedReply || raw.trim() },
@@ -99,10 +100,16 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
-    const decisionForValidation = {\n      tool: parsed.tool,\n      arguments: parsed.arguments || {},\n      needs_clarification: parsed.needs_clarification === false ? false : undefined,\n      ask: parsed.ask,\n      reason: parsed.reason,\n    };\n    Object.keys(decisionForValidation).forEach((key) => {\n      if ((decisionForValidation as Record<string, unknown>)[key] === undefined) delete (decisionForValidation as Record<string, unknown>)[key];\n    });\n    const validation = validateV2Output(JSON.stringify(decisionForValidation));
+    const decisionForValidation = {
+      tool: parsed.tool,
+      arguments: parsed.arguments || {},
+      needs_clarification: false,
+    };
+    const validation = validateV2Output(JSON.stringify(decisionForValidation));
+
     if (!validation.valid || !validation.parsed) {
       return json({
-        result: { tool: "clarification", arguments: {}, reply: parsedReply || raw.trim() },
+        result: { tool: "clarification", arguments: {}, reply: parsedReply || "ممكن توضّحلي طلبك أكتر؟" },
         routed: false,
         executed: false,
         validation,
@@ -110,11 +117,11 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
-    const result = validation.parsed;\n    if (!result) return json({ error: "Groq decision validation produced no result.", provider: "groq" }, 502);
+    const result = validation.parsed;
 
     if (MUTATING_TOOLS.has(result.tool) && !confirmed) {
       return json({
-        result,
+        result: { ...result, reply: parsedReply || "تمام، فهمت طلبك. تأكدلي بس إنك عايزني أنفذه." },
         validation,
         routed: true,
         executed: false,
@@ -127,6 +134,7 @@ export async function POST(request: Request): Promise<Response> {
     if (result.tool === "add_expense" || result.tool === "add_daily_task") {
       const toolResult = executeToolAction(userId, { type: result.tool, payload: result.arguments || {} } as any);
       const verified = toolResult.ok === true && toolResult.verification?.persisted === true;
+
       if (!verified) {
         return json({
           result,
@@ -142,10 +150,11 @@ export async function POST(request: Request): Promise<Response> {
       const finalSystem = [
         "أنت SMART TIME AI.",
         "اكتب ردًا نهائيًا قصيرًا وطبيعيًا بالمصرية للمستخدم.",
-        "تم تنفيذ الأداة والتحقق من نجاحها. لا تطلب تأكيدًا مرة أخرى ولا تدّعي شيئًا غير موجود في نتيجة التنفيذ.",
+        "تم تنفيذ الأداة والتحقق من نجاحها. لا تطلب تأكيدًا مرة أخرى.",
         "لا تذكر JSON أو أسماء الأدوات أو تفاصيل داخلية.",
       ].join("\n");
-      let reply = String(result.reply || "").trim();
+
+      let reply = parsedReply || "تم تنفيذ الطلب بنجاح.";
       try {
         reply = await groqReply(finalSystem, [
           { role: "system", content: finalSystem },
@@ -178,12 +187,31 @@ export async function POST(request: Request): Promise<Response> {
       }, 501);
     }
 
+    const readOnlySystem = [
+      "أنت SMART TIME AI.",
+      "اكتب ردًا نهائيًا قصيرًا وطبيعيًا بالمصرية.",
+      "استخدم سياق SMART TIME المرفق للإجابة الفعلية عن السؤال.",
+      "لا تخترع أرقامًا. لو البيانات غير موجودة قل ذلك بوضوح.",
+      "لا تذكر JSON أو أسماء الأدوات أو تفاصيل داخلية.",
+    ].join("\n");
+
+    let reply = parsedReply || "هراجع بيانات SMART TIME المتاحة وأقولك النتيجة.";
+    try {
+      reply = await groqReply(readOnlySystem, [
+        { role: "system", content: readOnlySystem },
+        { role: "user", content: input },
+        { role: "assistant", content: JSON.stringify(result) },
+        { role: "tool", tool_call_id: "smart-time-context", name: result.tool, content: JSON.stringify(smartTimeData) },
+      ], 0.5);
+      attempts += 1;
+    } catch {}
+
     return json({
-      result: { ...result, reply: String(result.reply || "الطلب ده محتاج خطوة إضافية في التطبيق.") },
+      result: { ...result, reply },
       validation,
       routed: true,
       executed: false,
-      routerStatus: "read_only_finance_boundary",
+      routerStatus: "read_only_answered_by_groq",
       ...meta(GROQ_CHAT_MODEL, attempts),
     });
   } catch (error) {
