@@ -19,17 +19,16 @@ export default function SmartAIServicePage() {
             SMART TIME
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-white/50 sm:text-lg">
-            خدمة SMART TIME: اكتب طلبك بالمصري، وشاهد الناتج
-            المنظم قبل ما يكمل طريقه إلى الـ Tool Router وقاعدة البيانات.
+            خدمة SMART TIME: اكتب طلبك بالمصري، والمساعد يفهم السياق ويرد عليك
+            باللهجة المصرية باستخدام Groq AI.
           </p>
 
           <div className="mt-7 flex flex-wrap justify-center gap-2">
             {[
-              "Qwen3-4B V2",
-              "LoRA r=64",
-              "alpha=128",
-              "JSON-Only",
-              "95%+ schema-valid",
+              "Groq AI",
+              "Egyptian Arabic",
+              "SMART TIME Context",
+              "Structured Output",
             ].map((badge) => (
               <span
                 key={badge}
@@ -50,16 +49,13 @@ export default function SmartAIServicePage() {
         <div className="mx-auto max-w-7xl px-6 py-12 sm:px-8 lg:px-12">
           <div className="mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div>
-              <p className="text-xs font-semibold text-white/35">MODEL ADAPTER</p>
-              <code
-                dir="ltr"
-                className="mt-2 block overflow-x-auto text-sm text-white/75"
-              >
-                backend/ai/models/smart-ai-v2-super
-              </code>
+              <p className="text-xs font-semibold text-white/35">AI ENGINE</p>
+              <p className="mt-2 text-sm text-white/75">
+                Groq AI · المحرك الإنتاجي الأساسي
+              </p>
             </div>
             <span className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/50">
-              smart-ai-v2-super.zip • Kaggle
+              Egyptian Arabic · SMART TIME Context
             </span>
           </div>
         </div>
