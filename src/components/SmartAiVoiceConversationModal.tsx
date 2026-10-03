@@ -5,11 +5,11 @@ import { transcribeVoiceBlob } from '../services/groqSttService';
 
 type VoiceStatus = 'starting' | 'listening' | 'processing' | 'error';
 
-const RECORDING_MAX_MS = 15_000;
-const SILENCE_AFTER_SPEECH_MS = 1_200;
-const SPEECH_START_GRACE_MS = 700;
+const RECORDING_MAX_MS = 20_000;
+const SILENCE_AFTER_SPEECH_MS = 1_000;
+const SPEECH_START_GRACE_MS = 350;
 const VAD_POLL_MS = 80;
-const VAD_RMS_THRESHOLD = 0.018;
+const VAD_RMS_THRESHOLD = 0.006;
 const SUPPORTED_MIME_TYPES = [
   'audio/webm;codecs=opus',
   'audio/webm',
