@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { SmartAiVoiceConversationModal } from "../../src/components/SmartAiVoiceConversationModal";
 import { transcribeVoiceBlob } from "../../src/services/groqSttService";
+import { startTrialSession } from "../../src/services/authService";
 
 type ChatMessage = { id: number; role: "user" | "assistant"; text: string };
 type ApiPayload = {
@@ -83,6 +84,9 @@ export default function SmartAIDemo() {
 
   useEffect(() => {
     document.title = "SMART TIME";
+    void startTrialSession().catch(() => {
+      // Keep the public demo usable; the voice path will surface an auth error if needed.
+    });
     return () => {
       window.speechSynthesis?.cancel();
       if (voiceStopTimerRef.current !== null) {
