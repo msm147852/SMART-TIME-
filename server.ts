@@ -181,13 +181,31 @@ app.post("/api/ai/stt", async (req, res) => {
       ? "The audio is spoken Egyptian Arabic (Arabic, Egypt). Write the transcript in Arabic script. Preserve Egyptian words, names, numbers, dates, and only genuine English code-switching. Do not transliterate Arabic into Latin letters. Do not invent words. Transcribe only what is actually spoken."
       : "Transcribe only what is actually spoken. Preserve numbers, dates, names, and code-switching.";
 
-    const transcription = await groqProvider.transcribeAudio({
+    let transcription = await groqProvider.transcribeAudio({
       audio,
       mimeType,
       language,
       filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
       prompt,
     });
+
+    // Whisper occasionally emits Latin transliteration for short Arabic mobile
+    // utterances. If an Arabic request comes back mostly Latin, retry once with
+    // the full Whisper model and an explicit Arabic-script prompt.
+    if (language === "ar" && /[A-Za-z]/.test(transcription.text)) {
+      const letters = transcription.text.replace(/[^A-Za-z\u0600-\u06FF]/g, "").length;
+      const latin = transcription.text.replace(/[^A-Za-z]/g, "").length;
+      if (letters > 0 && latin / letters >= 0.35) {
+        transcription = await groqProvider.transcribeAudio({
+          audio,
+          mimeType,
+          language,
+          filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
+          model: "whisper-large-v3",
+          prompt: "Egyptian Arabic speech. Output ONLY the Arabic-script transcription of what was spoken. Never transliterate Arabic into Latin letters. Preserve Egyptian wording, names, numbers, and genuine English words only.",
+        });
+      }
+    }
 
     return res.json({
       provider: transcription.provider,
