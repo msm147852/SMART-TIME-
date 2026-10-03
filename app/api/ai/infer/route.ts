@@ -2,7 +2,7 @@ import { groqProvider } from "../../../../backend/ai/providers/groqProvider.js";
 import { validateV2Output } from "../../../../backend/ai/training/v2StructuredOutput.js";
 import { executeToolAction } from "../../../../backend/ai/toolExecutor.js";
 
-const GROQ_CHAT_MODEL = String(process.env.GROQ_CHAT_MODEL || "llama-3.3-70b-versatile").trim();
+const GROQ_CHAT_MODEL = String(process.env.GROQ_CHAT_MODEL || process.env.GROQ_MODEL || "openai/gpt-oss-120b").trim();
 const DEFAULT_USER_ID = "smart-time-trial-user";
 const MUTATING_TOOLS = new Set(["add_expense", "add_daily_task", "calendar.event.create"]);
 
@@ -30,7 +30,7 @@ export async function POST(request: Request): Promise<Response> {
       "Allowed tools: clarification, unsupported, add_expense, add_daily_task, calendar.event.create.",
       "Mutation tools require explicit confirmation from the user before execution.",
     ].join("\n");
-    const prompt = body?.messages ? JSON.stringify(body.messages) : input;
+    const messages = Array.isArray(body?.messages) && body.messages.length\n      ? body.messages.map((message: any) => ({\n          role: message?.role === "assistant" ? "assistant" : "user",\n          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
     let attempts = 0;
     let raw = "";
     try {
