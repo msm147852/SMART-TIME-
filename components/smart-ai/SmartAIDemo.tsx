@@ -290,7 +290,7 @@ export default function SmartAIDemo() {
             }
             const rms = Math.sqrt(sum / data.length);
             const now = performance.now();
-            if (rms >= 0.018) {
+            if (rms >= 0.006) {
               if (voiceSpeechStartedAtRef.current === null) voiceSpeechStartedAtRef.current = now;
               voiceSilenceSinceRef.current = null;
             } else if (voiceSpeechStartedAtRef.current !== null && now - voiceSpeechStartedAtRef.current >= 700) {
