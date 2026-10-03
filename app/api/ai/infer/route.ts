@@ -1,3 +1,4 @@
+import type { AIMessage } from "../../../../backend/ai/providers/aiProvider.js";
 import { groqProvider } from "../../../../backend/ai/providers/groqProvider.js";
 import { validateV2Output } from "../../../../backend/ai/training/v2StructuredOutput.js";
 import { executeToolAction } from "../../../../backend/ai/toolExecutor.js";
@@ -30,9 +31,10 @@ export async function POST(request: Request): Promise<Response> {
       "Allowed tools: clarification, unsupported, add_expense, add_daily_task, calendar.event.create.",
       "Mutation tools require explicit confirmation from the user before execution.",
     ].join("\n");
-    const messages = Array.isArray(body?.messages) && body.messages.length
-      ? body.messages.map((message: any) => ({
-          role: message?.role === "assistant" ? "assistant" : "user",\n          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
+    const messages: AIMessage[] = Array.isArray(body?.messages) && body.messages.length
+      ? body.messages.map((message: any): AIMessage => ({
+          role: message?.role === "assistant" ? "assistant" : "user",
+          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
     let attempts = 0;
     let raw = "";
     try {
