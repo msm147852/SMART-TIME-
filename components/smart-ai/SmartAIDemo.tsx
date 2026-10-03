@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { SmartAiVoiceConversationModal } from "../../src/components/SmartAiVoiceConversationModal";
 import { transcribeVoiceBlob } from "../../src/services/groqSttService";
-import { startTrialSession } from "../../src/services/authService";
+import { startTrialSession, getStoredSession } from "../../src/services/authService";
+import { StorageAdapter } from "../../src/services/storageAdapter";
+import { STORAGE_KEYS } from "../../src/services/storageKeys";
 
 type ChatMessage = { id: number; role: "user" | "assistant"; text: string };
 type ApiPayload = {
@@ -10,6 +12,22 @@ type ApiPayload = {
   degraded?: boolean;
 };
 const APP_FEATURE_TOOLS = new Set(["add_expense", "add_daily_task", "calendar.event.create"]);
+
+function buildSmartTimeAiContext() {
+  return {
+    profile: StorageAdapter.getItem(STORAGE_KEYS.USER_PROFILE, {}),
+    expenses: StorageAdapter.getItem(STORAGE_KEYS.EXPENSES, []),
+    monthlyIncome: StorageAdapter.getItem(STORAGE_KEYS.MONTHLY_INCOME, []),
+    vehicles: StorageAdapter.getItem(STORAGE_KEYS.VEHICLES, []),
+    fuelRecords: StorageAdapter.getItem(STORAGE_KEYS.FUEL_RECORDS, []),
+    students: StorageAdapter.getItem(STORAGE_KEYS.STUDENTS, []),
+    lessons: StorageAdapter.getItem(STORAGE_KEYS.LESSONS, []),
+    educationExpenses: StorageAdapter.getItem(STORAGE_KEYS.EDUCATION_EXPENSES, []),
+    notes: StorageAdapter.getItem(STORAGE_KEYS.NOTES, []),
+    dailyTasks: StorageAdapter.getItem(STORAGE_KEYS.DAILY_TASKS, []),
+    recentTrips: StorageAdapter.getItem(STORAGE_KEYS.RECENT_TRIPS, []),
+  };
+}
 
 function assistantText(result: ApiPayload["result"]) {
   if (result?.reply?.trim()) return result.reply.trim();
@@ -343,7 +361,12 @@ export default function SmartAIDemo() {
       const response = await fetch("/api/ai/infer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: text }),
+        body: JSON.stringify({
+          input: text,
+          userId: getStoredSession()?.user.id,
+          context: buildSmartTimeAiContext(),
+          messages: messages.map((message) => ({ role: message.role, content: message.text })),
+        }),
       });
       const payload = (await response.json()) as ApiPayload;
 
