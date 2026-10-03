@@ -88,9 +88,10 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const parsed = parseDecision(raw);
+    const parsedReply = String(parsed?.reply || parsed?.ask || "").trim();
     if (parsed.tool === "clarification" || parsed.tool === "unsupported") {
       return json({
-        result: { tool: parsed.tool, arguments: {}, reply: String(parsed.reply || raw).trim() },
+        result: { tool: parsed.tool, arguments: {}, reply: parsedReply || raw.trim() },
         routed: false,
         executed: false,
         degraded: false,
@@ -98,10 +99,10 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
-    const validation = validateV2Output(JSON.stringify(parsed));
+    const decisionForValidation = {\n      tool: parsed.tool,\n      arguments: parsed.arguments || {},\n      needs_clarification: parsed.needs_clarification === false ? false : undefined,\n      ask: parsed.ask,\n      reason: parsed.reason,\n    };\n    Object.keys(decisionForValidation).forEach((key) => {\n      if ((decisionForValidation as Record<string, unknown>)[key] === undefined) delete (decisionForValidation as Record<string, unknown>)[key];\n    });\n    const validation = validateV2Output(JSON.stringify(decisionForValidation));
     if (!validation.valid || !validation.parsed) {
       return json({
-        result: { tool: "clarification", arguments: {}, reply: String(parsed.reply || raw).trim() },
+        result: { tool: "clarification", arguments: {}, reply: parsedReply || raw.trim() },
         routed: false,
         executed: false,
         validation,
@@ -109,7 +110,7 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
-    const result = validation.parsed;
+    const result = validation.parsed;\n    if (!result) return json({ error: "Groq decision validation produced no result.", provider: "groq" }, 502);
 
     if (MUTATING_TOOLS.has(result.tool) && !confirmed) {
       return json({
