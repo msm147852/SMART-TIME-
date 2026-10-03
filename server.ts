@@ -178,8 +178,8 @@ app.post("/api/ai/stt", async (req, res) => {
     if (audio.length > STT_MAX_AUDIO_BYTES) return res.status(413).json({ error: "Audio payload is too large." });
 
     const prompt = language === "ar"
-      ? "The audio is spoken Egyptian Arabic (Arabic, Egypt). Write the transcript in Arabic script. Preserve Egyptian words, names, numbers, dates, and only genuine English code-switching. Do not transliterate Arabic into Latin letters. Do not invent words. Transcribe only what is actually spoken."
-      : "Transcribe only what is actually spoken. Preserve numbers, dates, names, and code-switching.";
+      ? "الكلام باللهجة المصرية وبالعربي. اكتب النص المنطوق بالعربية فقط وبنفس الكلمات التي قالها المتحدث. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ. لا تترجم الكلام إلى الإنجليزية ولا تكتب العربية بحروف لاتينية. اكتب الكلمات الإنجليزية فقط إذا نطقها المتحدث فعلًا."
+      : "اكتب الكلام المنطوق فقط كما قيل، مع الحفاظ على الأرقام والتواريخ والأسماء والكلمات الإنجليزية التي نُطقت فعلًا.";
 
     let transcription = await groqProvider.transcribeAudio({
       audio,
@@ -202,8 +202,18 @@ app.post("/api/ai/stt", async (req, res) => {
           language,
           filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
           model: "whisper-large-v3",
-          prompt: "Egyptian Arabic speech. Output ONLY the Arabic-script transcription of what was spoken. Never transliterate Arabic into Latin letters. Preserve Egyptian wording, names, numbers, and genuine English words only.",
+          prompt: "الكلام باللهجة المصرية. أخرج النص العربي المنطوق فقط كما قيل. ممنوع الترجمة إلى الإنجليزية وممنوع كتابة العربية بحروف لاتينية. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ، واكتب الإنجليزية فقط إذا نُطقت فعلًا.",
         });
+
+        const retryText = transcription.text.trim();
+        const retryArabic = retryText.replace(/[^\u0600-\u06FF]/g, "").length;
+        const retryLatin = retryText.replace(/[^A-Za-z]/g, "").length;
+        if (retryText && retryLatin > 0 && retryArabic === 0) {
+          return res.status(502).json({
+            error: "تعذر الحصول على تفريغ عربي موثوق من الصوت.",
+            code: "arabic-transcript-validation-failed",
+          });
+        }
       }
     }
 
