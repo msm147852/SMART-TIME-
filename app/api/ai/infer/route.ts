@@ -90,10 +90,24 @@ export async function POST(request: Request): Promise<Response> {
 
     const parsed = parseDecision(raw);
     const parsedReply = String(parsed?.reply || parsed?.ask || "").trim();
+    const clarificationQuestion = String(
+      parsed?.arguments?.question
+      || parsed?.arguments?.ask
+      || parsed?.arguments?.clarification
+      || ""
+    ).trim();
+    const cleanDecisionReply =
+      parsedReply
+      || (parsed.tool === "clarification" ? clarificationQuestion : "")
+      || (parsed.tool === "unsupported" ? "الطلب ده غير مدعوم حاليًا." : "");
 
     if (parsed.tool === "clarification" || parsed.tool === "unsupported") {
       return json({
-        result: { tool: parsed.tool, arguments: {}, reply: parsedReply || raw.trim() },
+        result: {
+          tool: parsed.tool,
+          arguments: {},
+          reply: cleanDecisionReply || "ممكن توضّحلي طلبك أكتر؟",
+        },
         routed: false,
         executed: false,
         degraded: false,
