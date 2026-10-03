@@ -1,11 +1,10 @@
-import { runLocalInference } from "../../../../backend/ai/inference/localInference.js";
+import { groqProvider } from "../../../../backend/ai/providers/groqProvider.js";
 import { validateV2Output } from "../../../../backend/ai/training/v2StructuredOutput.js";
 import { executeToolAction } from "../../../../backend/ai/toolExecutor.js";
 import { buildSmartTimeData } from "../../../../backend/ai/appContext.js";
 import { answerWithRules } from "../../../../backend/ai/rulesEngine.js";
 
-const DATASET_SHA = "a6b0fc5461df86d9e175654b2e5ff156903aa552";
-const MODEL_PATH = "backend/ai/models/smart-ai-v2-super";
+const GROQ_CHAT_MODEL = String(process.env.GROQ_CHAT_MODEL || "llama-3.3-70b-versatile").trim();
 const DEFAULT_USER_ID = "smart-time-trial-user";
 const MUTATING_TOOLS = new Set(["add_expense", "add_daily_task", "calendar.event.create"]);
 
@@ -13,9 +12,7 @@ function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8" } });
 }
 
-function meta(inference: Awaited<ReturnType<typeof runLocalInference>>, attempts: number) {
-  return { model: inference.model, modelPath: inference.modelPath, runtime: inference.runtime, retryAttempts: attempts, datasetSha: DATASET_SHA };
-}
+function meta(model: string, attempts: number) { return { model, runtime: { source: "groq", provider: "groq" }, retryAttempts: attempts }; }
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -26,54 +23,44 @@ export async function POST(request: Request): Promise<Response> {
 
     const confirmed = body?.confirmed === true;
     const userId = String(body?.userId || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
-
-    // The preview/public SMART AI demo must remain conversational even when
-    // the optional local Qwen/vLLM runtime is not provisioned. Never fabricate
-    // a model result: use the verified app-owned rules engine as an explicit
-    // degraded response and expose the degraded flag to the UI.
-    if (!String(process.env.SMART_AI_LOCAL_URL || "").trim() && !confirmed) {
-      const appData = buildSmartTimeData({}, input);
-      const fallback = answerWithRules(input, "ar", appData);
-      const result = {
-        tool: "clarification",
-        arguments: {},
-        reply: fallback.reply,
-      };
-      return json({
-        result,
-        routed: false,
-        executed: false,
-        degraded: true,
-        degradedReason: "SMART_AI_LOCAL_URL is not configured; app-owned rules response used.",
-        model: fallback.model || "smart-time-core",
-        runtime: { source: "app-owned-rules", enableThinking: false },
-      });
-    }
-
-    let inference: Awaited<ReturnType<typeof runLocalInference>>;
-    let validation: ReturnType<typeof validateV2Output>;
+    const system = [
+      "You are SMART TIME AI, the conversational assistant for the SMART TIME app.",
+      "Speak naturally in Egyptian Arabic when the user speaks Arabic. Do not use canned phrases unless appropriate.",
+      "Understand the actual request and context. Vary wording naturally.",
+      "Never claim an action was completed unless a tool result confirms it.",
+      "For actions, return exactly one JSON object with keys tool and arguments and optionally reply.",
+      "Allowed tools: clarification, unsupported, add_expense, add_daily_task, calendar.event.create.",
+      "Mutation tools require explicit confirmation from the user before execution.",
+    ].join("\n");
+    const prompt = body?.messages ? JSON.stringify(body.messages) : input;
     let attempts = 0;
-
-    if (confirmed && body?.confirmedResult) {
-      validation = validateV2Output(JSON.stringify(body.confirmedResult));
-      if (!validation.valid || !validation.parsed) return json({ error: "Confirmed result failed V2 validation; nothing was executed.", validation, routed: false, executed: false, datasetSha: DATASET_SHA }, 422);
-      if (!MUTATING_TOOLS.has(validation.parsed.tool)) return json({ error: "Confirmed result is not a mutation.", validation, routed: false, executed: false, datasetSha: DATASET_SHA }, 400);
-      inference = await runLocalInference({ input, modelPath: MODEL_PATH, retryHint: "Confirmation path: the supplied JSON was revalidated before execution." });
+    let raw = "";
+    try {
+      const response = await groqProvider.chat({ model: GROQ_CHAT_MODEL, system, input: prompt, temperature: 0.7, maxTokens: 700 });
       attempts = 1;
-    } else {
-      inference = await runLocalInference({ input, modelPath: MODEL_PATH });
-      attempts = 1;
-      validation = validateV2Output(inference.raw);
-      if (!validation.valid || !validation.parsed) {
-        inference = await runLocalInference({ input, modelPath: MODEL_PATH, retryHint: "Your previous response failed the SMART TIME V2 schema. Correct it now. Output exactly one valid JSON object, no <think>, no markdown, no extra keys." });
-        attempts = 2;
-        validation = validateV2Output(inference.raw);
-      }
+      raw = response.text;
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : "Groq chat failed", provider: "groq", ...meta(GROQ_CHAT_MODEL, attempts) }, 502);
     }
-
-    if (!validation.valid || !validation.parsed) return json({ error: "V2 validation failed after bounded local retry; nothing was routed or executed.", retry: false, validation, raw: inference.raw, ...meta(inference, attempts) }, 422);
-
+    let parsed: any = null;
+    try {
+      const clean = raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+      parsed = JSON.parse(clean);
+    } catch { parsed = { tool: "clarification", arguments: {}, reply: raw }; }
+    if (!parsed || typeof parsed !== "object" || typeof parsed.tool !== "string") parsed = { tool: "clarification", arguments: {}, reply: raw };
+    if (parsed.tool === "clarification" || parsed.tool === "unsupported") return json({ result: parsed, routed: false, executed: false, degraded: false, ...meta(GROQ_CHAT_MODEL, attempts) });
+    const validation = validateV2Output(JSON.stringify(parsed));
+    if (!validation.valid || !validation.parsed) return json({ result: { tool: "clarification", arguments: {}, reply: parsed.reply || raw }, routed: false, executed: false, validation, ...meta(GROQ_CHAT_MODEL, attempts) });
     const result = validation.parsed;
+    if (MUTATING_TOOLS.has(result.tool) && !confirmed) return json({ result, validation, routed: true, executed: false, requiresConfirmation: true, confirmationReason: "Mutation requires explicit confirmation.", ...meta(GROQ_CHAT_MODEL, attempts) });
+    if (result.tool === "add_expense" || result.tool === "add_daily_task") {
+      const toolResult = executeToolAction(userId, { type: result.tool, payload: result.arguments || {} } as any);
+      const verified = toolResult.ok === true && toolResult.verification?.persisted === true;
+      if (!verified) return json({ result, validation, routed: true, executed: false, routerStatus: "backend_verification_failed", toolResult, ...meta(GROQ_CHAT_MODEL, attempts) }, 502);
+      return json({ result, validation, routed: true, executed: true, toolResult, ...meta(GROQ_CHAT_MODEL, attempts) });
+    }
+    if (result.tool === "calendar.event.create") return json({ result, validation, routed: true, executed: false, requiresConfirmation: false, routerStatus: "calendar_executor_not_implemented", ...meta(GROQ_CHAT_MODEL, attempts) }, 501);
+    return json({ result, validation, routed: true, executed: false, routerStatus: "read_only_finance_boundary", ...meta(GROQ_CHAT_MODEL, attempts) });
     if (result.tool === "clarification" || result.tool === "unsupported") return json({ result, validation, routed: false, executed: false, ...meta(inference, attempts) });
 
     if (MUTATING_TOOLS.has(result.tool) && !confirmed) return json({ result, validation, routed: true, executed: false, requiresConfirmation: true, confirmationReason: "Mutation requires explicit confirmation.", ...meta(inference, attempts) });
