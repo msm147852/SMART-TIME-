@@ -1,8 +1,6 @@
 import { groqProvider } from "../../../../backend/ai/providers/groqProvider.js";
 import { validateV2Output } from "../../../../backend/ai/training/v2StructuredOutput.js";
 import { executeToolAction } from "../../../../backend/ai/toolExecutor.js";
-import { buildSmartTimeData } from "../../../../backend/ai/appContext.js";
-import { answerWithRules } from "../../../../backend/ai/rulesEngine.js";
 
 const GROQ_CHAT_MODEL = String(process.env.GROQ_CHAT_MODEL || "llama-3.3-70b-versatile").trim();
 const DEFAULT_USER_ID = "smart-time-trial-user";
@@ -61,21 +59,8 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (result.tool === "calendar.event.create") return json({ result, validation, routed: true, executed: false, requiresConfirmation: false, routerStatus: "calendar_executor_not_implemented", ...meta(GROQ_CHAT_MODEL, attempts) }, 501);
     return json({ result, validation, routed: true, executed: false, routerStatus: "read_only_finance_boundary", ...meta(GROQ_CHAT_MODEL, attempts) });
-    if (result.tool === "clarification" || result.tool === "unsupported") return json({ result, validation, routed: false, executed: false, ...meta(inference, attempts) });
 
-    if (MUTATING_TOOLS.has(result.tool) && !confirmed) return json({ result, validation, routed: true, executed: false, requiresConfirmation: true, confirmationReason: "Mutation requires explicit confirmation.", ...meta(inference, attempts) });
-
-    if (result.tool === "add_expense" || result.tool === "add_daily_task") {
-      const toolResult = executeToolAction(userId, { type: result.tool, payload: result.arguments || {} } as any);
-      const verified = toolResult.ok === true && toolResult.verification?.persisted === true;
-      if (!verified) return json({ result, validation, routed: true, executed: false, routerStatus: "backend_verification_failed", toolResult, ...meta(inference, attempts) }, 502);
-      return json({ result, validation, routed: true, executed: true, toolResult, ...meta(inference, attempts) });
-    }
-
-    if (result.tool === "calendar.event.create") return json({ result, validation, routed: true, executed: false, requiresConfirmation: false, routerStatus: "calendar_executor_not_implemented", ...meta(inference, attempts) }, 501);
-
-    return json({ result, validation, routed: true, executed: false, routerStatus: "read_only_finance_boundary", ...meta(inference, attempts) });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "SMART TIME inference failed", retry: false, datasetSha: DATASET_SHA }, 500);
+    return json({ error: error instanceof Error ? error.message : "SMART TIME inference failed", retry: false, provider: "groq" }, 500);
   }
 }
