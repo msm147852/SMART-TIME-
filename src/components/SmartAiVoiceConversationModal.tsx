@@ -5,7 +5,11 @@ import { transcribeVoiceBlob } from '../services/groqSttService';
 
 type VoiceStatus = 'starting' | 'listening' | 'processing' | 'error';
 
-const RECORDING_MAX_MS = 90_000;
+const RECORDING_MAX_MS = 15_000;
+const SILENCE_AFTER_SPEECH_MS = 1_200;
+const SPEECH_START_GRACE_MS = 700;
+const VAD_POLL_MS = 80;
+const VAD_RMS_THRESHOLD = 0.018;
 const SUPPORTED_MIME_TYPES = [
   'audio/webm;codecs=opus',
   'audio/webm',
@@ -45,6 +49,11 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const stopTimerRef = useRef<number | null>(null);
+  const vadTimerRef = useRef<number | null>(null);
+  const silenceSinceRef = useRef<number | null>(null);
+  const speechStartedAtRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const activeRef = useRef(false);
   const processingRef = useRef(false);
   const turnGenerationRef = useRef(0);
@@ -62,6 +71,22 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
       window.clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
     }
+    if (vadTimerRef.current !== null) {
+      window.clearTimeout(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
+  };
+
+  const cleanupVad = () => {
+    if (vadTimerRef.current !== null) {
+      window.clearTimeout(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
+    try { audioContextRef.current?.close(); } catch {}
+    audioContextRef.current = null;
+    analyserRef.current = null;
+    silenceSinceRef.current = null;
+    speechStartedAtRef.current = null;
   };
 
   const releaseStream = () => {
@@ -71,6 +96,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
 
   const resetRecorder = () => {
     clearTimer();
+    cleanupVad();
     recorderRef.current = null;
     chunksRef.current = [];
     releaseStream();
@@ -204,6 +230,50 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
       recorder.start();
       setStatus('listening');
       stopTimerRef.current = window.setTimeout(stopRecording, RECORDING_MAX_MS);
+
+      // Real hands-free turn detection: stop automatically after ~1.2s of silence
+      // once speech has actually started. This keeps the mic separate from chat
+      // while making both voice controls behave naturally on mobile.
+      try {
+        const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (AudioContextCtor) {
+          const audioContext = new AudioContextCtor();
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+          audioContextRef.current = audioContext;
+          analyserRef.current = analyser;
+          const data = new Uint8Array(analyser.fftSize);
+
+          const pollVad = () => {
+            if (!activeRef.current || processingRef.current || recorderRef.current !== recorder || recorder.state !== 'recording') return;
+            analyser.getByteTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i += 1) {
+              const normalized = (data[i] - 128) / 128;
+              sum += normalized * normalized;
+            }
+            const rms = Math.sqrt(sum / data.length);
+            const now = performance.now();
+            if (rms >= VAD_RMS_THRESHOLD) {
+              if (speechStartedAtRef.current === null) speechStartedAtRef.current = now;
+              silenceSinceRef.current = null;
+            } else if (speechStartedAtRef.current !== null && now - speechStartedAtRef.current >= SPEECH_START_GRACE_MS) {
+              if (silenceSinceRef.current === null) silenceSinceRef.current = now;
+              if (now - silenceSinceRef.current >= SILENCE_AFTER_SPEECH_MS) {
+                stopRecording();
+                return;
+              }
+            }
+            vadTimerRef.current = window.setTimeout(pollVad, VAD_POLL_MS);
+          };
+          void audioContext.resume().catch(() => {});
+          vadTimerRef.current = window.setTimeout(pollVad, VAD_POLL_MS);
+        }
+      } catch {
+        // If Web Audio/VAD is unavailable, the explicit stop button and max timer remain.
+      }
     } catch {
       resetRecorder();
       fail(language === 'ar' ? 'تعذر بدء تسجيل الصوت.' : 'Could not start audio recording.');
@@ -266,6 +336,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   if (inline) {
     const isActive = isOpen;
     const isBusy = status === 'processing' || status === 'starting';
+    const isError = status === 'error';
 
     return (
       <button
@@ -274,7 +345,9 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
         className={
           'relative shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-extrabold text-xs transition-all active:scale-95 border ' +
           (isActive
-            ? 'bg-red-600 hover:bg-red-700 text-white border-red-500 shadow-lg shadow-red-500/30'
+            ? isError
+              ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-500 shadow-lg shadow-amber-500/30'
+              : 'bg-red-600 hover:bg-red-700 text-white border-red-500 shadow-lg shadow-red-500/30'
             : 'bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 border-slate-200 hover:border-red-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-red-950/30 dark:hover:text-red-300')
         }
         aria-label={language === 'ar' ? 'حوار صوتي مع SMART AI' : 'Voice conversation with SMART AI'}
@@ -283,12 +356,17 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
       >
         {isBusy && isActive ? (
           <Loader2 className="w-4 h-4 animate-spin" />
+        ) : isActive && isError ? (
+          <MicOff className="w-4 h-4" />
         ) : isActive ? (
           <Mic className="w-4 h-4" />
         ) : (
           <MessageCircle className="w-4 h-4" />
         )}
         <span>{language === 'ar' ? 'حوار' : 'Talk'}</span>
+        {isActive && error && (
+          <span className="sr-only">{error}</span>
+        )}
         {isActive && (
           <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-red-400 ring-2 ring-white dark:ring-slate-850 animate-pulse" />
         )}
