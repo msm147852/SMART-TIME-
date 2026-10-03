@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, MicOff, Sparkles, X } from 'lucide-react';
+import { Loader2, MessageCircle, Mic, MicOff, Sparkles, X } from 'lucide-react';
 import { Language } from '../types';
 import { transcribeVoiceBlob } from '../services/groqSttService';
 
@@ -23,16 +23,20 @@ interface Props {
   isOpen: boolean;
   language: Language;
   onClose: () => void;
+  onOpen?: () => void;
   onTurn: (transcript: string) => Promise<void>;
   onInterrupt?: () => void;
+  inline?: boolean;
 }
 
 export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   isOpen,
   language,
   onClose,
+  onOpen,
   onTurn,
   onInterrupt,
+  inline = false,
 }) => {
   const [status, setStatus] = useState<VoiceStatus>('starting');
   const [transcript, setTranscript] = useState('');
@@ -258,6 +262,39 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     setTranscript('');
     void startRecording();
   };
+
+  if (inline) {
+    const isActive = isOpen;
+    const isBusy = status === 'processing' || status === 'starting';
+
+    return (
+      <button
+        type="button"
+        onClick={() => (isActive ? onClose() : onOpen?.())}
+        className={
+          'relative shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-extrabold text-xs transition-all active:scale-95 border ' +
+          (isActive
+            ? 'bg-red-600 hover:bg-red-700 text-white border-red-500 shadow-lg shadow-red-500/30'
+            : 'bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 border-slate-200 hover:border-red-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-red-950/30 dark:hover:text-red-300')
+        }
+        aria-label={language === 'ar' ? 'حوار صوتي مع SMART AI' : 'Voice conversation with SMART AI'}
+        aria-pressed={isActive}
+        title={language === 'ar' ? 'حوار: سماع ورد صوتي' : 'Conversation: listen and reply by voice'}
+      >
+        {isBusy && isActive ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : isActive ? (
+          <Mic className="w-4 h-4" />
+        ) : (
+          <MessageCircle className="w-4 h-4" />
+        )}
+        <span>{language === 'ar' ? 'حوار' : 'Talk'}</span>
+        {isActive && (
+          <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-red-400 ring-2 ring-white dark:ring-slate-850 animate-pulse" />
+        )}
+      </button>
+    );
+  }
 
   if (!isOpen) return null;
 
