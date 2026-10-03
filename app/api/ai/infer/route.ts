@@ -30,13 +30,19 @@ export async function POST(request: Request): Promise<Response> {
       "Allowed tools: clarification, unsupported, add_expense, add_daily_task, calendar.event.create.",
       "Mutation tools require explicit confirmation from the user before execution.",
     ].join("\n");
-    const messages = Array.isArray(body?.messages) && body.messages.length\n      ? body.messages.map((message: any) => ({\n          role: message?.role === "assistant" ? "assistant" : "user",\n          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
+    const messages = Array.isArray(body?.messages) && body.messages.length
+      ? body.messages.map((message: any) => ({\n          role: message?.role === "assistant" ? "assistant" : "user",\n          content: String(message?.content ?? message?.text ?? "").trim(),\n        })).filter((message: { content: string }) => message.content)\n      : [{ role: "user" as const, content: input }];
     let attempts = 0;
     let raw = "";
     try {
-      const response = await groqProvider.chat({ model: GROQ_CHAT_MODEL, system, input: prompt, temperature: 0.7, maxTokens: 700 });
+      const response = await groqProvider.chat({
+        model: GROQ_CHAT_MODEL,
+        messages: [{ role: "system", content: system }, ...messages],
+        temperature: 0.7,
+        maxCompletionTokens: 700,
+      });
       attempts = 1;
-      raw = response.text;
+      raw = response.content;
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : "Groq chat failed", provider: "groq", ...meta(GROQ_CHAT_MODEL, attempts) }, 502);
     }
