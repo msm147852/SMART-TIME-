@@ -3,9 +3,10 @@ export interface VoiceDnaSynthesisRequest {
   language: "ar" | "en";
   locale: "ar-EG" | "en-US";
   profileId: string;
-  referenceAudio: Uint8Array;
-  referenceMimeType: string;
+  referenceAudio?: Uint8Array;
+  referenceMimeType?: string;
   referenceText?: string;
+  speaker?: string;
   speakingStyle?: "natural" | "calm" | "warm" | "formal" | "alert";
 }
 
@@ -38,34 +39,51 @@ export function createHttpVoiceDnaProvider(options: { id?: string; url: string; 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 90000);
       try {
-        const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "audio/wav, audio/mpeg, application/json" };
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Accept: "audio/wav, audio/mpeg, application/json",
+        };
         if (options.token?.trim()) headers.Authorization = "Bearer " + options.token.trim();
+
+        const body: Record<string, unknown> = {
+          text: request.text,
+          language: request.language,
+          locale: request.locale,
+          profileId: request.profileId,
+          referenceText: request.referenceText || "",
+          speaker: request.speaker || "",
+          speakingStyle: request.speakingStyle || "natural",
+        };
+        if (request.referenceAudio?.length) {
+          body.referenceAudioBase64 = Buffer.from(request.referenceAudio).toString("base64");
+          body.referenceMimeType = request.referenceMimeType || "audio/wav";
+        }
+
         const response = await fetch(options.url, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            text: request.text,
-            language: request.language,
-            locale: request.locale,
-            profileId: request.profileId,
-            referenceAudioBase64: Buffer.from(request.referenceAudio).toString("base64"),
-            referenceMimeType: request.referenceMimeType,
-            referenceText: request.referenceText || "",
-            speakingStyle: request.speakingStyle || "natural",
-          }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
         if (!response.ok) {
-          const body = await response.text().catch(() => "");
-          throw new Error("Voice DNA provider failed (" + response.status + ")" + (body ? ": " + body.slice(0, 300) : ""));
+          const bodyText = await response.text().catch(() => "");
+          throw new Error("Voice DNA provider failed (" + response.status + ")" + (bodyText ? ": " + bodyText.slice(0, 300) : ""));
         }
         const contentType = String(response.headers.get("content-type") || "audio/wav");
         if (contentType.includes("application/json")) {
           const json = await response.json() as { audioBase64?: string; contentType?: string };
           if (!json.audioBase64) throw new Error("Voice DNA provider returned no audio.");
-          return { audio: Uint8Array.from(Buffer.from(json.audioBase64, "base64")), contentType: json.contentType || "audio/wav", provider: id };
+          return {
+            audio: Uint8Array.from(Buffer.from(json.audioBase64, "base64")),
+            contentType: json.contentType || "audio/wav",
+            provider: id,
+          };
         }
-        return { audio: new Uint8Array(await response.arrayBuffer()), contentType, provider: id };
+        return {
+          audio: new Uint8Array(await response.arrayBuffer()),
+          contentType,
+          provider: id,
+        };
       } finally {
         clearTimeout(timeout);
       }

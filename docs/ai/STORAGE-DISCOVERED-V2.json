@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "scanned_at": "2026-09-28T20:05:41.477Z",
+  "scanned_at": "2026-10-03T03:14:37.518Z",
   "scope": {
     "root": "src",
     "extensions": [
@@ -59,9 +59,9 @@
     ]
   },
   "scan": {
-    "files_scanned": 114,
-    "total_discovered_keys": 64,
-    "hidden_discovered_keys": 31,
+    "files_scanned": 116,
+    "total_discovered_keys": 56,
+    "hidden_discovered_keys": 23,
     "hidden_keys": [
       "smart_time_adhan_alert",
       "smart_time_auth_session",
@@ -75,25 +75,17 @@
       "smart_time_contacts_changed",
       "smart_time_dashboard_layout_settings_v1",
       "smart_time_device_id",
-      "smart_time_house_expenses",
-      "smart_time_medical_expenses",
       "smart_time_permission_audit_logs_v1",
       "smart_time_permissions_changed",
       "smart_time_permissions_v1",
       "smart_time_personal_associations",
-      "smart_time_personal_expenses",
       "smart_time_phone_contacts_v1",
       "smart_time_quran_bookmarks",
       "smart_time_quran_last_stop",
       "smart_time_quran_wird",
-      "smart_time_student_expenses",
       "smart_time_surah_cache_",
       "smart_time_trip_home",
-      "smart_time_trip_work",
-      "smart_time_vehicle_fuel",
-      "smart_time_vehicle_maint",
-      "smart_time_vehicle_oil_filters",
-      "smart_time_work_expenses"
+      "smart_time_trip_work"
     ],
     "findings": {
       "smart_time_permissions_changed": [
@@ -113,56 +105,7 @@
           "evidence": "smart_time-literal"
         }
       ],
-      "smart_time_house_expenses": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_medical_expenses": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_work_expenses": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_personal_expenses": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
       "smart_time_personal_associations": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_vehicle_fuel": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_vehicle_maint": [
-        {
-          "file": "src/components/ExpensesView.tsx",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_vehicle_oil_filters": [
         {
           "file": "src/components/ExpensesView.tsx",
           "access": "string-reference",
@@ -177,13 +120,6 @@
         },
         {
           "file": "src/services/storageKeys.ts",
-          "access": "string-reference",
-          "evidence": "smart_time-literal"
-        }
-      ],
-      "smart_time_student_expenses": [
-        {
-          "file": "src/components/ExpensesView.tsx",
           "access": "string-reference",
           "evidence": "smart_time-literal"
         }

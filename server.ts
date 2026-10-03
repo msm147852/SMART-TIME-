@@ -18,6 +18,8 @@ import { createCanonicalExpense, updateCanonicalExpense, deleteCanonicalExpense,
 import { acknowledgeEventReminder, listPendingEventReminders, queueDueEventReminders } from "./backend/ai/calendar/reminderScheduler.js";
 import { isLocalSmartAiConfigured } from "./backend/ai/localInference.js";
 import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/voice/voiceDnaProvider.js";
+import { POST as smartAiV2Infer } from "./app/api/ai/infer/route.js";
+import { getGroqHealth, groqProvider } from "./backend/ai/providers/groqProvider.js";
 
 dotenv.config();
 
@@ -31,6 +33,21 @@ const smartVoiceDnaProvider = SMART_VOICE_DNA_PROVIDER_URL
   : new DisabledVoiceDnaProvider();
 const SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE || 8));
 const voiceDnaRequestWindow = new Map<string, { startedAt: number; count: number }>();
+const sttRequestWindow = new Map<string, { startedAt: number; count: number }>();
+const STT_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.STT_MAX_REQUESTS_PER_MINUTE || 12));
+const STT_MAX_AUDIO_BYTES = Math.max(256 * 1024, Number(process.env.STT_MAX_AUDIO_BYTES || 8 * 1024 * 1024));
+function consumeSttQuota(userId: string): boolean {
+  const now = Date.now();
+  const current = sttRequestWindow.get(userId);
+  if (!current || now - current.startedAt >= 60_000) {
+    sttRequestWindow.set(userId, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= STT_MAX_REQUESTS_PER_MINUTE) return false;
+  current.count += 1;
+  return true;
+}
+
 let voiceDnaProviderHealth = { checkedAt: 0, healthy: false };
 
 async function checkVoiceDnaProviderHealth(): Promise<boolean> {
@@ -97,6 +114,142 @@ seedServiceStatuses();
 seedDefaultChatRooms();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+const groqHealthHandler = async (_req: express.Request, res: express.Response) => {
+  // Preparation-only endpoint: never expose provider diagnostics from production.
+  const previewEnvironment = process.env.VERCEL_ENV === "preview" || process.env.RAILWAY_ENVIRONMENT_NAME === "staging";
+  if (!previewEnvironment && process.env.NODE_ENV === "production") {
+    return res.status(404).json({ error: "preview-only" });
+  }
+  try {
+    const health = await getGroqHealth();
+    const status = health.configured && health.reachable ? 200 : 503;
+    return res.status(status).json({
+      provider: "groq",
+      configured: health.configured,
+      reachable: health.reachable,
+      modelCount: health.models.length,
+      models: health.models.map(({ id, active, ownedBy }) => ({ id, active, ownedBy })),
+    });
+  } catch (error) {
+    return res.status(502).json({
+      provider: "groq",
+      configured: true,
+      reachable: false,
+      error: error instanceof Error ? error.message : "Groq health check failed",
+    });
+  }
+};
+
+app.get("/api/ai/groq-health", groqHealthHandler);
+app.get("/api/ai/groq_health", groqHealthHandler);
+
+app.post("/api/ai/stt", async (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "Authentication is required for voice transcription." });
+  if (!consumeSttQuota(String(user.id))) return res.status(429).json({ error: "Voice transcription rate limit exceeded. Try again shortly." });
+
+  try {
+    const rawAudio = String(req.body?.audioBase64 || "").trim();
+    const language = String(req.body?.language || "ar").trim().toLowerCase();
+    const locale = String(req.body?.locale || (language === "ar" ? "ar-EG" : "en-US")).trim();
+    const mimeType = String(req.body?.mimeType || "audio/webm").split(";")[0].trim().toLowerCase();
+    if (!rawAudio) return res.status(400).json({ error: "audioBase64 is required." });
+    if (!["ar", "en"].includes(language)) return res.status(400).json({ error: "language must be ar or en." });
+    if (!["ar-EG", "en-US"].includes(locale)) return res.status(400).json({ error: "Unsupported STT locale." });
+    const allowedMimeTypes = new Set(["audio/webm", "audio/mp4", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac"]);
+    if (!allowedMimeTypes.has(mimeType)) return res.status(415).json({ error: "Unsupported audio format." });
+
+    const normalizedBase64 = rawAudio.replace(/^data:[^,]*;base64,/i, "").replace(/\s+/g, "");
+    const maxBase64Chars = Math.ceil(STT_MAX_AUDIO_BYTES / 3) * 4 + 4;
+    if (normalizedBase64.length > maxBase64Chars) {
+      return res.status(413).json({ error: "Audio payload is too large." });
+    }
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalizedBase64) || normalizedBase64.length % 4 === 1) {
+      return res.status(400).json({ error: "Invalid base64 audio payload." });
+    }
+    let audio: Buffer;
+    try {
+      audio = Buffer.from(normalizedBase64, "base64");
+    } catch {
+      return res.status(400).json({ error: "Invalid base64 audio payload." });
+    }
+    if (!audio.length) return res.status(400).json({ error: "Audio payload is empty." });
+    if (audio.length > STT_MAX_AUDIO_BYTES) return res.status(413).json({ error: "Audio payload is too large." });
+
+    const prompt = language === "ar"
+      ? "الكلام باللهجة المصرية وبالعربي. اكتب النص المنطوق بالعربية فقط وبنفس الكلمات التي قالها المتحدث. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ. لا تترجم الكلام إلى الإنجليزية ولا تكتب العربية بحروف لاتينية. اكتب الكلمات الإنجليزية فقط إذا نطقها المتحدث فعلًا."
+      : "اكتب الكلام المنطوق فقط كما قيل، مع الحفاظ على الأرقام والتواريخ والأسماء والكلمات الإنجليزية التي نُطقت فعلًا.";
+
+    let transcription = await groqProvider.transcribeAudio({
+      audio,
+      mimeType,
+      language,
+      filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
+      prompt,
+    });
+
+    // Whisper occasionally emits Latin transliteration for short Arabic mobile
+    // utterances. If an Arabic request comes back mostly Latin, retry once with
+    // the full Whisper model and an explicit Arabic-script prompt.
+    if (language === "ar" && /[A-Za-z]/.test(transcription.text)) {
+      const letters = transcription.text.replace(/[^A-Za-z\u0600-\u06FF]/g, "").length;
+      const latin = transcription.text.replace(/[^A-Za-z]/g, "").length;
+      if (letters > 0 && latin / letters >= 0.35) {
+        transcription = await groqProvider.transcribeAudio({
+          audio,
+          mimeType,
+          language,
+          filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
+          model: "whisper-large-v3",
+          prompt: "الكلام باللهجة المصرية. أخرج النص العربي المنطوق فقط كما قيل. ممنوع الترجمة إلى الإنجليزية وممنوع كتابة العربية بحروف لاتينية. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ، واكتب الإنجليزية فقط إذا نُطقت فعلًا.",
+        });
+
+        const retryText = transcription.text.trim();
+        const retryArabic = retryText.replace(/[^\u0600-\u06FF]/g, "").length;
+        const retryLatin = retryText.replace(/[^A-Za-z]/g, "").length;
+        if (retryText && retryLatin > 0 && retryArabic === 0) {
+          return res.status(502).json({
+            error: "تعذر الحصول على تفريغ عربي موثوق من الصوت.",
+            code: "arabic-transcript-validation-failed",
+          });
+        }
+      }
+    }
+
+    return res.json({
+      provider: transcription.provider,
+      model: transcription.model,
+      transcript: transcription.text,
+      requestId: transcription.requestId,
+      locale,
+      persisted: false,
+    });
+  } catch (error) {
+    if (error instanceof Error && /authentication failed/i.test(error.message)) {
+      return res.status(502).json({ error: "Speech provider authentication failed." });
+    }
+    if (error instanceof Error && /rate limit/i.test(error.message)) {
+      return res.status(429).json({ error: "Speech provider rate limit reached." });
+    }
+    return res.status(502).json({ error: "Speech transcription provider failed." });
+  }
+});
+
+app.post("/api/ai/infer", async (req, res) => {
+  try {
+    const request = new Request("http://localhost/api/ai/infer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...(req.body || {}), userId: req.body?.userId }),
+    });
+    const response = await smartAiV2Infer(request);
+    const text = await response.text();
+    res.status(response.status).type("application/json").send(text);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "SMART AI V2 route failed", retry: true });
+  }
+});
 
 // Mount Chat API
 app.use("/api/chat", chatRouter);
@@ -942,6 +1095,50 @@ app.get("/api/voice-dna/status", async (req, res) => {
     });
   } catch {
     return res.status(500).json({ error: "تعذر قراءة حالة Voice DNA." });
+  }
+});
+
+app.post("/api/ai/egyptian-tts", async (req, res) => {
+  try {
+    if (!smartVoiceDnaProvider.isAvailable()) {
+      return res.status(503).json({ error: "محرك الصوت المصري غير موصل حاليًا." });
+    }
+
+    const ipKey = "public-tts:" + clientIp(req);
+    if (!consumeVoiceDnaQuota(ipKey)) {
+      return res.status(429).json({ error: "طلبات الصوت كثيرة حاليًا. حاول بعد قليل." });
+    }
+
+    const text = String(req.body?.text || "").trim();
+    const speaker = String(req.body?.speaker || "Mohamed").trim();
+    if (!text) return res.status(400).json({ error: "النص الصوتي مطلوب." });
+    if (text.length > 800) return res.status(413).json({ error: "النص الصوتي طويل جدًا." });
+
+    const allowedSpeakers = new Set([
+      "Abdelrahman", "Abdullah", "Kamal", "Hossam", "Mohamed",
+      "Omar", "Sayed", "Zaki", "Aly", "Essam", "Ahmed",
+      "Asmaa", "Esraa", "Hanan", "Sarah", "Yasmin", "Omnia",
+    ]);
+    if (!allowedSpeakers.has(speaker)) {
+      return res.status(400).json({ error: "الصوت المصري المطلوب غير متاح." });
+    }
+
+    const result = await smartVoiceDnaProvider.synthesize({
+      text,
+      language: "ar",
+      locale: "ar-EG",
+      profileId: "smart-ai-egyptian-default",
+      speaker,
+      speakingStyle: "natural",
+    });
+
+    res.setHeader("Content-Type", result.contentType || "audio/wav");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-SMART-VOICE-PROVIDER", result.provider);
+    return res.send(Buffer.from(result.audio));
+  } catch (error: any) {
+    console.error("Egyptian TTS error:", error?.message || error);
+    return res.status(502).json({ error: "تعذر توليد الصوت المصري حاليًا." });
   }
 });
 

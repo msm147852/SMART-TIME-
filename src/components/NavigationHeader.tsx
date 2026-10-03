@@ -14,6 +14,7 @@ import {
   Clock,
   CalendarDays,
   LogOut,
+  Sparkles,
 } from 'lucide-react';
 import { Language, ThemeMode, UserProfile, AppNotification, DailyTask, Note } from '../types';
 import { translations } from '../services/i18n';
@@ -323,6 +324,16 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                     </button>
                   ))}
                 </div>
+
+                {/* AI Service */}
+                <a
+                  href="/services/smart-ai"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 text-accent-500" />
+                  <span>AI Service</span>
+                </a>
 
                 {/* Settings Link */}
                 <div className="pt-1 border-t border-slate-100 dark:border-slate-800">

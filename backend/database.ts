@@ -5,7 +5,12 @@ import { SMART_AI_CANONICAL_SCHEMA_SQL } from './database/canonicalSchema.js';
 
 const dataDir = path.join(process.cwd(), 'data');
 fs.mkdirSync(dataDir, { recursive: true });
-export const db = new DatabaseSync(path.join(dataDir, 'smart-time.db'));
+
+const configuredDbPath = process.env.SMART_TIME_DB_PATH?.trim();
+const dbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(dataDir, 'smart-time.db');
+
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+export const db = new DatabaseSync(dbPath);
 db.exec(`
 PRAGMA journal_mode = WAL;
 CREATE TABLE IF NOT EXISTS service_status (

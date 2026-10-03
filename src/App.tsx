@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   AppView,
   Language,
@@ -66,6 +66,8 @@ import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { SettingsAndBackupModal } from './components/SettingsAndBackupModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
+import ServicesPage from '../app/services/page';
+import SmartAIServicePage from '../app/services/smart-ai/page';
 import { CalendarView } from './components/CalendarView';
 import { startTrialSession } from './services/authService';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
@@ -80,6 +82,13 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  const servicePath = typeof window !== 'undefined' ? window.location.pathname : '/';
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/') {
+      window.location.replace('/services');
+    }
+  }, []);
+
   // Global App State
   const [authChecked, setAuthChecked] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
@@ -109,6 +118,11 @@ export default function App() {
   // Modals
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const handleVoiceTranscript = useCallback((finalTranscript: string) => {
+    setVoiceTranscript(finalTranscript);
+    setIsVoiceOpen(false);
+  }, []);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -350,6 +364,8 @@ export default function App() {
     { view: 'notes' as AppView, label: language === 'ar' ? 'الملاحظات' : 'Notes', icon: FileText },
   ];
 
+  if (servicePath === '/services/smart-ai') return <SmartAIServicePage />;
+  if (servicePath === '/services') return <ServicesPage />;
   if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تشغيل النسخة التجريبية…</div>;
 
   return (
@@ -547,6 +563,7 @@ export default function App() {
             <AiCenterView
               language={language}
               onOpenVoiceSearch={() => setIsVoiceOpen(true)}
+              initialInputText={voiceTranscript}
               appContext={{
                 profile: userProfile,
                 expenses,
@@ -631,7 +648,6 @@ export default function App() {
           expenses={expenses}
           vehicles={vehicles}
           lessons={lessons}
-          onNavigate={(view) => handleNavigateSafe(view)}
         />
 
         {/* Voice Search Modal */}
@@ -639,7 +655,7 @@ export default function App() {
           isOpen={isVoiceOpen}
           onClose={() => setIsVoiceOpen(false)}
           language={language}
-          onNavigate={(view) => handleNavigateSafe(view)}
+          onTranscript={handleVoiceTranscript}
         />
 
         {/* Settings & Backup Modal */}

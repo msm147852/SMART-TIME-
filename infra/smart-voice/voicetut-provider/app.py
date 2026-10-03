@@ -30,8 +30,9 @@ class SynthesizeRequest(BaseModel):
     language: str = "ar"
     locale: str = "ar-EG"
     profileId: str = Field(min_length=1, max_length=180)
-    referenceAudioBase64: str = Field(min_length=1)
+    referenceAudioBase64: str = ""
     referenceMimeType: str = "audio/webm"
+    speaker: str = ""
     referenceText: str = ""
     speakingStyle: str = "natural"
 
@@ -70,13 +71,15 @@ def synthesize(payload: SynthesizeRequest, authorization: str | None = Header(de
     if len(payload.text) > MAX_TEXT_CHARS:
         raise HTTPException(status_code=413, detail="Text is too long.")
 
-    try:
-        reference_audio = base64.b64decode(payload.referenceAudioBase64, validate=True)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid reference audio encoding.")
+    reference_audio = b""
+    if payload.referenceAudioBase64.strip():
+        try:
+            reference_audio = base64.b64decode(payload.referenceAudioBase64, validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid reference audio encoding.")
 
-    if not reference_audio:
-        raise HTTPException(status_code=400, detail="Reference audio is empty.")
+    if not reference_audio and not payload.speaker.strip():
+        raise HTTPException(status_code=400, detail="Either reference audio or an approved built-in speaker is required.")
     if len(reference_audio) > MAX_REFERENCE_BYTES:
         raise HTTPException(status_code=413, detail="Reference audio is too large.")
 
@@ -95,14 +98,22 @@ def synthesize(payload: SynthesizeRequest, authorization: str | None = Header(de
         tts = _get_tts()
         with tempfile.TemporaryDirectory(prefix="smart-time-voice-") as tmp:
             tmp_path = Path(tmp)
-            ref_path = tmp_path / ("reference" + suffix)
             out_path = tmp_path / "output.wav"
-            ref_path.write_bytes(reference_audio)
 
-            kwargs = {
-                "ref_audio": str(ref_path),
-                "output": str(out_path),
-            }
+            kwargs = {"output": str(out_path)}
+            if reference_audio:
+                ref_path = tmp_path / ("reference" + suffix)
+                ref_path.write_bytes(reference_audio)
+                kwargs["ref_audio"] = str(ref_path)
+            elif payload.speaker.strip():
+                allowed_speakers = {
+                    "Abdelrahman", "Abdullah", "Kamal", "Hossam", "Mohamed",
+                    "Omar", "Sayed", "Zaki", "Aly", "Essam", "Ahmed",
+                    "Asmaa", "Esraa", "Hanan", "Sarah", "Yasmin", "Omnia",
+                }
+                if payload.speaker.strip() not in allowed_speakers:
+                    raise HTTPException(status_code=400, detail="Unsupported built-in speaker.")
+                kwargs["speaker"] = payload.speaker.strip()
             if payload.referenceText.strip():
                 kwargs["ref_text"] = payload.referenceText.strip()
 
