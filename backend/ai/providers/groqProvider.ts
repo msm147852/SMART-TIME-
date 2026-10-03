@@ -210,9 +210,10 @@ export class GroqProvider implements AIProvider {
     language?: string;
     filename?: string;
     prompt?: string;
+    model?: string;
   }): Promise<{ provider: string; model: string; text: string; requestId?: string }> {
     if (!this.apiKey) throw new GroqProviderError("GROQ_API_KEY is not configured.", "not_configured");
-    const model = String(process.env.GROQ_STT_MODEL || "whisper-large-v3-turbo").trim() || "whisper-large-v3-turbo";
+    const model = String(input.model || process.env.GROQ_STT_MODEL || "whisper-large-v3-turbo").trim() || "whisper-large-v3-turbo";
     const form = new FormData();
     form.append("file", new Blob([input.audio], { type: input.mimeType }), input.filename || "voice.webm");
     form.append("model", model);
