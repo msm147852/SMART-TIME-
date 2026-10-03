@@ -71,12 +71,13 @@ export async function POST(request: Request): Promise<Response> {
       JSON.stringify(smartTimeData),
     ].join("\n");
 
-    const messages: AIMessage[] = Array.isArray(body?.messages) && body.messages.length
+    const history: AIMessage[] = Array.isArray(body?.messages)
       ? body.messages.map((message: any): AIMessage => ({
           role: message?.role === "assistant" ? "assistant" : "user",
           content: String(message?.content ?? message?.text ?? "").trim(),
         })).filter((message: { content: string }) => message.content)
-      : [{ role: "user" as const, content: input }];
+      : [];
+    const messages: AIMessage[] = [...history, { role: "user" as const, content: input }];
 
     let attempts = 0;
     let raw: string;
