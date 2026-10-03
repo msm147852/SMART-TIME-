@@ -178,7 +178,7 @@ app.post("/api/ai/stt", async (req, res) => {
     if (audio.length > STT_MAX_AUDIO_BYTES) return res.status(413).json({ error: "Audio payload is too large." });
 
     const prompt = language === "ar"
-      ? "Egyptian Arabic speech. Preserve Egyptian words, names, numbers, dates, and common English code-switching. Transcribe only what is actually spoken."
+      ? "The audio is spoken Egyptian Arabic (Arabic, Egypt). Write the transcript in Arabic script. Preserve Egyptian words, names, numbers, dates, and only genuine English code-switching. Do not transliterate Arabic into Latin letters. Do not invent words. Transcribe only what is actually spoken."
       : "Transcribe only what is actually spoken. Preserve numbers, dates, names, and code-switching.";
 
     const transcription = await groqProvider.transcribeAudio({
