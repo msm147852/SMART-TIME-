@@ -13,10 +13,10 @@ const APP_FEATURE_TOOLS = new Set(["add_expense", "add_daily_task", "calendar.ev
 
 function assistantText(result: ApiPayload["result"]) {
   if (result?.reply?.trim()) return result.reply.trim();
-  if (result?.tool && APP_FEATURE_TOOLS.has(result.tool)) return "الميزة دي في التطبيق - حمله من هنا";
   if (result?.tool === "clarification") return "ممكن توضّحلي طلبك أكتر؟";
-  if (result?.tool === "unsupported") return "الطلب ده متاح داخل تطبيق SMART TIME الكامل.";
-  return "أهلاً بيك! أنا مساعد SMART TIME. أقدر أساعدك في فهم طلبك، والميزات الكاملة موجودة داخل التطبيق.";
+  if (result?.tool === "unsupported") return "الطلب ده غير مدعوم حاليًا.";
+  if (result?.tool && APP_FEATURE_TOOLS.has(result.tool)) return "تمام، فهمت الطلب. هحتاج تأكيدك قبل تنفيذ العملية.";
+  return "لم يصل رد نصي من Groq.";
 }
 
 async function speak(text: string): Promise<void> {
@@ -375,7 +375,7 @@ export default function SmartAIDemo() {
         <div>
           <p className="text-sm font-bold">مساعد SMART TIME</p>
           <p className="mt-1 text-xs text-zinc-500">
-            Qwen3-4B V2 · r=64 · enable_thinking=false
+            Groq AI · المحرك الأساسي للمساعد
           </p>
         </div>
         <span
