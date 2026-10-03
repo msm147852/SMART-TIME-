@@ -22,36 +22,57 @@ function assistantText(result: ApiPayload["result"]) {
 async function speak(text: string): Promise<void> {
   if (typeof window === "undefined" || !text.trim()) return;
 
-  // SMART AI must not silently downgrade to a random browser Arabic voice.
-  // The conversation contract requires Egyptian Arabic from the server-side
-  // VoiceTuT provider. Browser TTS remains an explicit non-Egyptian fallback
-  // only when the user later chooses a generic voice mode.
-  const response = await fetch("/api/ai/egyptian-tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: text.trim(), speaker: "Mohamed" }),
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload?.error || "محرك الصوت المصري غير متاح حاليًا.");
-  }
-
-  const blob = await response.blob();
-  if (!blob.size) throw new Error("محرك الصوت المصري أعاد ملفًا صوتيًا فارغًا.");
-
-  const url = URL.createObjectURL(blob);
+  // Prefer the Egyptian server TTS when the VoiceTuT provider is connected.
+  // If that provider is not configured yet, keep voice conversation usable
+  // with the device's Arabic speech engine instead of breaking the whole turn.
   try {
-    await new Promise<void>((resolve, reject) => {
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      audio.onended = () => resolve();
-      audio.onerror = () => reject(new Error("تعذر تشغيل الرد الصوتي المصري."));
-      void audio.play().catch(reject);
+    const response = await fetch("/api/ai/egyptian-tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text.trim(), speaker: "Mohamed" }),
     });
-  } finally {
-    URL.revokeObjectURL(url);
+
+    if (response.ok) {
+      const blob = await response.blob();
+      if (blob.size) {
+        const url = URL.createObjectURL(blob);
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const audio = new Audio(url);
+            audio.preload = "auto";
+            audio.onended = () => resolve();
+            audio.onerror = () => reject(new Error("تعذر تشغيل الرد الصوتي المصري."));
+            void audio.play().catch(reject);
+          });
+          return;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+    }
+  } catch {
+    // Fall through to the device Arabic voice.
   }
+
+  if (!("speechSynthesis" in window)) {
+    throw new Error("لا يوجد محرك صوت متاح على الجهاز.");
+  }
+
+  const voices = window.speechSynthesis.getVoices();
+  const egyptian = voices.find((voice) => /^ar-EG$/i.test(voice.lang))
+    || voices.find((voice) => /^ar(-|$)/i.test(voice.lang));
+
+  await new Promise<void>((resolve, reject) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text.trim());
+    utterance.lang = egyptian?.lang || "ar-EG";
+    if (egyptian) utterance.voice = egyptian;
+    utterance.rate = 0.98;
+    utterance.pitch = 1;
+    utterance.onend = () => resolve();
+    utterance.onerror = (event) => reject(new Error(event.error || "تعذر تشغيل الرد الصوتي."));
+    window.speechSynthesis.speak(utterance);
+  });
 }
 
 function stopSpeech() {
