@@ -22,9 +22,6 @@ function assistantText(result: ApiPayload["result"]) {
 async function speak(text: string): Promise<void> {
   if (typeof window === "undefined" || !text.trim()) return;
 
-  // Prefer the Egyptian server TTS when the VoiceTuT provider is connected.
-  // If that provider is not configured yet, keep voice conversation usable
-  // with the device's Arabic speech engine instead of breaking the whole turn.
   try {
     const response = await fetch("/api/ai/egyptian-tts", {
       method: "POST",
@@ -37,13 +34,7 @@ async function speak(text: string): Promise<void> {
       if (blob.size) {
         const url = URL.createObjectURL(blob);
         try {
-          await new Promise<void>((resolve, reject) => {
-            const audio = new Audio(url);
-            audio.preload = "auto";
-            audio.onended = () => resolve();
-            audio.onerror = () => reject(new Error("تعذر تشغيل الرد الصوتي المصري."));
-            void audio.play().catch(reject);
-          });
+          await playAudioWithTimeout(url, 20_000);
           return;
         } finally {
           URL.revokeObjectURL(url);
@@ -63,15 +54,52 @@ async function speak(text: string): Promise<void> {
     || voices.find((voice) => /^ar(-|$)/i.test(voice.lang));
 
   await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      if (error) reject(error);
+      else resolve();
+    };
+    const timeoutId = window.setTimeout(() => {
+      window.speechSynthesis.cancel();
+      finish();
+    }, Math.min(20_000, Math.max(5_000, text.trim().length * 180)));
+
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.trim());
     utterance.lang = egyptian?.lang || "ar-EG";
     if (egyptian) utterance.voice = egyptian;
     utterance.rate = 0.98;
     utterance.pitch = 1;
-    utterance.onend = () => resolve();
-    utterance.onerror = (event) => reject(new Error(event.error || "تعذر تشغيل الرد الصوتي."));
+    utterance.onend = () => finish();
+    utterance.onerror = () => finish(new Error("تعذر تشغيل الرد الصوتي."));
     window.speechSynthesis.speak(utterance);
+  });
+}
+
+function playAudioWithTimeout(url: string, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      audio.pause();
+      resolve();
+    }, timeoutMs);
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      if (error) reject(error);
+      else resolve();
+    };
+    audio.onended = () => finish();
+    audio.onerror = () => finish(new Error("تعذر تشغيل الرد الصوتي المصري."));
+    void audio.play().catch(() => finish(new Error("تعذر تشغيل الرد الصوتي المصري.")));
   });
 }
 
