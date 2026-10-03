@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { SmartAiVoiceConversationModal } from "../../src/components/SmartAiVoiceConversationModal";
+import { transcribeVoiceBlob } from "../../src/services/groqSttService";
 
 type ChatMessage = { id: number; role: "user" | "assistant"; text: string };
 type ApiPayload = {
@@ -73,14 +74,148 @@ export default function SmartAIDemo() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [voiceConversationOpen, setVoiceConversationOpen] = useState(false);
+  const [voiceSearchState, setVoiceSearchState] = useState<"idle" | "recording" | "processing">("idle");
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceStopTimerRef = useRef<number | null>(null);
   const nextId = useRef(2);
 
   useEffect(() => {
     document.title = "SMART TIME";
     return () => {
       window.speechSynthesis?.cancel();
+      if (voiceStopTimerRef.current !== null) {
+        window.clearTimeout(voiceStopTimerRef.current);
+      }
+      try {
+        const recorder = voiceRecorderRef.current;
+        if (recorder && recorder.state !== "inactive") recorder.stop();
+      } catch {}
+      voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
+
+  function resetVoiceSearch() {
+    if (voiceStopTimerRef.current !== null) {
+      window.clearTimeout(voiceStopTimerRef.current);
+      voiceStopTimerRef.current = null;
+    }
+    voiceRecorderRef.current = null;
+    voiceChunksRef.current = [];
+    voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceStreamRef.current = null;
+  }
+
+  async function startVoiceSearch() {
+    if (loading || voiceSearchState !== "idle") return;
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("تسجيل الصوت الحقيقي غير مدعوم في هذا المتصفح.");
+      return;
+    }
+
+    setError("");
+    setVoiceSearchState("recording");
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    } catch (cause) {
+      setVoiceSearchState("idle");
+      const name = cause instanceof DOMException ? cause.name : "UnknownError";
+      setError(name === "NotAllowedError" ? "تم رفض إذن الميكروفون." : "تعذر الوصول إلى الميكروفون.");
+      return;
+    }
+
+    voiceStreamRef.current = stream;
+    const supportedTypes = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg",
+    ];
+    const mimeType = supportedTypes.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || "";
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64_000 })
+        : new MediaRecorder(stream);
+    } catch {
+      resetVoiceSearch();
+      setVoiceSearchState("idle");
+      setError("تعذر بدء تسجيل الصوت.");
+      return;
+    }
+
+    voiceRecorderRef.current = recorder;
+    voiceChunksRef.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) voiceChunksRef.current.push(event.data);
+    };
+    recorder.onerror = () => {
+      resetVoiceSearch();
+      setVoiceSearchState("idle");
+      setError("حدث خطأ أثناء تسجيل الصوت.");
+    };
+    recorder.onstop = async () => {
+      const blob = new Blob(voiceChunksRef.current, {
+        type: recorder.mimeType || mimeType || "audio/webm",
+      });
+      resetVoiceSearch();
+
+      if (!blob.size) {
+        setVoiceSearchState("idle");
+        setError("لم يتم التقاط صوت.");
+        return;
+      }
+
+      setVoiceSearchState("processing");
+      try {
+        const result = await transcribeVoiceBlob(blob, "ar");
+        const transcript = result.transcript.trim();
+        if (!transcript) throw new Error("لم يتم التعرف على كلام واضح.");
+        await sendMessage(undefined, transcript);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "تعذر تحويل الصوت إلى نص.");
+      } finally {
+        setVoiceSearchState("idle");
+      }
+    };
+
+    try {
+      recorder.start();
+      voiceStopTimerRef.current = window.setTimeout(() => {
+        if (voiceRecorderRef.current?.state === "recording") {
+          voiceRecorderRef.current.stop();
+        }
+      }, 90_000);
+    } catch {
+      resetVoiceSearch();
+      setVoiceSearchState("idle");
+      setError("تعذر بدء تسجيل الصوت.");
+    }
+  }
+
+  function handleVoiceSearchClick() {
+    if (voiceSearchState === "recording") {
+      if (voiceStopTimerRef.current !== null) {
+        window.clearTimeout(voiceStopTimerRef.current);
+        voiceStopTimerRef.current = null;
+      }
+      voiceRecorderRef.current?.stop();
+      return;
+    }
+    void startVoiceSearch();
+  }
 
   async function sendMessage(event?: FormEvent, textOverride?: string) {
     event?.preventDefault();
@@ -179,19 +314,6 @@ export default function SmartAIDemo() {
           </p>
         )}
 
-        <SmartAiVoiceConversationModal
-          isOpen={voiceConversationOpen}
-          language="ar"
-          onClose={() => {
-            stopSpeech();
-            setVoiceConversationOpen(false);
-          }}
-          onInterrupt={stopSpeech}
-          onTurn={async (transcript) => {
-            await sendMessage(undefined, transcript);
-          }}
-        />
-
         <form
           onSubmit={(event) => {
             void sendMessage(event);
@@ -200,27 +322,56 @@ export default function SmartAIDemo() {
         >
           <button
             type="button"
-            onClick={() => setVoiceConversationOpen(true)}
-            aria-label="بدء محادثة SMART AI الصوتية"
-            title="محادثة SMART AI الصوتية"
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-lg shadow-purple-900/30 transition-all hover:bg-indigo-600 active:scale-95"
+            onClick={handleVoiceSearchClick}
+            disabled={loading || voiceSearchState === "processing"}
+            aria-label={voiceSearchState === "recording" ? "إيقاف التسجيل وإرسال الصوت للشات" : "إرسال صوت للشات"}
+            title={voiceSearchState === "recording" ? "إيقاف التسجيل وإرسال الصوت للشات" : "إرسال صوت للشات"}
+            className={
+              "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 " +
+              (voiceSearchState === "recording"
+                ? "bg-red-600 shadow-red-900/30 hover:bg-red-700"
+                : "bg-purple-600 shadow-purple-900/30 hover:bg-indigo-600")
+            }
           >
-            <span className="absolute -end-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-zinc-950" />
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-5 w-5"
-              aria-hidden="true"
-            >
-              <rect x="8" y="3" width="8" height="12" rx="4" />
-              <path
-                d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"
-                strokeLinecap="round"
-              />
-            </svg>
+            {voiceSearchState === "processing" ? (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <>
+                {voiceSearchState === "recording" && (
+                  <span className="absolute -end-1 -top-1 h-2.5 w-2.5 animate-pulse rounded-full bg-red-300 ring-2 ring-zinc-950" />
+                )}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <rect x="8" y="3" width="8" height="12" rx="4" />
+                  <path
+                    d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </>
+            )}
           </button>
+
+          <SmartAiVoiceConversationModal
+            inline
+            isOpen={voiceConversationOpen}
+            language="ar"
+            onOpen={() => setVoiceConversationOpen(true)}
+            onClose={() => {
+              stopSpeech();
+              setVoiceConversationOpen(false);
+            }}
+            onInterrupt={stopSpeech}
+            onTurn={async (transcript) => {
+              await sendMessage(undefined, transcript);
+            }}
+          />
 
           <input
             value={input}
