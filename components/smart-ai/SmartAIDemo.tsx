@@ -264,7 +264,7 @@ export default function SmartAIDemo() {
         if (voiceRecorderRef.current?.state === "recording") {
           voiceRecorderRef.current.stop();
         }
-      }, 15_000);
+      }, 20_000);
 
       // Hands-free stop after speech ends. The explicit mic button remains a
       // manual stop fallback for devices that do not expose Web Audio.
@@ -293,9 +293,9 @@ export default function SmartAIDemo() {
             if (rms >= 0.006) {
               if (voiceSpeechStartedAtRef.current === null) voiceSpeechStartedAtRef.current = now;
               voiceSilenceSinceRef.current = null;
-            } else if (voiceSpeechStartedAtRef.current !== null && now - voiceSpeechStartedAtRef.current >= 700) {
+            } else if (voiceSpeechStartedAtRef.current !== null && now - voiceSpeechStartedAtRef.current >= 350) {
               if (voiceSilenceSinceRef.current === null) voiceSilenceSinceRef.current = now;
-              if (now - voiceSilenceSinceRef.current >= 1200) {
+              if (now - voiceSilenceSinceRef.current >= 1000) {
                 recorder.stop();
                 return;
               }
