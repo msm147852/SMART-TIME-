@@ -101,6 +101,11 @@ export default function SmartAIDemo() {
   const voiceStreamRef = useRef<MediaStream | null>(null);
   const voiceChunksRef = useRef<Blob[]>([]);
   const voiceStopTimerRef = useRef<number | null>(null);
+  const voiceVadTimerRef = useRef<number | null>(null);
+  const voiceAudioContextRef = useRef<AudioContext | null>(null);
+  const voiceAnalyserRef = useRef<AnalyserNode | null>(null);
+  const voiceSilenceSinceRef = useRef<number | null>(null);
+  const voiceSpeechStartedAtRef = useRef<number | null>(null);
   const nextId = useRef(2);
 
   useEffect(() => {
@@ -126,6 +131,15 @@ export default function SmartAIDemo() {
       window.clearTimeout(voiceStopTimerRef.current);
       voiceStopTimerRef.current = null;
     }
+    if (voiceVadTimerRef.current !== null) {
+      window.clearTimeout(voiceVadTimerRef.current);
+      voiceVadTimerRef.current = null;
+    }
+    try { voiceAudioContextRef.current?.close(); } catch {}
+    voiceAudioContextRef.current = null;
+    voiceAnalyserRef.current = null;
+    voiceSilenceSinceRef.current = null;
+    voiceSpeechStartedAtRef.current = null;
     voiceRecorderRef.current = null;
     voiceChunksRef.current = [];
     voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -222,7 +236,48 @@ export default function SmartAIDemo() {
         if (voiceRecorderRef.current?.state === "recording") {
           voiceRecorderRef.current.stop();
         }
-      }, 90_000);
+      }, 15_000);
+
+      // Hands-free stop after speech ends. The explicit mic button remains a
+      // manual stop fallback for devices that do not expose Web Audio.
+      try {
+        const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (AudioContextCtor) {
+          const audioContext = new AudioContextCtor();
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+          voiceAudioContextRef.current = audioContext;
+          voiceAnalyserRef.current = analyser;
+          const data = new Uint8Array(analyser.fftSize);
+
+          const pollVad = () => {
+            if (voiceSearchState !== "recording" || voiceRecorderRef.current !== recorder || recorder.state !== "recording") return;
+            analyser.getByteTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i += 1) {
+              const normalized = (data[i] - 128) / 128;
+              sum += normalized * normalized;
+            }
+            const rms = Math.sqrt(sum / data.length);
+            const now = performance.now();
+            if (rms >= 0.018) {
+              if (voiceSpeechStartedAtRef.current === null) voiceSpeechStartedAtRef.current = now;
+              voiceSilenceSinceRef.current = null;
+            } else if (voiceSpeechStartedAtRef.current !== null && now - voiceSpeechStartedAtRef.current >= 700) {
+              if (voiceSilenceSinceRef.current === null) voiceSilenceSinceRef.current = now;
+              if (now - voiceSilenceSinceRef.current >= 1200) {
+                recorder.stop();
+                return;
+              }
+            }
+            voiceVadTimerRef.current = window.setTimeout(pollVad, 80);
+          };
+          void audioContext.resume().catch(() => {});
+          voiceVadTimerRef.current = window.setTimeout(pollVad, 80);
+        }
+      } catch {}
     } catch {
       resetVoiceSearch();
       setVoiceSearchState("idle");
