@@ -253,7 +253,7 @@ export default function SmartAIDemo() {
           const data = new Uint8Array(analyser.fftSize);
 
           const pollVad = () => {
-            if (voiceSearchState !== "recording" || voiceRecorderRef.current !== recorder || recorder.state !== "recording") return;
+            if (voiceRecorderRef.current !== recorder || recorder.state !== "recording") return;
             analyser.getByteTimeDomainData(data);
             let sum = 0;
             for (let i = 0; i < data.length; i += 1) {
