@@ -106,23 +106,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     (u.phone || '').includes(searchQuery)
   );
 
-  const handleAdd = async () => {
-    if (!selectedUserId) return;
-    setSubmitting(true);
-    try {
-      const result = await chatService.createRoom({
-        title: 'محادثة مباشرة',
-        type: 'direct',
-        memberIds: [selectedUserId],
-      });
-      onMemberAdded?.(result.roomId);
-      onClose();
-    } catch (err: any) {
-      alert(err.message || 'حدث خطأ أثناء إضافة العضو');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[85] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" dir={isAr ? 'rtl' : 'ltr'}>
