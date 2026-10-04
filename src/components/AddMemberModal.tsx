@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, X, Check, Shield, User, ShieldAlert, Contact, Smartphone } from 'lucide-react';
+import { UserPlus, Search, X, Check, Contact, Smartphone } from 'lucide-react';
 import { ChatMember } from '../types';
 import { chatService } from '../services/chatService';
 
@@ -26,7 +26,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'moderator' | 'member'>('member');
   const [submitting, setSubmitting] = useState(false);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactsMessage, setContactsMessage] = useState('');
@@ -117,7 +116,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 {isAr ? 'إضافة عضو جديد للغرفة' : 'Add New Member'}
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                {isAr ? 'اختر مستخدماً من النظام لإضافته وتحديد صلاحياته' : 'Select user to add and set their role'}
+                {isAr ? 'اختر جهة اتصال لديها SMART TIME لفتح محادثة مباشرة' : 'Choose a SMART TIME contact to start a direct chat'}
               </p>
             </div>
           </div>
@@ -229,39 +228,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           </div>
         )}
 
-        {/* Role Selector */}
-        {selectedUserId && (
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-              {isAr ? 'تحديد رتبة العضو في الغرفة:' : 'Assign member role:'}
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'member', label: isAr ? 'عضو عادي' : 'Member', icon: User },
-                { id: 'moderator', label: isAr ? 'مشرف' : 'Moderator', icon: Shield },
-                { id: 'admin', label: isAr ? 'مسؤول' : 'Admin', icon: ShieldAlert },
-              ].map((r) => {
-                const Icon = r.icon;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setSelectedRole(r.id as any)}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all ${
-                      selectedRole === r.id
-                        ? 'bg-sky-600 text-white border-sky-500 shadow-xs'
-                        : 'border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-900'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{r.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
           <button
@@ -277,7 +243,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             onClick={handleAdd}
             className="px-5 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white shadow-md transition-all active:scale-95"
           >
-            {submitting ? (isAr ? 'جاري الإضافة...' : 'Adding...') : (isAr ? 'إضافة إلى الغرفة' : 'Add Member')}
+            {submitting ? (isAr ? 'جاري فتح المحادثة...' : 'Opening chat...') : (isAr ? 'بدء المحادثة' : 'Start Chat')}
           </button>
         </div>
       </div>
