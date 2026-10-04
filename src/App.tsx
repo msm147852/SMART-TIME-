@@ -152,15 +152,11 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
   useEffect(() => {
-    restoreSession()
-      .then((session) => {
-        if (session) {
-          setAuthenticated(true);
-          setUserProfile(UserRepository.getProfile());
-        }
-      })
-      .catch((error) => console.error('Auth restore error:', error))
-      .finally(() => setAuthChecked(true));
+    // Login screen is the mandatory application entry point.
+    // Do not silently restore a previous browser session on startup.
+    localStorage.removeItem('smart_time_auth_session');
+    setAuthenticated(false);
+    setAuthChecked(true);
   }, []);
 
   useEffect(() => {
@@ -370,15 +366,7 @@ export default function App() {
           setAuthenticated(true);
           setUserProfile(UserRepository.getProfile());
         }}
-        onGuest={async () => {
-          try {
-            await startTrialSession();
-            setUserProfile(UserRepository.getProfile());
-            setAuthenticated(true);
-          } catch (error) {
-            console.error('Guest session error:', error);
-          }
-        }}
+
       />
     );
   }
