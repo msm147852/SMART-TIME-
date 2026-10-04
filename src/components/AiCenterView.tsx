@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Bot, Check, Copy, Mic, RotateCcw, Send, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
 import { SmartVoiceDnaPanel } from './SmartVoiceDnaPanel';
+import { SmartAiVoiceConversationModal } from './SmartAiVoiceConversationModal';
 import { AiMessage, AiModelType, Language } from '../types';
 import { ChatRepository } from '../services';
 import { askSmartAi, buildSmartAiContext, SmartAiAction } from '../services/aiService';
@@ -13,12 +14,14 @@ import { StorageAdapter } from '../services/storageAdapter';
 interface AiCenterViewProps {
   language: Language;
   onOpenVoiceSearch: () => void;
+  initialInputText?: string;
   appContext: Parameters<typeof buildSmartAiContext>[0];
 }
 
 export const AiCenterView: React.FC<AiCenterViewProps> = ({
   language,
   onOpenVoiceSearch,
+  initialInputText,
   appContext,
 }) => {
   const selectedModel: AiModelType = 'smart-time-core';
@@ -37,6 +40,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
   const [isVoiceDnaOpen, setIsVoiceDnaOpen] = useState(false);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
   const [voiceDnaProviderReady, setVoiceDnaProviderReady] = useState(false);
+  const [isVoiceConversationOpen, setIsVoiceConversationOpen] = useState(false);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -60,6 +64,10 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       void refreshVoiceDnaProviderStatus();
     }
   }, [isVoiceDnaOpen]);
+
+  useEffect(() => {
+    if (initialInputText?.trim()) setInputText(initialInputText.trim());
+  }, [initialInputText]);
 
   useEffect(() => {
     const saved = ChatRepository.getAiChatHistory();
@@ -177,9 +185,9 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
     { ar: '🎓 أضف مصروفًا لطالب', en: 'Add an education expense' },
   ];
 
-  const handleSendMessage = async (customText?: string) => {
+  const handleSendMessage = async (customText?: string, forceVoiceReply = false): Promise<string | null> => {
     const textToSend = (customText || inputText).trim();
-    if (!textToSend || isLoading) return;
+    if (!textToSend || isLoading) return null;
 
     const userMessage: AiMessage = {
       id: 'msg_' + Date.now(),
@@ -209,7 +217,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         appContext: buildSmartAiContext(appContext),
       });
 
-      if (isVoiceEnabled && data.reply) {
+      if ((isVoiceEnabled || forceVoiceReply) && data.reply) {
         const usedDna = await speakWithSelectedVoice(data.reply);
         if (!usedDna && selectedVoiceDnaProfile) {
           speakSmartAi(data.reply, smartLanguage, selectedVoice);
@@ -231,6 +239,7 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       setPendingAction(data.action || null);
       setPendingMessage(data.action ? textToSend : '');
       setActionStatus(data.actionSummary || '');
+      return data.reply || null;
     } catch (error) {
       console.error('SMART AI chat failed:', error);
       const fallback: AiMessage = {
@@ -246,6 +255,8 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
       };
       setMessages([...nextMessages, fallback]);
       ChatRepository.saveAiChatHistory([...nextMessages, fallback]);
+      if (forceVoiceReply) return fallback.text;
+      return fallback.text;
     } finally {
       setIsLoading(false);
     }
@@ -509,11 +520,27 @@ export const AiCenterView: React.FC<AiCenterViewProps> = ({
         <button
           type="button"
           onClick={onOpenVoiceSearch}
-          className="p-2.5 text-slate-400 hover:text-purple-600 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors"
-          title="تسجيل صوتي"
+          className="relative p-2.5 text-purple-600 hover:text-white rounded-xl bg-purple-50 hover:bg-gradient-to-r hover:from-purple-600 hover:to-indigo-600 dark:bg-purple-950/40 transition-all active:scale-95"
+          title={language === 'ar' ? 'إرسال صوت للشات' : 'Send voice to chat'}
+          aria-label={language === 'ar' ? 'إرسال صوت للشات' : 'Send voice to chat'}
         >
           <Mic className="w-5 h-5" />
+          <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-850" />
         </button>
+
+        <SmartAiVoiceConversationModal
+          inline
+          isOpen={isVoiceConversationOpen}
+          language={language}
+          onOpen={() => setIsVoiceConversationOpen(true)}
+          onClose={() => {
+            setIsVoiceConversationOpen(false);
+            stopSmartAiVoice();
+          }}
+          onTurn={async (transcript) => {
+            await handleSendMessage(transcript, true);
+          }}
+        />
 
         <input
           type="text"
