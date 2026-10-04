@@ -70,7 +70,7 @@ import ServicesPage from '../app/services/page';
 import SmartAIServicePage from '../app/services/smart-ai/page';
 import SmartAIDemo from '../components/smart-ai/SmartAIDemo';
 import { CalendarView } from './components/CalendarView';
-import { restoreSession, startTrialSession } from './services/authService';
+import { restoreSession } from './services/authService';
 import { AuthView } from './components/AuthView';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
