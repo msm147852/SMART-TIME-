@@ -83,12 +83,6 @@ import {
 
 export default function App() {
   const servicePath = typeof window !== 'undefined' ? window.location.pathname : '/';
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/') {
-      window.location.replace('/services');
-    }
-  }, []);
-
   // Global App State
   const [authChecked, setAuthChecked] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
