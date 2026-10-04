@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, X, Check, Contact, Smartphone } from 'lucide-react';
+import { UserPlus, Search, X, Check, Contact, Smartphone, Share2 } from 'lucide-react';
 import { ChatMember } from '../types';
 import { chatService } from '../services/chatService';
 
@@ -29,6 +29,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactsMessage, setContactsMessage] = useState('');
+  const [inviteContact, setInviteContact] = useState<{ name: string; phone: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,39 +46,60 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const existingIds = new Set(existingMembers.map((m) => m.id));
 
-  const openPhoneContacts = async () => {
-    const contactsApi = (navigator as any).contacts;
-    if (!contactsApi?.select) {
-      setContactsMessage(isAr ? 'المتصفح لا يدعم جهات اتصال الهاتف. استخدم البحث عن مستخدم SMART TIME.' : 'This browser does not support phone contacts. Use SMART TIME user search instead.');
-      return;
-    }
-    setContactsLoading(true);
-    setContactsMessage('');
+  const createInviteLink = (name: string, phone: string) => {
+    const params = new URLSearchParams({ invite: 'chat', from: 'smart-time', phone, name });
+    return window.location.origin + '/?' + params.toString();
+  };
+
+  const shareInvite = async (name: string, phone: string) => {
+    const link = createInviteLink(name, phone);
+    setInviteContact({ name, phone });
+    setContactsMessage(isAr ? 'جهة الاتصال «' + (name || phone) + '» ليست مسجلة على SMART TIME. يمكنك إرسال رابط الدعوة لها.' : 'This contact is not registered on SMART TIME. You can send an invitation link.');
     try {
-      const picked = await contactsApi.select(['name', 'tel'], { multiple: true });
-      const phones = (picked || []).flatMap((c: any) => Array.isArray(c.tel) ? c.tel : []).filter(Boolean);
-      if (!phones.length) {
-        setContactsMessage(isAr ? 'لم يتم اختيار جهة اتصال بها رقم هاتف.' : 'No contact with a phone number was selected.');
-        return;
+      if (navigator.share) {
+        await navigator.share({ title: 'SMART TIME', text: isAr ? 'انضم إلى SMART TIME لفتح محادثة مباشرة معي.' : 'Join SMART TIME to start a direct chat with me.', url: link });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+        setContactsMessage(isAr ? 'تم نسخ رابط الدعوة. أرسله لجهة الاتصال للتسجيل.' : 'Invitation link copied. Send it to the contact.');
       }
-      const matches = await chatService.lookupContacts(phones);
-      if (!matches.length) {
-        setContactsMessage(isAr ? 'جهات الاتصال المختارة لا يوجد بها مستخدم SMART TIME بنفس رقم الهاتف.' : 'No selected contact is using SMART TIME with the same phone number.');
-        return;
-      }
-      setUsers((prev) => {
-        const map = new Map(prev.map((u) => [u.id, u]));
-        matches.forEach((u) => map.set(u.id, u));
-        return Array.from(map.values());
-      });
-      setSelectedUserId(matches[0].id);
     } catch (err: any) {
-      if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.'));
-    } finally {
-      setContactsLoading(false);
+      if (err?.name !== 'AbortError') {
+        try { await navigator.clipboard?.writeText(link); setContactsMessage(isAr ? 'تم نسخ رابط الدعوة. أرسله لجهة الاتصال للتسجيل.' : 'Invitation link copied. Send it to the contact.'); }
+        catch { setContactsMessage(isAr ? 'رابط الدعوة: ' + link : 'Invitation link: ' + link); }
+      }
     }
   };
 
+  const handleAdd = async (userId: string | null = selectedUserId) => {
+    if (!userId) return;
+    setSubmitting(true);
+    try {
+      const result = await chatService.createRoom({ title: 'محادثة مباشرة', type: 'direct', memberIds: [userId] });
+      onMemberAdded?.(result.roomId);
+      onClose();
+    } catch (err: any) {
+      setContactsMessage(err.message || (isAr ? 'تعذر فتح المحادثة.' : 'Could not open chat.'));
+    } finally { setSubmitting(false); }
+  };
+
+  const openPhoneContacts = async () => {
+    const contactsApi = (navigator as any).contacts;
+    if (!contactsApi?.select) { setContactsMessage(isAr ? 'المتصفح لا يدعم جهات اتصال الهاتف. استخدم البحث عن مستخدم SMART TIME.' : 'This browser does not support phone contacts. Use SMART TIME user search instead.'); return; }
+    setContactsLoading(true); setContactsMessage(''); setInviteContact(null);
+    try {
+      const picked = await contactsApi.select(['name', 'tel'], { multiple: true });
+      const selectedContacts = (picked || []).map((c: any) => ({ name: Array.isArray(c.name) ? (c.name[0] || '') : (c.name || ''), phones: Array.isArray(c.tel) ? c.tel.filter(Boolean) : [] })).filter((c: any) => c.phones.length);
+      if (!selectedContacts.length) { setContactsMessage(isAr ? 'لم يتم اختيار جهة اتصال بها رقم هاتف.' : 'No contact with a phone number was selected.'); return; }
+      const phones = selectedContacts.flatMap((c: any) => c.phones);
+      const matches = await chatService.lookupContacts(phones);
+      if (matches.length) {
+        setUsers((prev) => { const map = new Map(prev.map((u) => [u.id, u])); matches.forEach((u) => map.set(u.id, u)); return Array.from(map.values()); });
+        const first = matches[0]; setSelectedUserId(first.id); await handleAdd(first.id); return;
+      }
+      const firstContact = selectedContacts[0]; await shareInvite(firstContact.name, firstContact.phones[0]);
+    } catch (err: any) { if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.')); }
+    finally { setContactsLoading(false); }
+  };
   const filteredUsers = users.filter((u) =>
     (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -190,7 +212,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   key={u.id}
                   type="button"
                   disabled={isAlreadyMember}
-                  onClick={() => setSelectedUserId(u.id)}
+                  onClick={() => { setSelectedUserId(u.id); void handleAdd(u.id); }}
                   className={`w-full p-3 rounded-2xl border text-start flex items-center justify-between transition-all ${
                     isAlreadyMember
                       ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-850/30 border-slate-200 dark:border-slate-800'
@@ -232,6 +254,15 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             })
           )}
         </div>
+
+        {inviteContact && (
+          <div className="px-4 py-3 border-t border-amber-200 dark:border-amber-900/40 bg-amber-500/5 flex items-center justify-between gap-3">
+            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{isAr ? 'يمكن دعوة جهة الاتصال للتسجيل ثم بدء المحادثة.' : 'Invite the contact to register, then start the chat.'}</p>
+            <button type="button" onClick={() => void shareInvite(inviteContact.name, inviteContact.phone)} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-[10px] font-extrabold">
+              <Share2 className="w-4 h-4" />{isAr ? 'مشاركة الدعوة' : 'Share invite'}
+            </button>
+          </div>
+        )}
 
         {selectedUserId && (
           <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5">
