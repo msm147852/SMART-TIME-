@@ -131,7 +131,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
                 <div className="w-12 h-12 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-lg"><ShieldCheck className="w-6 h-6" /></div>
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black tracking-tight">مرحبًا بك في SMART TIME ❤️</h1>
-                  <p className="text-sm text-slate-500 mt-1">دخول وتسجيل مبسط — بدون أكواد تحقق</p>
+                  <p className="text-sm text-slate-500 mt-1">دخول وتسجيل مبسط — بدون OTP أو توثيق بريد</p>
                 </div>
               </div>
             </div>
