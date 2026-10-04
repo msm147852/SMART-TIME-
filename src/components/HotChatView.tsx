@@ -1008,26 +1008,29 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowAddMemberModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
-                id="fab-add-member"
-                title={isAr ? 'إضافة عضو / بدء محادثة مباشرة' : 'Add member / start direct chat'}
-              >
-                <UserPlus className="w-4 h-4 stroke-[2.5]" />
-                <span>{isAr ? 'إضافة عضو' : 'Add member'}</span>
-              </button>
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMemberModal(true)}
+                  className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+                  id="fab-add-member"
+                  title={isAr ? 'إضافة عضو / بدء محادثة مباشرة' : 'Add member / start direct chat'}
+                >
+                  <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                  <span>{isAr ? 'إضافة عضو' : 'Add member'}</span>
+                </button>
 
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs shadow-md shadow-sky-500/20 active:scale-95 transition-all"
-                id="fab-create-room"
-                title={isAr ? 'إنشاء محادثة أو غرفة جديدة' : 'New Chat / Room'}
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>{isAr ? 'جديد' : 'New'}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs shadow-md shadow-sky-500/20 active:scale-95 transition-all"
+                  id="fab-create-room"
+                  title={isAr ? 'إنشاء محادثة أو غرفة جديدة' : 'New Chat / Room'}
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>{isAr ? 'جديد' : 'New'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
