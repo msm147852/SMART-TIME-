@@ -10,7 +10,7 @@ import approvedLoginVisual from '../assets/images/login-screen-approved.png';
 
 interface Props {
   onAuthenticated: () => void;
-  onGuest?: () => void;
+  onGuest: () => void;
   loginNotice?: string;
   requireTripPhoneVerification?: boolean;
 }
