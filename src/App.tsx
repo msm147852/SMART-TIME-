@@ -68,6 +68,7 @@ import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
 import ServicesPage from '../app/services/page';
 import SmartAIServicePage from '../app/services/smart-ai/page';
+import SmartAIDemo from '../components/smart-ai/SmartAIDemo';
 import { CalendarView } from './components/CalendarView';
 import { startTrialSession } from './services/authService';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
@@ -554,24 +555,18 @@ export default function App() {
           )}
 
           {currentView === 'ai' && (
-            <AiCenterView
-              language={language}
-              onOpenVoiceSearch={() => setIsVoiceOpen(true)}
-              initialInputText={voiceTranscript}
-              appContext={{
-                profile: userProfile,
-                expenses,
-                monthlyIncome,
-                vehicles,
-                fuelRecords,
-                students,
-                lessons,
-                educationExpenses,
-                notes,
-                dailyTasks,
-                recentTrips,
-              }}
-            />
+            <div className="w-full" dir="rtl">
+              <div className="mb-3 rounded-2xl border border-purple-200/70 dark:border-purple-900/60 bg-white dark:bg-slate-900 px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <div>
+                    <h2 className="text-sm font-black text-slate-900 dark:text-white">SMART AI · Groq</h2>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">مساعد الذكاء الاصطناعي المصري داخل SMART TIME</p>
+                  </div>
+                </div>
+              </div>
+              <SmartAIDemo />
+            </div>
           )}
 
           {currentView === 'chat' && (
