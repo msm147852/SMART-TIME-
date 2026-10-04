@@ -70,7 +70,8 @@ import ServicesPage from '../app/services/page';
 import SmartAIServicePage from '../app/services/smart-ai/page';
 import SmartAIDemo from '../components/smart-ai/SmartAIDemo';
 import { CalendarView } from './components/CalendarView';
-import { startTrialSession } from './services/authService';
+import { restoreSession, startTrialSession } from './services/authService';
+import { AuthView } from './components/AuthView';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
 // Icons
@@ -86,6 +87,7 @@ export default function App() {
   const servicePath = typeof window !== 'undefined' ? window.location.pathname : '/';
   // Global App State
   const [authChecked, setAuthChecked] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [viewHistory, setViewHistory] = useState<AppView[]>([]);
   const [language, setLanguage] = useState<Language>('ar');
@@ -150,15 +152,14 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
   useEffect(() => {
-    // المرحلة التجريبية: تشغيل التطبيق مباشرة بدون شاشة دخول أو أي توثيق.
-    startTrialSession()
+    restoreSession()
       .then((session) => {
-        if (session) setUserProfile(UserRepository.getProfile());
+        if (session) {
+          setAuthenticated(true);
+          setUserProfile(UserRepository.getProfile());
+        }
       })
-      .catch((error) => {
-        console.error('Trial session error:', error);
-        // حتى لو فشل الاتصال بالـ API، لا نعرض شاشة دخول؛ التطبيق يظل قابلاً للاستعراض.
-      })
+      .catch((error) => console.error('Auth restore error:', error))
       .finally(() => setAuthChecked(true));
   }, []);
 
@@ -361,7 +362,27 @@ export default function App() {
 
   if (servicePath === '/services/smart-ai') return <SmartAIServicePage />;
   if (servicePath === '/services') return <ServicesPage />;
-  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تشغيل النسخة التجريبية…</div>;
+  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ التحقق من الجلسة…</div>;
+
+  if (!authenticated) {
+    return (
+      <AuthView
+        onAuthenticated={() => {
+          setAuthenticated(true);
+          setUserProfile(UserRepository.getProfile());
+        }}
+        onGuest={async () => {
+          try {
+            await startTrialSession();
+            setUserProfile(UserRepository.getProfile());
+            setAuthenticated(true);
+          } catch (error) {
+            console.error('Guest session error:', error);
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-accent-500 selection:text-white">
