@@ -360,8 +360,7 @@ export default function App() {
     { view: 'notes' as AppView, label: language === 'ar' ? 'الملاحظات' : 'Notes', icon: FileText },
   ];
 
-  if (servicePath === '/services/smart-ai') return <SmartAIServicePage />;
-  if (servicePath === '/services') return <ServicesPage />;
+  // Authentication must guard every application route, including service landing pages.
   if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ التحقق من الجلسة…</div>;
 
   if (!authenticated) {
@@ -383,6 +382,9 @@ export default function App() {
       />
     );
   }
+
+  if (servicePath === '/services/smart-ai') return <SmartAIServicePage />;
+  if (servicePath === '/services') return <ServicesPage />;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-accent-500 selection:text-white">
