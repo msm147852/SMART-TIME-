@@ -2130,9 +2130,16 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         existingMembers={roomMembers}
         isAr={isAr}
         isDark={isDark}
-        onMemberAdded={async () => {
-          const detail = await chatService.getRoomDetails(activeRoomId);
-          if (detail?.members) setRoomMembers(detail.members);
+        onMemberAdded={async (newRoomId) => {
+          if (newRoomId) {
+            await loadRooms();
+            setActiveRoomId(newRoomId);
+            setActiveTab('private');
+            setMobileShowChat(true);
+          } else {
+            const detail = await chatService.getRoomDetails(activeRoomId);
+            if (detail?.members) setRoomMembers(detail.members);
+          }
         }}
       />
 
