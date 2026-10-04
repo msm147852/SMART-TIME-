@@ -449,46 +449,31 @@ app.get('/api/trial/session', (req,res) => {
   }
 });
 
-app.post('/api/auth/register', async (req,res)=>{
-  try{
-    const name=String(req.body.name||'').trim(), username=normalizeUsername(req.body.username), email=String(req.body.email||'').trim().toLowerCase(), password=String(req.body.password||'');
-    // TEMPORARY (testing phase): phone is now optional at signup. Leaving it blank skips phone
-    // verification entirely — the account is created and usable immediately across every section.
-    // The Trips section's phone-gift screen still asks for it later, whenever the user chooses to.
-    // To make phone required again, restore the `if(phone.length<8) return res.status(400)...` check below.
-    const rawPhone=normalizePhone(req.body.phone), phone = rawPhone.length>=8 ? rawPhone : '';
-    const deviceId=String(req.body.deviceId||'').trim().slice(0,200);
-    if(name.length<2)return res.status(400).json({error:'الاسم مطلوب'});
-    if(!/^[a-z0-9_.-]{3,30}$/.test(username))return res.status(400).json({error:'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا، باستخدام حروف إنجليزية أو أرقام أو _ أو - أو .'});
-    if(!/^\S+@\S+\.\S+$/.test(email))return res.status(400).json({error:'البريد الإلكتروني غير صحيح'});
-    if(password.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});
-    if(db.prepare('SELECT id FROM users WHERE email=?').get(email))return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});
-    if(db.prepare('SELECT id FROM users WHERE username=?').get(username))return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
-    if(phone && db.prepare('SELECT id FROM users WHERE phone=?').get(phone))return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر.'});
-    const id=`usr_${crypto.randomUUID()}`, now=new Date().toISOString();
-    db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,0)").run(id,email,username,hashPassword(password),name,now,phone||null,0,'active');
-    // IMPORTANT: the account (with its email) is already committed to the users table above.
-    // A failure to send the phone-verification SMS must never delete that row again — losing the
-    // SMS provider must not mean losing the registration. We keep the account and let the user
-    // retry verification later (via the Trips phone-gift screen, which re-sends a fresh OTP).
-    let expires = new Date(Date.now()+300000).toISOString();
-    let smsSent = false;
-    let devCode: string | undefined;
-    if (phone) {
-      try { const otpResult = await requestPhoneOtp(phone); expires = otpResult.expires; devCode = otpResult.devCode; smsSent = otpResult.provider !== 'development'; }
-      catch(e:any) { /* smsSent stays false; user can retry from the Trips phone-gift screen */ }
-    }
-    const user={id,email,username,name,phone:phone||undefined,phoneVerified:false,activationStatus:'active'};
-    res.json({
-      token:createSession(id),
-      user,
-      requiresPhoneVerification: !!phone,
-      expiresAt:expires,
-      devCode,
-      smsSent,
-      smsWarning: (!smsSent && process.env.NODE_ENV==='production') ? 'تم إنشاء حسابك وتسجيل بريدك الإلكتروني بنجاح، لكن تعذر إرسال رمز SMS الآن. يمكنك إعادة طلب رمز التحقق لاحقًا من شاشة تفعيل هدية الرحلات.' : undefined,
-    });
-  }catch(e:any){res.status(500).json({error:e.message||'تعذر إنشاء الحساب'});}
+app.post('/api/auth/register', (req,res)=>{
+  try {
+    const name=String(req.body.name||'').trim();
+    const username=normalizeUsername(req.body.username);
+    const email=String(req.body.email||'').trim().toLowerCase();
+    const password=String(req.body.password||'');
+    const phone=normalizePhone(req.body.phone);
+    if(name.length<2) return res.status(400).json({error:'الاسم مطلوب'});
+    if(!/^[a-z0-9_.-]{3,30}$/.test(username)) return res.status(400).json({error:'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا، باستخدام حروف إنجليزية أو أرقام أو _ أو - أو .'});
+    if(!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({error:'البريد الإلكتروني غير صحيح'});
+    if(password.length<8) return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});
+    if(phone.length<8) return res.status(400).json({error:'رقم الهاتف مطلوب ويجب أن يكون صحيحًا'});
+    if(db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});
+    if(db.prepare('SELECT id FROM users WHERE username=?').get(username)) return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
+    if(db.prepare('SELECT id FROM users WHERE phone=?').get(phone)) return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر.'});
+    const id=`usr_${crypto.randomUUID()}`;
+    const now=new Date().toISOString();
+    db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,0)")
+      .run(id,email,username,hashPassword(password),name,now,phone,1,'active');
+    const row=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(id) as any;
+    const user=publicUser(row);
+    return res.json({token:createSession(id),user});
+  } catch(e:any) {
+    return res.status(500).json({error:e.message||'تعذر إنشاء الحساب'});
+  }
 });
 
 app.post('/api/auth/register/verify-phone',async(req,res)=>{
@@ -527,6 +512,33 @@ app.post('/api/auth/phone-login/request-otp',async(req,res)=>{try{const phone=no
 app.post('/api/auth/phone-login',async(req,res)=>{try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({token:createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
 app.post('/api/auth/forgot-password',async(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code);res.json({ok:true,emailSent:true,provider:info.provider,devCode:info.devCode});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.status(503).json({error:mailErr.message||'تعذر إرسال رسالة إعادة تعيين كلمة المرور.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
 app.post('/api/auth/reset-password',(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase(),code=String(req.body.code||'').trim(),newPassword=String(req.body.newPassword||'');if(newPassword.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});const reset=db.prepare('SELECT * FROM password_resets WHERE email=?').get(email) as any;if(!reset||new Date(reset.expires_at).getTime()<Date.now())return res.status(400).json({error:'رمز الاستعادة منتهي أو غير موجود'});if(reset.attempts>=5)return res.status(429).json({error:'تم تجاوز عدد المحاولات.'});db.prepare('UPDATE password_resets SET attempts=attempts+1 WHERE email=?').run(email);if(otpHash(code)!==reset.code_hash)return res.status(400).json({error:'رمز الاستعادة غير صحيح'});db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword),email);db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.json({ok:true});}catch(e:any){res.status(500).json({error:e.message||'تعذر تغيير كلمة المرور'});}});
+app.post('/api/auth/forgot-password-phone',(req,res)=>{
+  try {
+    const phone=normalizePhone(req.body.phone);
+    if(phone.length<8) return res.status(400).json({error:'رقم الهاتف غير صحيح'});
+    const row=db.prepare('SELECT id FROM users WHERE phone=?').get(phone) as any;
+    if(!row) return res.json({ok:true,found:false});
+    return res.json({ok:true,found:true});
+  } catch(e:any) {
+    return res.status(500).json({error:e.message||'تعذر التحقق من الرقم'});
+  }
+});
+
+app.post('/api/auth/reset-password-phone',(req,res)=>{
+  try {
+    const phone=normalizePhone(req.body.phone);
+    const newPassword=String(req.body.newPassword||'');
+    if(phone.length<8) return res.status(400).json({error:'رقم الهاتف غير صحيح'});
+    if(newPassword.length<8) return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});
+    const row=db.prepare('SELECT id FROM users WHERE phone=?').get(phone) as any;
+    if(!row) return res.status(404).json({error:'الرقم غير مسجل على السيرفر'});
+    db.prepare('UPDATE users SET password_hash=? WHERE phone=?').run(hashPassword(newPassword),phone);
+    return res.json({ok:true});
+  } catch(e:any) {
+    return res.status(500).json({error:e.message||'تعذر تغيير كلمة المرور'});
+  }
+});
+
 app.post('/api/auth/logout',(req,res)=>{const h=String(req.headers.authorization||''),token=h.startsWith('Bearer ')?h.slice(7).trim():'';if(token)db.prepare('DELETE FROM sessions WHERE id=?').run(token);res.json({ok:true});});
 app.post('/api/auth/chat/request-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول بالبريد أولاً'});const phone=normalizePhone(req.body.phone);if(phone.length<8)return res.status(400).json({error:'رقم الهاتف غير صحيح'});const taken=db.prepare('SELECT id FROM users WHERE phone=? AND id<>?').get(phone,user.id) as any;if(taken)return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر'});try{const otpResult=await requestPhoneOtp(phone);res.json({ok:true,expiresAt:otpResult.expires,devCode:otpResult.devCode,smsProvider:otpResult.provider});}catch(err:any){return res.status(503).json({error:err.message||'تعذر إرسال SMS'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر إرسال رمز التحقق'});}});
 app.post('/api/auth/chat/verify-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول غير صالحة'});const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});db.prepare('UPDATE users SET phone=?,phone_verified=1 WHERE id=?').run(phone,user.id);db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any;res.json({token:createSession(user.id),user:publicUser(refreshed)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد الرقم'});}});
