@@ -127,6 +127,14 @@ export async function verifyChatOtp(phone: string, code: string): Promise<AuthSe
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
+export async function requestPasswordResetByPhone(phone: string) {
+  return request('/api/auth/forgot-password-phone', { phone });
+}
+
+export async function resetPasswordByPhone(phone: string, newPassword: string) {
+  return request('/api/auth/reset-password-phone', { phone, newPassword });
+}
+
 export async function logout() {
   try { await api('/api/auth/logout', { method: 'POST', headers: authHeaders() }); } catch {}
   clearSession();
