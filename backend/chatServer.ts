@@ -271,6 +271,46 @@ chatRouter.get('/users', (req, res) => {
   }
 });
 
+// 1.5 POST /api/chat/contacts/lookup - Match phone contacts to SMART TIME users
+chatRouter.post('/contacts/lookup', (req, res) => {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+
+    const phones = Array.isArray(req.body?.phones) ? req.body.phones : [];
+    const normalized = Array.from(new Set(
+      phones.map((p: any) => String(p || '').replace(/[^0-9+]/g, '')).filter(Boolean)
+    )).slice(0, 500);
+
+    if (!normalized.length) return res.json({ users: [] });
+
+    const rows = db.prepare(`
+      SELECT id, display_name as name, email, avatar, phone
+      FROM users
+      WHERE phone IS NOT NULL AND phone != '' AND id != ?
+    `).all(user.id) as any[];
+
+    const normalize = (p: string) => {
+      const digits = String(p || '').replace(/[^0-9]/g, '');
+      return digits.length > 10 ? digits.slice(-10) : digits;
+    };
+    const wanted = new Set(normalized.map(normalize));
+
+    const users = rows.filter((u) => wanted.has(normalize(u.phone))).map((u) => ({
+      id: u.id,
+      name: u.name || u.email.split('@')[0],
+      email: u.email,
+      avatar: u.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+      phone: u.phone,
+      isOnline: isUserOnline(u.id),
+    }));
+
+    res.json({ users });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 2. GET /api/chat/rooms - List all rooms accessible to the current user
 chatRouter.get('/rooms', (req, res) => {
   try {
