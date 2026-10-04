@@ -10,7 +10,6 @@ import approvedLoginVisual from '../assets/images/login-screen-approved.png';
 
 interface Props {
   onAuthenticated: () => void;
-  onGuest: () => void;
   loginNotice?: string;
   requireTripPhoneVerification?: boolean;
 }
@@ -18,7 +17,7 @@ interface Props {
 type Mode = 'login' | 'register' | 'forgot';
 type LoginMethod = 'email' | 'username';
 
-export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotice }) => {
+export const AuthView: React.FC<Props> = ({ onAuthenticated, loginNotice }) => {
   const [mode, setMode] = useState<Mode>('login');
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
   const [name, setName] = useState('');
@@ -115,7 +114,6 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
           <button type="button" onClick={goToLogin} className="mt-5 w-full max-w-md py-4 rounded-2xl bg-slate-950 text-white font-black text-base shadow-xl hover:bg-slate-800 transition flex items-center justify-center gap-2">
             <LogIn className="w-5 h-5" />سجل الدخول أو أنشئ حسابك<ArrowRight className="w-5 h-5" />
           </button>
-          <button type="button" onClick={onGuest} className="mt-3 text-sm font-bold text-slate-500 hover:text-slate-950 transition">الدخول كزائر</button>
         </div>
         <div className="relative z-10 pb-5 text-center text-xs text-slate-400 flex flex-col items-center gap-1">
           <span>اسحب لأعلى للتسجيل أو تسجيل الدخول</span><ArrowDown className="w-4 h-4 animate-bounce" /><span>SMART TIME · v1.8</span>
