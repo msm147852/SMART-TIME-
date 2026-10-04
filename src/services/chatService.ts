@@ -336,7 +336,23 @@ class ChatService {
     return data.users || [];
   }
 
-  // 17. Search messages across rooms
+  // 17. Match phone contacts to SMART TIME users
+  async lookupContacts(phones: string[]): Promise<Array<{
+    id: string;
+    name: string;
+    email: string;
+    avatar: string;
+    phone?: string;
+    isOnline?: boolean;
+  }>> {
+    const data = await this.request('/api/chat/contacts/lookup', {
+      method: 'POST',
+      body: JSON.stringify({ phones }),
+    });
+    return data.users || [];
+  }
+
+  // 18. Search messages across rooms
   async searchMessages(q: string): Promise<Array<{
     id: string;
     roomId: string;
