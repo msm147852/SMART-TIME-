@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, X, Check, Shield, User, ShieldAlert } from 'lucide-react';
+import { UserPlus, Search, X, Check, Shield, User, ShieldAlert, Contact, Smartphone } from 'lucide-react';
 import { ChatMember } from '../types';
 import { chatService } from '../services/chatService';
 
@@ -10,7 +10,7 @@ interface AddMemberModalProps {
   existingMembers: ChatMember[];
   isAr: boolean;
   isDark: boolean;
-  onMemberAdded?: () => void;
+  onMemberAdded?: (roomId?: string) => void;
 }
 
 export const AddMemberModal: React.FC<AddMemberModalProps> = ({
@@ -28,6 +28,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<'admin' | 'moderator' | 'member'>('member');
   const [submitting, setSubmitting] = useState(false);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactsMessage, setContactsMessage] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +46,39 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const existingIds = new Set(existingMembers.map((m) => m.id));
 
+  const openPhoneContacts = async () => {
+    const contactsApi = (navigator as any).contacts;
+    if (!contactsApi?.select) {
+      setContactsMessage(isAr ? 'المتصفح لا يدعم جهات اتصال الهاتف. استخدم البحث عن مستخدم SMART TIME.' : 'This browser does not support phone contacts. Use SMART TIME user search instead.');
+      return;
+    }
+    setContactsLoading(true);
+    setContactsMessage('');
+    try {
+      const picked = await contactsApi.select(['name', 'tel'], { multiple: true });
+      const phones = (picked || []).flatMap((c: any) => Array.isArray(c.tel) ? c.tel : []).filter(Boolean);
+      if (!phones.length) {
+        setContactsMessage(isAr ? 'لم يتم اختيار جهة اتصال بها رقم هاتف.' : 'No contact with a phone number was selected.');
+        return;
+      }
+      const matches = await chatService.lookupContacts(phones);
+      if (!matches.length) {
+        setContactsMessage(isAr ? 'جهات الاتصال المختارة لا يوجد بها مستخدم SMART TIME بنفس رقم الهاتف.' : 'No selected contact is using SMART TIME with the same phone number.');
+        return;
+      }
+      setUsers((prev) => {
+        const map = new Map(prev.map((u) => [u.id, u]));
+        matches.forEach((u) => map.set(u.id, u));
+        return Array.from(map.values());
+      });
+      setSelectedUserId(matches[0].id);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.'));
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
   const filteredUsers = users.filter((u) =>
     (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -54,8 +89,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     if (!selectedUserId) return;
     setSubmitting(true);
     try {
-      await chatService.addMember(roomId, selectedUserId, selectedRole);
-      onMemberAdded?.();
+      const result = await chatService.createRoom({
+        title: 'محادثة مباشرة',
+        type: 'direct',
+        memberIds: [selectedUserId],
+      });
+      onMemberAdded?.(result.roomId);
       onClose();
     } catch (err: any) {
       alert(err.message || 'حدث خطأ أثناء إضافة العضو');
@@ -89,6 +128,20 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Phone Contacts */}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={openPhoneContacts}
+            disabled={contactsLoading}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-extrabold shadow-md transition-all"
+          >
+            {contactsLoading ? <Smartphone className="w-4 h-4 animate-pulse" /> : <Contact className="w-4 h-4" />}
+            {contactsLoading ? (isAr ? 'جاري قراءة جهات الاتصال...' : 'Reading contacts...') : (isAr ? 'اختيار من جهات اتصال الهاتف' : 'Choose from phone contacts')}
+          </button>
+          {contactsMessage && <p className="mt-2 text-[10px] text-amber-500 font-medium">{contactsMessage}</p>}
         </div>
 
         {/* Search */}
@@ -147,7 +200,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     </div>
                     <div className="min-w-0">
                       <h4 className="font-bold text-xs truncate">{u.name}</h4>
-                      <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{u.phone || u.email}</p>
                     </div>
                   </div>
 
@@ -167,6 +220,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             })
           )}
         </div>
+
+        {selectedUserId && (
+          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5">
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+              {isAr ? 'سيتم فتح محادثة مباشرة وحفظها تلقائيًا في قائمة المحادثات.' : 'A direct chat will open and be saved automatically.'}
+            </p>
+          </div>
+        )}
 
         {/* Role Selector */}
         {selectedUserId && (
