@@ -120,13 +120,26 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!selectedUserId || submitting}
+              className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-md"
+              title={isAr ? 'تأكيد وبدء المحادثة' : 'Confirm and start chat'}
+              aria-label={isAr ? 'تأكيد وبدء المحادثة' : 'Confirm and start chat'}
+            >
+              {submitting ? <Smartphone className="w-5 h-5 animate-pulse" /> : <Check className="w-5 h-5 stroke-[3]" />}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              title={isAr ? 'إغلاق' : 'Close'}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Phone Contacts */}
