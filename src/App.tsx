@@ -152,11 +152,15 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
   useEffect(() => {
-    // Login screen is the mandatory application entry point.
-    // Do not silently restore a previous browser session on startup.
-    localStorage.removeItem('smart_time_auth_session');
-    setAuthenticated(false);
-    setAuthChecked(true);
+    restoreSession()
+      .then((session) => {
+        if (session) {
+          setAuthenticated(true);
+          setUserProfile(UserRepository.getProfile());
+        }
+      })
+      .catch((error) => console.error('Auth restore error:', error))
+      .finally(() => setAuthChecked(true));
   }, []);
 
   useEffect(() => {

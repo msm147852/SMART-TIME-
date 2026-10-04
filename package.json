@@ -1,7 +1,7 @@
 {
-  "name": "open-mind-ai",
+  "name": "smart-time",
   "private": true,
-  "version": "25.7.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:open-mind": "tsx backend/ai/openMindBrain.test.ts && tsx backend/ai/openMindE2E.test.ts",
+    "test:smart-time": "tsx backend/ai/openMindBrain.test.ts && tsx backend/ai/openMindE2E.test.ts",
     "validate:smart-ai": "node scripts/validate-smart-ai-datasets.mjs",
     "train:smart-ai": "python infra/smart-ai/training/train_smart_ai.py",
     "eval:smart-ai": "python infra/smart-ai/training/evaluate_smart_ai.py",

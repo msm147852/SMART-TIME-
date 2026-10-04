@@ -15,6 +15,7 @@ export interface AuthUser {
 export interface AuthSession {
   token: string;
   user: AuthUser;
+  expiresAt?: string;
 }
 
 const SESSION_KEY = 'smart_time_auth_session';
@@ -62,7 +63,7 @@ export async function startTrialSession(): Promise<AuthSession> {
   const res = await fetch(apiUrl('/api/trial/session'));
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.token) throw new Error(data.error || 'تعذر بدء النسخة التجريبية');
-  const session: AuthSession = { token: data.token, user: data.user };
+  const session: AuthSession = { token: data.token, user: data.user, expiresAt: data.expiresAt };
   saveSession(session);
   applyUserToProfile(session.user);
   return session;
@@ -70,7 +71,7 @@ export async function startTrialSession(): Promise<AuthSession> {
 
 export async function loginWithIdentifier(identifier: string, password: string): Promise<AuthSession> {
   const data = await request('/api/auth/login', { identifier, password });
-  const session: AuthSession = { token: data.token, user: data.user };
+  const session: AuthSession = { token: data.token, user: data.user, expiresAt: data.expiresAt };
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
@@ -79,7 +80,7 @@ export async function requestPhoneLoginOtp(phone: string) { return request('/api
 
 export async function loginWithPhone(phone: string, code: string): Promise<AuthSession> {
   const data = await request('/api/auth/phone-login', { phone, code });
-  const session: AuthSession = { token: data.token, user: data.user };
+  const session: AuthSession = { token: data.token, user: data.user, expiresAt: data.expiresAt };
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
@@ -94,7 +95,7 @@ export async function resetPassword(email: string, code: string, newPassword: st
 export async function registerWithEmail(name: string, username: string, email: string, password: string, phone: string): Promise<any> {
   const data = await request('/api/auth/register', { name, username, email, password, phone, deviceId: getDeviceId() });
   if (!data.token) return data;
-  const session: AuthSession = { token: data.token, user: data.user };
+  const session: AuthSession = { token: data.token, user: data.user, expiresAt: data.expiresAt };
   saveSession(session); applyUserToProfile(session.user);
   // Return every field the server sent (devCode, smsSent, smsWarning, requiresPhoneVerification, ...),
   // not just {token, user} — the caller needs those to tell the person what actually happened.
@@ -109,10 +110,20 @@ export async function restoreSession(): Promise<AuthSession | null> {
   const stored = getStoredSession();
   if (!stored?.token) return null;
   try {
+    const expiresAt = stored.expiresAt ? Date.parse(stored.expiresAt) : 0;
+    if (expiresAt && expiresAt - Date.now() < 24 * 60 * 60 * 1000) {
+      const refreshed = await request('/api/auth/refresh', {});
+      if (refreshed?.token) {
+        const refreshedSession: AuthSession = { token: refreshed.token, user: refreshed.user, expiresAt: refreshed.expiresAt };
+        saveSession(refreshedSession);
+        applyUserToProfile(refreshedSession.user);
+        return refreshedSession;
+      }
+    }
     const res = await api('/api/auth/me', { headers: authHeaders() });
     const data = await res.json();
     if (!res.ok) throw new Error();
-    const session = { token: stored.token, user: data.user } as AuthSession;
+    const session = { token: stored.token, user: data.user, expiresAt: data.expiresAt || stored.expiresAt } as AuthSession;
     saveSession(session); applyUserToProfile(session.user); return session;
   } catch { clearSession(); return null; }
 }
@@ -123,7 +134,7 @@ export async function requestChatOtp(phone: string) {
 
 export async function verifyChatOtp(phone: string, code: string): Promise<AuthSession> {
   const data = await request('/api/auth/chat/verify-otp', { phone, code, token: getStoredSession()?.token });
-  const session: AuthSession = { token: data.token, user: data.user };
+  const session: AuthSession = { token: data.token, user: data.user, expiresAt: data.expiresAt };
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 

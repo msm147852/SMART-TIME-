@@ -10,6 +10,13 @@ const configuredDbPath = process.env.SMART_TIME_DB_PATH?.trim();
 const dbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(dataDir, 'smart-time.db');
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+const pendingRestorePath = path.join(dataDir, 'restore.pending.db');
+if (fs.existsSync(pendingRestorePath)) {
+  fs.rmSync(`${dbPath}-wal`, { force: true });
+  fs.rmSync(`${dbPath}-shm`, { force: true });
+  fs.copyFileSync(pendingRestorePath, dbPath);
+  fs.rmSync(pendingRestorePath, { force: true });
+}
 export const db = new DatabaseSync(dbPath);
 db.exec(`
 PRAGMA journal_mode = WAL;

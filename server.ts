@@ -1,6 +1,7 @@
 import express from "express";
 import http from "node:http";
 import path from "path";
+import fs from "node:fs";
 import dotenv from "dotenv";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
@@ -25,6 +26,15 @@ dotenv.config();
 
 const app = express();
 app.set("trust proxy", 1);
+const runtimeMetrics = { total: 0, status5xx: 0, status429: 0 };
+app.use((req, res, next) => {
+  runtimeMetrics.total += 1;
+  res.on("finish", () => {
+    if (res.statusCode >= 500) runtimeMetrics.status5xx += 1;
+    if (res.statusCode === 429) runtimeMetrics.status429 += 1;
+  });
+  next();
+});
 const PORT = Number(process.env.PORT || 3000);
 const SMART_VOICE_DNA_PROVIDER_URL = String(process.env.SMART_VOICE_DNA_PROVIDER_URL || "").trim();
 const SMART_VOICE_DNA_PROVIDER_TOKEN = String(process.env.SMART_VOICE_DNA_PROVIDER_TOKEN || "").trim();
@@ -33,18 +43,24 @@ const smartVoiceDnaProvider = SMART_VOICE_DNA_PROVIDER_URL
   : new DisabledVoiceDnaProvider();
 const SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.SMART_VOICE_DNA_MAX_REQUESTS_PER_MINUTE || 8));
 const voiceDnaRequestWindow = new Map<string, { startedAt: number; count: number }>();
-const sttRequestWindow = new Map<string, { startedAt: number; count: number }>();
+const sttRequestWindow = new Map<string, number[]>();
 const STT_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.STT_MAX_REQUESTS_PER_MINUTE || 12));
 const STT_MAX_AUDIO_BYTES = Math.max(256 * 1024, Number(process.env.STT_MAX_AUDIO_BYTES || 8 * 1024 * 1024));
 function consumeSttQuota(userId: string): boolean {
   const now = Date.now();
-  const current = sttRequestWindow.get(userId);
-  if (!current || now - current.startedAt >= 60_000) {
-    sttRequestWindow.set(userId, { startedAt: now, count: 1 });
-    return true;
+  const cutoff = now - 60_000;
+  const recent = (sttRequestWindow.get(userId) || []).filter((timestamp) => timestamp > cutoff);
+  if (recent.length >= STT_MAX_REQUESTS_PER_MINUTE) {
+    sttRequestWindow.set(userId, recent);
+    return false;
   }
-  if (current.count >= STT_MAX_REQUESTS_PER_MINUTE) return false;
-  current.count += 1;
+  recent.push(now);
+  sttRequestWindow.set(userId, recent);
+  if (sttRequestWindow.size > 10000) {
+    for (const [key, timestamps] of sttRequestWindow) {
+      if (!timestamps.some((timestamp) => timestamp > cutoff)) sttRequestWindow.delete(key);
+    }
+  }
   return true;
 }
 
@@ -178,8 +194,8 @@ app.post("/api/ai/stt", async (req, res) => {
     if (audio.length > STT_MAX_AUDIO_BYTES) return res.status(413).json({ error: "Audio payload is too large." });
 
     const prompt = language === "ar"
-      ? "الكلام باللهجة المصرية وبالعربي. اكتب النص المنطوق بالعربية فقط وبنفس الكلمات التي قالها المتحدث. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ. لا تترجم الكلام إلى الإنجليزية ولا تكتب العربية بحروف لاتينية. اكتب الكلمات الإنجليزية فقط إذا نطقها المتحدث فعلًا."
-      : "اكتب الكلام المنطوق فقط كما قيل، مع الحفاظ على الأرقام والتواريخ والأسماء والكلمات الإنجليزية التي نُطقت فعلًا.";
+      ? `اللغة المصرية العربية (${locale}). أخرج الكلام المنطوق فقط كما قيل، بنفس الكلمات واللهجة. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ. لا تترجم إلى الإنجليزية ولا تكتب العربية بحروف لاتينية. اكتب الإنجليزية فقط إذا نطقها المتحدث فعلًا.`
+      : `اللغة الإنجليزية (${locale}). أخرج الكلام المنطوق فقط كما قيل، بدون ترجمة أو إعادة صياغة. حافظ على الأسماء والأرقام والتواريخ والكلمات الأجنبية المنطوقة فعلًا.`;
 
     let transcription = await groqProvider.transcribeAudio({
       audio,
@@ -202,7 +218,7 @@ app.post("/api/ai/stt", async (req, res) => {
           language,
           filename: mimeType === "audio/webm" ? "voice.webm" : "voice.audio",
           model: "whisper-large-v3",
-          prompt: "الكلام باللهجة المصرية. أخرج النص العربي المنطوق فقط كما قيل. ممنوع الترجمة إلى الإنجليزية وممنوع كتابة العربية بحروف لاتينية. حافظ على الكلمات المصرية والأسماء والأرقام والتواريخ، واكتب الإنجليزية فقط إذا نُطقت فعلًا.",
+          prompt,
         });
 
         const retryText = transcription.text.trim();
@@ -259,7 +275,7 @@ app.use("/api/chat", chatRouter);
 
 const TRIAL_MODE = String(process.env.TRIAL_MODE || 'true').trim().toLowerCase() !== 'false';
 const TRIAL_USER_ID = 'smart-time-trial-user';
-const AUTH_SESSION_DAYS = 30;
+const AUTH_SESSION_DAYS = 7;
 const PASSWORD_RESET_MINUTES = 15;
 const PROGRAM_OWNER_EMAIL = String(process.env.PROGRAM_OWNER_EMAIL || '').trim().toLowerCase();
 const PROGRAM_OWNER_USER_ID = String(process.env.PROGRAM_OWNER_USER_ID || '').trim();
@@ -281,8 +297,8 @@ const ALLOWED_TOPUP_METHODS = new Set(['vodafone_cash', 'instapay', 'etisalat_ca
 const MAX_REVIEW_NOTE_LENGTH = 300;
 function hashPassword(password: string) { const salt = crypto.randomBytes(16).toString('hex'); return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`; }
 function verifyPassword(password: string, stored: string) { const [salt, expected] = String(stored||'').split(':'); if (!salt||!expected) return false; const actual=crypto.scryptSync(password,salt,64).toString('hex'); return crypto.timingSafeEqual(Buffer.from(actual,'hex'),Buffer.from(expected,'hex')); }
-function createSession(userId: string) { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at) VALUES (?,?,?,?)').run(token,userId,expires,now.toISOString()); return token; }
-function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
+function createSession(userId: string) { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at) VALUES (?,?,?,?)').run(token,userId,expires,now.toISOString()); return { token, expiresAt: expires }; }
+function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,s.id as session_id,s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
 function publicUser(row:any){return {id:row.id,email:row.email,username:row.username||undefined,name:row.name||row.display_name||'',phone:row.phone||undefined,phoneVerified:!!row.phoneVerified,activationStatus:row.activation_status||row.activationStatus||'pending'};}
 function normalizePhone(phone:string){return String(phone||'').replace(/[\s()-]/g,'');}
 function normalizeUsername(username:string){return String(username||'').trim().toLowerCase();}
@@ -442,8 +458,8 @@ app.get('/api/trial/session', (req,res) => {
     } else {
       db.prepare("UPDATE users SET activation_status='active', phone_verified=0, phone=NULL WHERE id=?").run(TRIAL_USER_ID);
     }
-    const token = createSession(TRIAL_USER_ID);
-    res.json({ token, user: publicUser({ ...row, name: row.display_name, phoneVerified: false, activation_status: 'active' }) });
+    const session = createSession(TRIAL_USER_ID);
+    res.json({ ...session, user: publicUser({ ...row, name: row.display_name, phoneVerified: false, activation_status: 'active' }) });
   } catch (e:any) {
     res.status(500).json({ error: e.message || 'تعذر بدء النسخة التجريبية' });
   }
@@ -470,7 +486,7 @@ app.post('/api/auth/register', (req,res)=>{
       .run(id,email,username,hashPassword(password),name,now,phone,1,'active');
     const row=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(id) as any;
     const user=publicUser(row);
-    return res.json({token:createSession(id),user});
+    const session=createSession(id); return res.json({...session,user});
   } catch(e:any) {
     return res.status(500).json({error:e.message||'تعذر إنشاء الحساب'});
   }
@@ -505,11 +521,12 @@ app.post('/api/auth/trips/verify-phone',async(req,res)=>{
   try{ const user=authUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول أولاً'}); const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim(); const row=db.prepare('SELECT * FROM users WHERE id=?').get(user.id) as any; if(!row)return res.status(404).json({error:'الحساب غير موجود'}); if(row.phone_verified)return res.json({ok:true,user:publicUser({...row,phoneVerified:true}),freeSearches:Number(row.trip_free_searches||0),alreadyVerified:true}); const check=await checkPhoneOtp(phone,code); if(!check.ok)return res.status(check.status).json({error:check.error}); const taken=db.prepare('SELECT id FROM users WHERE phone=? AND id<>?').get(phone,user.id) as any; if(taken)return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر.'}); db.exec('BEGIN IMMEDIATE'); try{ const priorClaim=db.prepare('SELECT id FROM trip_gift_claims WHERE user_id<>? AND phone_hash=? LIMIT 1').get(user.id,giftSignalHash(phone)) as any; const giftEligible=!priorClaim; db.prepare('UPDATE users SET phone=?,phone_verified=1,trip_free_searches=?,trip_gift_claimed_at=? WHERE id=?').run(phone,giftEligible?TRIP_WELCOME_FREE_SEARCHES:0,giftEligible?new Date().toISOString():null,user.id); if(giftEligible)db.prepare('INSERT INTO trip_gift_claims (id,user_id,device_hash,ip_hash,phone_hash,created_at) VALUES (?,?,?,?,?,?)').run(`gift_${crypto.randomUUID()}`,user.id,req.body.deviceId?giftSignalHash(String(req.body.deviceId)):null,giftSignalHash(clientIp(req)),giftSignalHash(phone),new Date().toISOString()); db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone); db.exec('COMMIT'); const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any; res.json({ok:true,user:publicUser(refreshed),giftEligible,freeSearches:giftEligible?3:0,message:giftEligible?'تم تأكيد رقم الهاتف 🎉 حصلت على 3 أبحاث مجانية هدية ترحيبية.':'تم تأكيد الهاتف، لكن الهدية سبق استخدامها بهذا الرقم.'}); }catch(e){db.exec('ROLLBACK');throw e;} }catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد رقم الهاتف'});}
 });
 
-app.post('/api/auth/login',(req,res)=>{try{const identifier=String(req.body.identifier||req.body.email||'').trim(),normalizedEmail=identifier.toLowerCase(),normalizedUsername=normalizeUsername(identifier),password=String(req.body.password||'');let row:any=null;if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;if(!row||!verifyPassword(password,row.password_hash))return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});const user={...row,name:row.display_name,phoneVerified:row.phone_verified};res.json({token:createSession(row.id),user:publicUser(user)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول'});}});
-app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user)});});
+app.post('/api/auth/login',(req,res)=>{try{const identifier=String(req.body.identifier||req.body.email||'').trim(),normalizedEmail=identifier.toLowerCase(),normalizedUsername=normalizeUsername(identifier),password=String(req.body.password||'');let row:any=null;if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;if(!row||!verifyPassword(password,row.password_hash))return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});const user={...row,name:row.display_name,phoneVerified:row.phone_verified};res.json({...createSession(row.id),user:publicUser(user)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول'});}});
+app.post('/api/auth/refresh',(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});const oldToken=user.session_id;const session=createSession(user.id);db.prepare('DELETE FROM sessions WHERE id=?').run(oldToken);res.json({...session,user:publicUser(user)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تجديد جلسة الدخول'});}});
+app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user),expiresAt:user.expiresAt});});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
 app.post('/api/auth/phone-login/request-otp',async(req,res)=>{try{const phone=normalizePhone(req.body.phone);if(phone.length<8)return res.status(400).json({error:'رقم الهاتف غير صحيح'});const row=db.prepare('SELECT id FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});try{const otpResult=await requestPhoneOtp(phone);res.json({ok:true,expiresAt:otpResult.expires,devCode:otpResult.devCode,smsProvider:otpResult.provider});}catch(err:any){return res.status(503).json({error:err.message||'تعذر إرسال SMS'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر إرسال رمز SMS'});}});
-app.post('/api/auth/phone-login',async(req,res)=>{try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({token:createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
+app.post('/api/auth/phone-login',async(req,res)=>{try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({...createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
 app.post('/api/auth/forgot-password',async(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code);res.json({ok:true,emailSent:true,provider:info.provider,devCode:info.devCode});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.status(503).json({error:mailErr.message||'تعذر إرسال رسالة إعادة تعيين كلمة المرور.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
 app.post('/api/auth/reset-password',(req,res)=>{try{const email=String(req.body.email||'').trim().toLowerCase(),code=String(req.body.code||'').trim(),newPassword=String(req.body.newPassword||'');if(newPassword.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});const reset=db.prepare('SELECT * FROM password_resets WHERE email=?').get(email) as any;if(!reset||new Date(reset.expires_at).getTime()<Date.now())return res.status(400).json({error:'رمز الاستعادة منتهي أو غير موجود'});if(reset.attempts>=5)return res.status(429).json({error:'تم تجاوز عدد المحاولات.'});db.prepare('UPDATE password_resets SET attempts=attempts+1 WHERE email=?').run(email);if(otpHash(code)!==reset.code_hash)return res.status(400).json({error:'رمز الاستعادة غير صحيح'});db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword),email);db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.json({ok:true});}catch(e:any){res.status(500).json({error:e.message||'تعذر تغيير كلمة المرور'});}});
 app.post('/api/auth/forgot-password-phone',(req,res)=>{
@@ -541,7 +558,7 @@ app.post('/api/auth/reset-password-phone',(req,res)=>{
 
 app.post('/api/auth/logout',(req,res)=>{const h=String(req.headers.authorization||''),token=h.startsWith('Bearer ')?h.slice(7).trim():'';if(token)db.prepare('DELETE FROM sessions WHERE id=?').run(token);res.json({ok:true});});
 app.post('/api/auth/chat/request-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول بالبريد أولاً'});const phone=normalizePhone(req.body.phone);if(phone.length<8)return res.status(400).json({error:'رقم الهاتف غير صحيح'});const taken=db.prepare('SELECT id FROM users WHERE phone=? AND id<>?').get(phone,user.id) as any;if(taken)return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر'});try{const otpResult=await requestPhoneOtp(phone);res.json({ok:true,expiresAt:otpResult.expires,devCode:otpResult.devCode,smsProvider:otpResult.provider});}catch(err:any){return res.status(503).json({error:err.message||'تعذر إرسال SMS'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر إرسال رمز التحقق'});}});
-app.post('/api/auth/chat/verify-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول غير صالحة'});const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});db.prepare('UPDATE users SET phone=?,phone_verified=1 WHERE id=?').run(phone,user.id);db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any;res.json({token:createSession(user.id),user:publicUser(refreshed)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد الرقم'});}});
+app.post('/api/auth/chat/verify-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول غير صالحة'});const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});db.prepare('UPDATE users SET phone=?,phone_verified=1 WHERE id=?').run(phone,user.id);db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any;res.json({...createSession(user.id),user:publicUser(refreshed)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد الرقم'});}});
 
 
 // ----------------------------------------------------
@@ -2039,17 +2056,58 @@ app.post("/api/maps/parse-voice-trip", async (req, res) => {
 });
 
 // ----------------------------------------------------
-// 5. Data Backup / Restore Sync API
+// 5. Data Backup / Restore API
 // ----------------------------------------------------
-app.post("/api/backup/export", (req, res) => {
-  const payload = req.body;
-  res.setHeader("Content-Disposition", 'attachment; filename="smart_time_backup.json"');
-  res.setHeader("Content-Type", "application/json");
-  res.json({
-    exportDate: new Date().toISOString(),
-    version: "25.7",
-    data: payload,
-  });
+const configuredDbPath = process.env.SMART_TIME_DB_PATH?.trim();
+const runtimeDbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(process.cwd(), 'data', 'smart-time.db');
+const dbBackupDir = path.join(path.dirname(runtimeDbPath), 'backups');
+fs.mkdirSync(dbBackupDir, { recursive: true });
+
+app.get('/api/ops/metrics', (_req, res) => {
+  const memory = process.memoryUsage();
+  let dbBytes = 0;
+  try { dbBytes = fs.statSync(runtimeDbPath).size; } catch {}
+  res.json({ ok: true, uptimeSeconds: Math.floor(process.uptime()), requests: runtimeMetrics.total, responses5xx: runtimeMetrics.status5xx, responses429: runtimeMetrics.status429, memoryMB: Math.round(memory.rss / 1024 / 1024), heapUsedMB: Math.round(memory.heapUsed / 1024 / 1024), heapTotalMB: Math.round(memory.heapTotal / 1024 / 1024), database: { engine: 'sqlite', bytes: dbBytes, wal: true }, timestamp: new Date().toISOString() });
+});
+
+app.get('/api/backup/sqlite', (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول أولاً' });
+  try {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(dbBackupDir, `smart-time-${stamp}.db`);
+    const escaped = backupPath.replace(/'/g, "''");
+    db.exec(`PRAGMA wal_checkpoint(TRUNCATE); VACUUM INTO '${escaped}';`);
+    res.download(backupPath, path.basename(backupPath), (error) => { if (!error) fs.rmSync(backupPath, { force: true }); });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'تعذر إنشاء نسخة احتياطية من قاعدة البيانات' });
+  }
+});
+
+app.post('/api/backup/restore', (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول أولاً' });
+  const filename = path.basename(String(req.body?.filename || '').trim());
+  if (!/^smart-time-[A-Za-z0-9_.-]+\.db$/.test(filename)) return res.status(400).json({ error: 'اسم النسخة الاحتياطية غير صحيح' });
+  const backupPath = path.join(dbBackupDir, filename);
+  if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'النسخة الاحتياطية غير موجودة' });
+  const pendingRestorePath = path.join(path.dirname(runtimeDbPath), 'restore.pending.db');
+  try {
+    fs.copyFileSync(backupPath, pendingRestorePath);
+    res.json({ ok: true, message: 'تم تجهيز الاستعادة. سيتم إعادة تشغيل الخدمة لتطبيق النسخة الاحتياطية.' });
+    setTimeout(() => process.exit(0), 250);
+  } catch (error: any) {
+    fs.rmSync(pendingRestorePath, { force: true });
+    res.status(500).json({ error: error?.message || 'تعذر تجهيز استعادة قاعدة البيانات' });
+  }
+});
+
+app.post('/api/backup/export', (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول أولاً' });
+  res.setHeader('Content-Disposition', 'attachment; filename="smart_time_backup.json"');
+  res.setHeader('Content-Type', 'application/json');
+  res.json({ exportDate: new Date().toISOString(), version: '1.0', data: req.body });
 });
 
 // ----------------------------------------------------
