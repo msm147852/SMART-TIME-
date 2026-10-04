@@ -152,15 +152,34 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
   useEffect(() => {
-    restoreSession()
-      .then((session) => {
-        if (session) {
-          setAuthenticated(true);
-          setUserProfile(UserRepository.getProfile());
+    const checkAuth = async () => {
+      try {
+        const stored = localStorage.getItem('smart_time_auth_session');
+        if (!stored) {
+          setAuthenticated(false);
+          setAuthChecked(true);
+          return;
         }
-      })
-      .catch((error) => console.error('Auth restore error:', error))
-      .finally(() => setAuthChecked(true));
+        const session = await restoreSession();
+        if (session?.token) {
+          const profile = UserRepository.getProfile();
+          // للتجربة: لو مفيش ايميل ورقم تليفون في البروفايل، اجبره يسجل تاني.
+          if (!profile.email || !profile.phone) {
+            setAuthenticated(false);
+          } else {
+            setAuthenticated(true);
+            setUserProfile(profile);
+          }
+        } else {
+          setAuthenticated(false);
+        }
+      } catch {
+        setAuthenticated(false);
+      } finally {
+        setAuthChecked(true);
+      }
+    };
+    checkAuth();
   }, []);
 
   useEffect(() => {
