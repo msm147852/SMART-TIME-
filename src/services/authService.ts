@@ -112,6 +112,12 @@ export async function restoreSession(): Promise<AuthSession | null> {
     const res = await api('/api/auth/me', { headers: authHeaders() });
     const data = await res.json();
     if (!res.ok) throw new Error();
+    // Trial sessions are not valid application accounts. They must not bypass
+    // the mandatory email/phone account gate for chat and app data.
+    if (String(data.user?.id || '') === 'trial_user' || String(data.user?.username || '') === 'smart_time_trial') {
+      clearSession();
+      return null;
+    }
     const session = { token: stored.token, user: data.user } as AuthSession;
     saveSession(session); applyUserToProfile(session.user); return session;
   } catch { clearSession(); return null; }
