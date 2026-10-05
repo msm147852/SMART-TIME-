@@ -280,7 +280,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const [liveLocationWatchId, setLiveLocationWatchId] = useState<number | null>(null);
+  const [liveLocationWatchId, setLiveLocationWatchId] = useState<ReturnType<typeof setInterval> | null>(null);
   const [liveLocationMsgId, setLiveLocationMsgId] = useState<string | null>(null);
 
   // Window state
@@ -398,7 +398,6 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           return r;
         })
       );
-
       if (roomId === activeRoomId) {        scrollToBottom();        chatService.markRoomAsRead(roomId);      }
     });
 
@@ -797,8 +796,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           { lat: pos.coords.latitude, lng: pos.coords.longitude, isLive: true }
         );
         const watchId = navigator.geolocation.watchPosition(
-          (watchPos) => {
-            chatService.sendLiveLocationUpdate(activeRoomId, { lat: watchPos.coords.latitude, lng: watchPos.coords.longitude });
+          (watchPos) => {            chatService.sendLiveLocationUpdate(activeRoomId, { lat: watchPos.coords.latitude, lng: watchPos.coords.longitude });
           },
           () => {},
           { enableHighAccuracy: true }
@@ -812,7 +810,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   const handleStopLiveLocation = () => {
     if (liveLocationWatchId !== null) {
-      navigator.geolocation.clearWatch(liveLocationWatchId);
+      clearInterval(liveLocationWatchId);
       setLiveLocationWatchId(null);
     }
   };
@@ -1197,8 +1195,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {room.unreadCount > 0 && (
                       <span className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shadow-xs animate-scaleUp">
-                        {room.unreadCount}
-                      </span>
+                        {room.unreadCount}                      </span>
                     )}
                     <CheckCheck className="w-3.5 h-3.5 text-sky-500" />
                   </div>
@@ -1597,8 +1594,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                                   {msg.poll.multiple
                                     ? isAr
                                       ? 'يمكن اختيار أكثر من إجابة'
-                                      : 'Multiple answers'
-                                    : isAr
+                                      : 'Multiple answers'                                    : isAr
                                     ? 'إجابة واحدة'
                                     : 'Single answer'}
                                 </div>
@@ -1997,8 +1993,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             }`}
           >
             <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-              <div>
-                <div className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <div>                <div className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {activeCall === 'video'
                     ? isAr
                       ? 'مكالمة فيديو مشفرة'
