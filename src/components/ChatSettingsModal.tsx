@@ -89,6 +89,9 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
     approvalRequired: room.settings?.approvalRequired ?? false,
   }));
 
+  const [soundNotifications, setSoundNotifications] = useState(() => localStorage.getItem('smart_time_chat_sound') !== 'false');
+  const [lastSeen, setLastSeen] = useState(() => localStorage.getItem('smart_time_chat_last_seen') !== 'false');
+
   // Background
   const [background, setBackground] = useState<string>(room.background || '');
   const [backgroundUrl, setBackgroundUrl] = useState<string>(room.backgroundUrl || '');
@@ -217,14 +220,16 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
     localStorage.setItem('smart_time_chat_profile_name', profileName);
     localStorage.setItem('smart_time_chat_profile_bio', profileBio);
     localStorage.setItem('smart_time_chat_profile_phone', profilePhone);
-    localStorage.setItem('smart_time_chat_prefs_' + room.id, JSON.stringify({prefs,background,backgroundUrl,memberPermissions,adminPermissions,moderatorPermissions}));
+    localStorage.setItem('smart_time_chat_sound', String(soundNotifications));
+    localStorage.setItem('smart_time_chat_last_seen', String(lastSeen));
+    localStorage.setItem('smart_time_chat_prefs_' + room.id, JSON.stringify({prefs, soundNotifications, lastSeen, background,backgroundUrl,memberPermissions,adminPermissions,moderatorPermissions}));
     onSave({
       title,
       name: title,
       description,
       avatar,
       pinned: isPinned,
-      settings: prefs,
+      settings: { ...prefs, soundNotifications, lastSeen } as any,
       background,
       backgroundUrl,
       permissions: memberPermissions,
@@ -397,8 +402,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                     className={`w-11 h-6 rounded-full p-1 transition ${
                       isPinned ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'
                     }`}
-                  >
-                    <div
+                  >                    <div
                       className={`w-4 h-4 rounded-full bg-white transition ${
                         isPinned ? (isAr ? '-translate-x-5' : 'translate-x-5') : ''
                       }`}
@@ -585,6 +589,18 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                         {opt.label}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Notifications + Privacy */}
+                <div className="space-y-2">
+                  <div className={`p-3.5 rounded-2xl border ${cardBg} flex items-center justify-between`}>
+                    <div><b className="text-xs block">{isAr ? 'الصوت' : 'Sound'}</b><span className={`text-[10px] ${mutedText}`}>{isAr ? 'تشغيل صوت إشعارات الرسائل' : 'Play message notification sounds'}</span></div>
+                    <button type="button" onClick={() => setSoundNotifications(v => !v)} className={`w-11 h-6 rounded-full p-1 ${soundNotifications?'bg-sky-600':'bg-slate-700'}`}><div className={`w-4 h-4 rounded-full bg-white ${soundNotifications?(isAr?'-translate-x-5':'translate-x-5'):''}`} /></button>
+                  </div>
+                  <div className={`p-3.5 rounded-2xl border ${cardBg} flex items-center justify-between`}>
+                    <div><b className="text-xs block">{isAr ? 'آخر ظهور' : 'Last Seen'}</b><span className={`text-[10px] ${mutedText}`}>{isAr ? 'السماح للآخرين برؤية آخر ظهورك' : 'Allow others to see your last seen'}</span></div>
+                    <button type="button" onClick={() => setLastSeen(v => !v)} className={`w-11 h-6 rounded-full p-1 ${lastSeen?'bg-sky-600':'bg-slate-700'}`}><div className={`w-4 h-4 rounded-full bg-white ${lastSeen?(isAr?'-translate-x-5':'translate-x-5'):''}`} /></button>
                   </div>
                 </div>
 
@@ -797,8 +813,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                               {m.role === 'owner'
                                 ? isAr ? 'مالك الغرفة' : 'Owner'
                                 : m.role === 'admin'
-                                ? isAr ? 'مدير' : 'Admin'
-                                : m.role === 'moderator'
+                                ? isAr ? 'مدير' : 'Admin'                                : m.role === 'moderator'
                                 ? isAr ? 'مشرف' : 'Moderator'
                                 : isAr ? 'عضو' : 'Member'}
                             </span>
