@@ -83,6 +83,7 @@ import { ChatMembersSidebar } from './ChatMembersSidebar';
 import { ChatSettingsModal } from './ChatSettingsModal';
 import { SavedMessagesModal } from './SavedMessagesModal';
 import { AddMemberModal } from './AddMemberModal';
+import { VoiceRoomModal } from './VoiceRoomModal';
 import { chatService } from '../services/chatService';
 import { getStoredSession } from '../services/authService';
 
@@ -213,6 +214,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRoomInfoModal, setShowRoomInfoModal] = useState(false);
+  const [showVoiceRoomModal, setShowVoiceRoomModal] = useState(false);
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
   const [chatBackground, setChatBackground] = useState<string>('');
 
@@ -397,8 +399,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
       if (roomId === activeRoomId) {
         scrollToBottom();
-        chatService.markRoomAsRead(roomId);
-      }
+        chatService.markRoomAsRead(roomId);      }
     });
 
     // Message updated / edited
@@ -797,8 +798,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   // Pin / Unpin
   const handleTogglePin = async (msg: ChatMessage) => {
-    try {
-      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
+    try {      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
       setMessagesMap((prev) => ({
         ...prev,
         [activeRoomId]: (prev[activeRoomId] || []).map((m) =>
@@ -1197,8 +1197,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               type="button"
               onClick={() => setMobileShowChat(false)}
               className="md:hidden p-2 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-sky-500 hover:bg-slate-200 dark:hover:bg-slate-700"
-              title={isAr ? 'الرجوع للقائمة' : 'Back to list'}
-            >
+              title={isAr ? 'الرجوع للقائمة' : 'Back to list'}            >
               <ChevronRight className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
             </button>
             <div className="relative shrink-0">
@@ -1277,6 +1276,17 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               aria-label={isAr ? 'إضافة عضو أو بدء محادثة مباشرة' : 'Add member or start direct chat'}
             >
               <UserPlus className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowVoiceRoomModal(true)}
+              className={`px-2.5 py-2 rounded-xl ${chatIconButton} text-emerald-500 transition-all hover:scale-105 flex items-center gap-1.5`}
+              title={isAr ? 'غرفة صوتية' : 'Voice Room'}
+              aria-label={isAr ? 'غرفة صوتية' : 'Voice Room'}
+            >
+              <Mic className="w-4 h-4" />
+              <span className="hidden xl:inline text-xs font-bold">{isAr ? 'غرفة صوتية' : 'Voice Room'}</span>
             </button>
 
             <button
@@ -1597,8 +1607,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                                     {isAr ? 'مباشر' : 'LIVE'}
                                   </span>
                                 )}
-                              </div>
-                              <span className="text-[10px] opacity-70 font-mono-num block truncate group-hover/loc:underline">
+                              </div>                              <span className="text-[10px] opacity-70 font-mono-num block truncate group-hover/loc:underline">
                                 {isAr ? 'فتح في خرائط جوجل' : 'Open in Google Maps'} ·{' '}
                                 {msg.location.lat.toFixed(4)}, {msg.location.lng.toFixed(4)}
                               </span>
@@ -1997,8 +2006,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 <div className="mt-1 text-xs text-slate-500">
                   {isAr ? 'جاري بدء الاتصال الصوتي…' : 'Starting voice call…'}
                 </div>
-              </div>
-            )}
+              </div>            )}
             <div className="p-4 flex justify-center">
               <button
                 onClick={() => setActiveCall(null)}
@@ -2168,8 +2176,17 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         }}
       />
 
+      <VoiceRoomModal
+        isOpen={showVoiceRoomModal}
+        roomId={activeRoomId}
+        roomTitle={activeRoom.title || activeRoom.name}
+        isHost={isRoomOwner}
+        language={language}
+        onClose={() => setShowVoiceRoomModal(false)}
+      />
+
       {/* ========================================================================= */}
-      {/* CHAT SETTINGS MODAL */}
+      {/* CHAT SETTINGS MODAL */
       {/* ========================================================================= */}
       <ChatSettingsModal
         isOpen={showRoomInfoModal}
