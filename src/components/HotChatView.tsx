@@ -196,6 +196,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
 
   // Calls
   const [activeCall, setActiveCall] = useState<'voice' | 'video' | null>(null);
@@ -397,8 +399,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         })
       );
 
-      if (roomId === activeRoomId) {        scrollToBottom();
-        chatService.markRoomAsRead(roomId);      }
+      if (roomId === activeRoomId) {        scrollToBottom();        chatService.markRoomAsRead(roomId);      }
     });
 
     // Message updated / edited
@@ -665,25 +666,53 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     }
   };
 
-  // Voice recording
-  const startVoiceRecording = () => {
-    setIsRecordingAudio(true);
-    setRecordingSeconds(0);
-    recordingTimerRef.current = setInterval(() => {
-      setRecordingSeconds((s) => s + 1);
-    }, 1000);
+  // Real voice recording: MediaRecorder -> backend/uploads -> playable audio URL
+  const startVoiceRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      alert(isAr ? 'المتصفح لا يدعم تسجيل الصوت.' : 'Audio recording is not supported.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferred = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m));
+      const recorder = preferred ? new MediaRecorder(stream, { mimeType: preferred }) : new MediaRecorder(stream);
+      mediaChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size) mediaChunksRef.current.push(e.data); };
+      recorder.start(250);
+      mediaRecorderRef.current = recorder;
+      setIsRecordingAudio(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } catch (e: any) {
+      alert(e?.name === 'NotAllowedError' ? (isAr ? 'تم رفض صلاحية الميكروفون.' : 'Microphone permission was denied.') : (isAr ? 'تعذر تشغيل الميكروفون.' : 'Could not start microphone.'));
+    }
   };
 
-  const stopVoiceRecording = (send: boolean) => {
+  const stopVoiceRecording = async (send: boolean) => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
     setIsRecordingAudio(false);
+    if (!recorder) return;
+    const seconds = recordingSeconds;
+    await new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+      try { recorder.stop(); } catch { resolve(); }
+    });
+    recorder.stream.getTracks().forEach((t) => t.stop());
     if (send) {
-      handleSendMessage(
-        undefined,
-        isAr ? `🎤 رسالة صوتية (${recordingSeconds} ثانية)` : `🎤 Voice note (${recordingSeconds}s)`,
-        'voice'
-      );
+      const blob = new Blob(mediaChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+      if (blob.size > 10 * 1024 * 1024) { alert(isAr ? 'التسجيل أكبر من 10MB.' : 'Recording exceeds 10MB.'); return; }
+      try {
+        const ext = (recorder.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
+        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: recorder.mimeType || 'audio/webm' });
+        const uploaded = await chatService.uploadChatFile(file);
+        await handleSendMessage(undefined, isAr ? `🎤 رسالة صوتية (${seconds} ثانية)` : `🎤 Voice note (${seconds}s)`, 'voice', undefined, uploaded.url, { waveform: [12,22,34,26,40,30,18,36,28,44], duration: seconds });
+      } catch (e: any) {
+        alert(e?.message || (isAr ? 'تعذر رفع الرسالة الصوتية.' : 'Could not upload voice message.'));
+      }
     }
+    mediaChunksRef.current = [];
     setRecordingSeconds(0);
   };
 
@@ -703,10 +732,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       return;
     }
     try {
-      const dataUrl = await fileToDataUrl(file);
-      const label =
-        kind === 'image' ? `🖼️ ${file.name}` : kind === 'video' ? `🎬 ${file.name}` : `📄 ${file.name}`;
-      handleSendMessage(undefined, label, kind, undefined, dataUrl);
+      const uploaded = await chatService.uploadChatFile(file);
+      const label = kind === 'image' ? `🖼️ ${file.name}` : kind === 'video' ? `🎬 ${file.name}` : `📄 ${file.name}`;
+      await handleSendMessage(undefined, label, kind, undefined, uploaded.url);
     } catch {
       alert(isAr ? 'تعذر قراءة الملف.' : 'Unable to read the file.');
     }
@@ -714,13 +742,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   const handleLiveCameraCapture = async (file: File, caption?: string) => {
     try {
-      const dataUrl = await fileToDataUrl(file);
-      handleSendMessage(
+      const uploaded = await chatService.uploadChatFile(file);
+      await handleSendMessage(
         undefined,
         caption || (isAr ? '📷 صورة بالكاميرا' : '📷 Camera photo'),
         'image',
         undefined,
-        dataUrl
+        uploaded.url
       );
     } catch (err) {
       console.error('Error handling camera capture:', err);
@@ -797,8 +825,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       alert(isAr ? 'اكتب السؤال وأضف خيارين على الأقل.' : 'Enter question and 2+ options.');
       return;
     }
-    const poll = { question, options, votes: {} as Record<number, string[]>, multiple: pollMultiple };
-    handleSendMessage(undefined, `📊 ${question}`, 'poll', undefined, undefined, { poll });
+    const poll = { question, options, votes: {} as Record<number, string[]>, multiple: pollMultiple };    handleSendMessage(undefined, `📊 ${question}`, 'poll', undefined, undefined, { poll });
     setPollQuestion('');
     setPollOptions(['', '']);
     setPollMultiple(false);
@@ -1197,8 +1224,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           isDark ? 'bg-slate-950' : 'bg-[#f0f2f5]'
         } relative ${mobileShowChat ? 'flex' : 'hidden md:flex'}`}
       >
-        {/* Header */}
-        <div
+        {/* Header */}        <div
           className={`px-4 py-3 ${chatPanel} border-b ${chatBorder} flex items-center justify-between z-10 shadow-xs`}
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -1597,8 +1623,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                             <div
                               className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                                 msg.location.isLive
-                                  ? 'bg-rose-500/20 text-rose-500 animate-pulse'
-                                  : 'bg-slate-900/20 text-current'
+                                  ? 'bg-rose-500/20 text-rose-500 animate-pulse'                                  : 'bg-slate-900/20 text-current'
                               }`}
                             >
                               {msg.location.isLive ? (
@@ -1622,9 +1647,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                           </a>
                         ) : msg.type === 'voice' ? (
                           <div className="flex items-center gap-3">
-                            <button className="w-8 h-8 rounded-full bg-slate-900/30 flex items-center justify-center text-current">
-                              <Play className="w-4 h-4 fill-current" />
-                            </button>
+                            <audio controls preload="metadata" src={msg.mediaUrl} className="max-w-[220px] h-8" />
                             <div className="flex-1">
                               <div className="h-1 bg-current/30 rounded-full w-32 overflow-hidden">
                                 <div className="h-full bg-current w-2/3" />
@@ -1997,8 +2020,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             </div>
             {activeCall === 'video' ? (
               <div className="aspect-video bg-black relative flex items-center justify-center">
-                <Camera className="w-12 h-12 text-slate-500 animate-pulse" />
-                <div className="absolute bottom-3 start-3 px-2 py-1 rounded-lg bg-black/60 text-white text-[10px]">
+                <Camera className="w-12 h-12 text-slate-500 animate-pulse" />                <div className="absolute bottom-3 start-3 px-2 py-1 rounded-lg bg-black/60 text-white text-[10px]">
                   {isAr ? 'جاري تهيئة الفيديو...' : 'Initializing video...'}
                 </div>
               </div>
