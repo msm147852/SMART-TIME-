@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Mic, MicOff, Hand, LogOut, UserPlus, X, Radio } from 'lucide-react';
 import { chatService } from '../services/chatService';
 import { Language } from '../types';
+
+// Chat Pro Full: realtime voice-room guest/host/listener surface.
 interface VoiceParticipant { userId:string; name:string; role:'host'|'guest'|'listener'; muted:boolean; handRaised:boolean; }
 interface Props { isOpen:boolean; roomId:string; roomTitle?:string; isHost?:boolean; onClose:()=>void; language?: Language; }
 export const VoiceRoomModal:React.FC<Props>=({isOpen,roomId,roomTitle,isHost=false,onClose,language='ar'})=>{
