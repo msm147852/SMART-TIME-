@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Mic, MicOff, Hand, LogOut, UserPlus, X, Radio } from 'lucide-react';
 import { chatService } from '../services/chatService';
+import { Language } from '../types';
 interface VoiceParticipant { userId:string; name:string; role:'host'|'guest'|'listener'; muted:boolean; handRaised:boolean; }
-interface Props { isOpen:boolean; roomId:string; roomTitle?:string; isHost?:boolean; onClose:()=>void; language?:'ar'|'en'; }
+interface Props { isOpen:boolean; roomId:string; roomTitle?:string; isHost?:boolean; onClose:()=>void; language?: Language; }
 export const VoiceRoomModal:React.FC<Props>=({isOpen,roomId,roomTitle,isHost=false,onClose,language='ar'})=>{
  const isAr=language==='ar'; const [participants,setParticipants]=useState<VoiceParticipant[]>([]); const [muted,setMuted]=useState(!isHost); const [handRaised,setHandRaised]=useState(false); const [joining,setJoining]=useState(false);
  useEffect(()=>{if(!isOpen||!roomId)return; setJoining(true); chatService.voiceJoin(roomId,isHost?'host':'guest').then((r:any)=>{setParticipants(r?.participants||[]);setMuted(r?.participant?.muted??!isHost)}).catch(()=>{}).finally(()=>setJoining(false));
