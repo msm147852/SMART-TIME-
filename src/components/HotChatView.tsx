@@ -667,7 +667,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   // Real voice recording: MediaRecorder -> backend/uploads -> playable audio URL
   const startVoiceRecording = async () => {
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       alert(isAr ? 'المتصفح لا يدعم تسجيل الصوت.' : 'Audio recording is not supported.');
       return;
     }
