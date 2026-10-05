@@ -175,8 +175,11 @@ export function setupChatWebSocket(httpServer: http.Server) {
 
         if (type === 'join_room') {
           const { roomId } = payload || {};
-          if (roomId) {
-            if (!roomSubscriptions.has(roomId)) {
+          if (roomId && ws.userId) {
+            const access = verifyConversationAccess(ws.userId, roomId);
+            if (!access.allowed) {
+              ws.send(JSON.stringify({ type: 'room_error', payload: { roomId, message: 'ليس لديك صلاحية الوصول لهذه المحادثة' } }));
+            } else if (!roomSubscriptions.has(roomId)) {
               roomSubscriptions.set(roomId, new Set());
             }
             roomSubscriptions.get(roomId)!.add(ws);
@@ -191,7 +194,7 @@ export function setupChatWebSocket(httpServer: http.Server) {
 
         if (type === 'leave_room') {
           const { roomId } = payload || {};
-          if (roomId) {
+          if (roomId && ws.userId) {
             roomSubscriptions.get(roomId)?.delete(ws);
             ws.rooms?.delete(roomId);
           }
@@ -1303,7 +1306,10 @@ chatRouter.post('/rooms/:roomId/voice/join',(req,res)=>{
  try{
   const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
   const {roomId}=req.params; if(!chatRoleAllowed(user.id,roomId))return res.status(403).json({error:'ليس لديك صلاحية دخول الغرفة'});
-  const role=['host','guest','listener'].includes(req.body?.role)?req.body.role:'guest';
+  const access=verifyConversationAccess(user.id,roomId);
+  if (!access.allowed) return res.status(403).json({error:'ليس لديك صلاحية دخول الغرفة'});
+  const requestedRole=['host','guest','listener'].includes(req.body?.role)?req.body.role:'guest';
+  const role=(access.role==='owner'||access.role==='admin') ? 'host' : requestedRole;
   const conv=db.prepare('SELECT voiceRoomActive, voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
   const participants=JSON.parse(conv?.voiceParticipants||'[]');
   const existing=participants.find((p:any)=>p.userId===user.id);
@@ -1317,7 +1323,7 @@ chatRouter.post('/rooms/:roomId/voice/join',(req,res)=>{
 chatRouter.post('/rooms/:roomId/voice/leave',(req,res)=>{
  try{
   const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
-  const {roomId}=req.params; const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
+  const {roomId}=req.params; if(!chatRoleAllowed(user.id,roomId))return res.status(403).json({error:'ليس لديك صلاحية الوصول لهذه الغرفة'}); const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
   const participants=JSON.parse(conv?.voiceParticipants||'[]').filter((p:any)=>p.userId!==user.id);
   db.prepare('UPDATE conversations SET voiceRoomActive=?, voiceParticipants=? WHERE id=?').run(participants.length?1:0,JSON.stringify(participants),roomId);
   broadcastToRoom(roomId,{type:'voice_participant_left',payload:{roomId,userId:user.id,participants}});
