@@ -397,8 +397,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         })
       );
 
-      if (roomId === activeRoomId) {
-        scrollToBottom();
+      if (roomId === activeRoomId) {        scrollToBottom();
         chatService.markRoomAsRead(roomId);      }
     });
 
@@ -501,6 +500,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     });
 
     // Presence update
+    const unsubPoll = chatService.on('poll_updated', ({ roomId, messageId, poll }) => {
+      setMessagesMap((prev) => ({ ...prev, [roomId]: (prev[roomId] || []).map((m) => m.id === messageId ? { ...m, poll } : m) }));
+    });
+    const unsubLiveLocation = chatService.on('live_location_update', ({ roomId, location }) => {
+      setMessagesMap((prev) => ({ ...prev, [roomId]: (prev[roomId] || []).map((m) => m.type === 'location' && m.location?.isLive ? { ...m, location } : m) }));
+    });
+
     const unsubPresence = chatService.on('presence_update', ({ userId, isOnline }) => {
       setRooms((prev) =>
         prev.map((r) => {
@@ -528,6 +534,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       unsubRoomCreated();
       unsubRoomDeleted();
       unsubPresence();
+      unsubPoll();
+      unsubLiveLocation();
     };
   }, [activeRoomId, isAr]);
 
@@ -761,7 +769,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           { lat: pos.coords.latitude, lng: pos.coords.longitude, isLive: true }
         );
         const watchId = navigator.geolocation.watchPosition(
-          () => {},
+          (watchPos) => {
+            chatService.sendLiveLocationUpdate(activeRoomId, { lat: watchPos.coords.latitude, lng: watchPos.coords.longitude });
+          },
           () => {},
           { enableHighAccuracy: true }
         );
@@ -797,8 +807,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   };
 
   // Pin / Unpin
-  const handleTogglePin = async (msg: ChatMessage) => {
-    try {      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
+  const handleTogglePin = async (msg: ChatMessage) => {    try {      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
       setMessagesMap((prev) => ({
         ...prev,
         [activeRoomId]: (prev[activeRoomId] || []).map((m) =>
@@ -1197,8 +1206,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               type="button"
               onClick={() => setMobileShowChat(false)}
               className="md:hidden p-2 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-sky-500 hover:bg-slate-200 dark:hover:bg-slate-700"
-              title={isAr ? 'الرجوع للقائمة' : 'Back to list'}            >
-              <ChevronRight className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
+              title={isAr ? 'الرجوع للقائمة' : 'Back to list'}            >              <ChevronRight className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
             </button>
             <div className="relative shrink-0">
               <img
@@ -1573,9 +1581,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                             <div className="font-bold text-sm leading-relaxed">{msg.poll.question}</div>
                             <div className="space-y-2">
                               {msg.poll.options.map((option, i) => (
-                                <div key={i} className="rounded-xl border border-current/10 p-2.5">
+                                <button type="button" onClick={() => chatService.votePoll(activeRoomId, msg.id, i).catch((e:any)=>alert(e.message||'تعذر تسجيل التصويت'))} className="w-full text-start rounded-xl border border-current/10 p-2.5 hover:bg-current/5 transition">
                                   <span className="font-semibold text-xs">{option}</span>
-                                </div>
+                                </button>
                               ))}
                             </div>
                           </div>
@@ -1597,8 +1605,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                                 <Navigation2 className="w-5 h-5" />
                               ) : (
                                 <MapPin className="w-5 h-5" />
-                              )}
-                            </div>
+                              )}                            </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold text-xs">{msg.text || msg.body}</span>
@@ -1997,8 +2004,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               </div>
             ) : (
               <div className="py-16 text-center">
-                <div className="w-20 h-20 mx-auto rounded-full bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-500 animate-pulse">
-                  <Phone className="w-9 h-9" />
+                <div className="w-20 h-20 mx-auto rounded-full bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-500 animate-pulse">                  <Phone className="w-9 h-9" />
                 </div>
                 <div className={`mt-4 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {activeRoom.title || activeRoom.name}
