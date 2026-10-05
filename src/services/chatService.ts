@@ -373,6 +373,7 @@ class ChatService {
   async voiceLeave(roomId: string) { return this.request(`/api/chat/rooms/${roomId}/voice/leave`, { method:'POST' }); }
   async voiceMute(roomId: string, muted: boolean) { return this.request(`/api/chat/rooms/${roomId}/voice/mute`, { method:'POST', body: JSON.stringify({ muted }) }); }
   voiceRaiseHand(roomId: string, raised: boolean) { this.sendWs('voice_raise_hand', { roomId, raised }); }
+  sendLiveLocationUpdate(roomId:string, location:{lat:number;lng:number}) { this.sendWs('live_location_update',{roomId,location}); }
   async uploadChatFile(file: File) { const data = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=reject;r.readAsDataURL(file);}); return this.request('/api/chat/upload',{method:'POST',body:JSON.stringify({name:file.name,mime:file.type,data})}); }
   async votePoll(roomId:string,messageId:string,option:number){ return this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/vote`,{method:'POST',body:JSON.stringify({option})}); }
 
