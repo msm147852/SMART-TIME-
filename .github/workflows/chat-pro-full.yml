@@ -1,0 +1,31 @@
+name: Chat Pro Full CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/chatServer.ts'
+      - 'backend/database.ts'
+      - 'src/components/AddMemberModal.tsx'
+      - 'src/components/ChatSettingsModal.tsx'
+      - 'src/components/HotChatView.tsx'
+      - 'src/components/VoiceRoomModal.tsx'
+      - 'src/services/chatService.ts'
+      - 'scripts/verify-chat-pro-full.mjs'
+      - 'package.json'
+      - '.github/workflows/chat-pro-full.yml'
+  push:
+    branches: [feat/chat-pro-full]
+
+jobs:
+  chat-pro-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run verify:chat-pro-full
+      - run: npm run lint
+      - run: npm run build

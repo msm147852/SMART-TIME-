@@ -83,6 +83,7 @@ import { ChatMembersSidebar } from './ChatMembersSidebar';
 import { ChatSettingsModal } from './ChatSettingsModal';
 import { SavedMessagesModal } from './SavedMessagesModal';
 import { AddMemberModal } from './AddMemberModal';
+import { VoiceRoomModal } from './VoiceRoomModal';
 import { chatService } from '../services/chatService';
 import { getStoredSession } from '../services/authService';
 
@@ -195,6 +196,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
 
   // Calls
   const [activeCall, setActiveCall] = useState<'voice' | 'video' | null>(null);
@@ -213,6 +216,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRoomInfoModal, setShowRoomInfoModal] = useState(false);
+  const [showVoiceRoomModal, setShowVoiceRoomModal] = useState(false);
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
   const [chatBackground, setChatBackground] = useState<string>('');
 
@@ -394,11 +398,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           return r;
         })
       );
-
-      if (roomId === activeRoomId) {
-        scrollToBottom();
-        chatService.markRoomAsRead(roomId);
-      }
+      if (roomId === activeRoomId) {        scrollToBottom();        chatService.markRoomAsRead(roomId);      }
     });
 
     // Message updated / edited
@@ -500,6 +500,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     });
 
     // Presence update
+    const unsubPoll = chatService.on('poll_updated', ({ roomId, messageId, poll }) => {
+      setMessagesMap((prev) => ({ ...prev, [roomId]: (prev[roomId] || []).map((m) => m.id === messageId ? { ...m, poll } : m) }));
+    });
+    const unsubLiveLocation = chatService.on('live_location_update', ({ roomId, location }) => {
+      setMessagesMap((prev) => ({ ...prev, [roomId]: (prev[roomId] || []).map((m) => m.type === 'location' && m.location?.isLive ? { ...m, location } : m) }));
+    });
+
     const unsubPresence = chatService.on('presence_update', ({ userId, isOnline }) => {
       setRooms((prev) =>
         prev.map((r) => {
@@ -527,6 +534,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       unsubRoomCreated();
       unsubRoomDeleted();
       unsubPresence();
+      unsubPoll();
+      unsubLiveLocation();
     };
   }, [activeRoomId, isAr]);
 
@@ -656,25 +665,53 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     }
   };
 
-  // Voice recording
-  const startVoiceRecording = () => {
-    setIsRecordingAudio(true);
-    setRecordingSeconds(0);
-    recordingTimerRef.current = setInterval(() => {
-      setRecordingSeconds((s) => s + 1);
-    }, 1000);
+  // Real voice recording: MediaRecorder -> backend/uploads -> playable audio URL
+  const startVoiceRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      alert(isAr ? 'المتصفح لا يدعم تسجيل الصوت.' : 'Audio recording is not supported.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferred = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m));
+      const recorder = preferred ? new MediaRecorder(stream, { mimeType: preferred }) : new MediaRecorder(stream);
+      mediaChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size) mediaChunksRef.current.push(e.data); };
+      recorder.start(250);
+      mediaRecorderRef.current = recorder;
+      setIsRecordingAudio(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } catch (e: any) {
+      alert(e?.name === 'NotAllowedError' ? (isAr ? 'تم رفض صلاحية الميكروفون.' : 'Microphone permission was denied.') : (isAr ? 'تعذر تشغيل الميكروفون.' : 'Could not start microphone.'));
+    }
   };
 
-  const stopVoiceRecording = (send: boolean) => {
+  const stopVoiceRecording = async (send: boolean) => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
     setIsRecordingAudio(false);
+    if (!recorder) return;
+    const seconds = recordingSeconds;
+    await new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+      try { recorder.stop(); } catch { resolve(); }
+    });
+    recorder.stream.getTracks().forEach((t) => t.stop());
     if (send) {
-      handleSendMessage(
-        undefined,
-        isAr ? `🎤 رسالة صوتية (${recordingSeconds} ثانية)` : `🎤 Voice note (${recordingSeconds}s)`,
-        'voice'
-      );
+      const blob = new Blob(mediaChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+      if (blob.size > 10 * 1024 * 1024) { alert(isAr ? 'التسجيل أكبر من 10MB.' : 'Recording exceeds 10MB.'); return; }
+      try {
+        const ext = (recorder.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
+        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: recorder.mimeType || 'audio/webm' });
+        const uploaded = await chatService.uploadChatFile(file);
+        await handleSendMessage(undefined, isAr ? `🎤 رسالة صوتية (${seconds} ثانية)` : `🎤 Voice note (${seconds}s)`, 'voice', undefined, uploaded.url, { waveform: [12,22,34,26,40,30,18,36,28,44], duration: seconds });
+      } catch (e: any) {
+        alert(e?.message || (isAr ? 'تعذر رفع الرسالة الصوتية.' : 'Could not upload voice message.'));
+      }
     }
+    mediaChunksRef.current = [];
     setRecordingSeconds(0);
   };
 
@@ -694,10 +731,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       return;
     }
     try {
-      const dataUrl = await fileToDataUrl(file);
-      const label =
-        kind === 'image' ? `🖼️ ${file.name}` : kind === 'video' ? `🎬 ${file.name}` : `📄 ${file.name}`;
-      handleSendMessage(undefined, label, kind, undefined, dataUrl);
+      const uploaded = await chatService.uploadChatFile(file);
+      const label = kind === 'image' ? `🖼️ ${file.name}` : kind === 'video' ? `🎬 ${file.name}` : `📄 ${file.name}`;
+      await handleSendMessage(undefined, label, kind, undefined, uploaded.url);
     } catch {
       alert(isAr ? 'تعذر قراءة الملف.' : 'Unable to read the file.');
     }
@@ -705,13 +741,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   const handleLiveCameraCapture = async (file: File, caption?: string) => {
     try {
-      const dataUrl = await fileToDataUrl(file);
-      handleSendMessage(
+      const uploaded = await chatService.uploadChatFile(file);
+      await handleSendMessage(
         undefined,
         caption || (isAr ? '📷 صورة بالكاميرا' : '📷 Camera photo'),
         'image',
         undefined,
-        dataUrl
+        uploaded.url
       );
     } catch (err) {
       console.error('Error handling camera capture:', err);
@@ -759,10 +795,16 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           'location',
           { lat: pos.coords.latitude, lng: pos.coords.longitude, isLive: true }
         );
+        let lastSentAt = 0;
         const watchId = navigator.geolocation.watchPosition(
+          (watchPos) => {
+            const now = Date.now();
+            if (now - lastSentAt < 5000) return;
+            lastSentAt = now;
+            chatService.sendLiveLocationUpdate(activeRoomId, { lat: watchPos.coords.latitude, lng: watchPos.coords.longitude });
+          },
           () => {},
-          () => {},
-          { enableHighAccuracy: true }
+          { enableHighAccuracy: true, maximumAge: 3000 }
         );
         setLiveLocationWatchId(watchId);
       },
@@ -786,8 +828,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       alert(isAr ? 'اكتب السؤال وأضف خيارين على الأقل.' : 'Enter question and 2+ options.');
       return;
     }
-    const poll = { question, options, votes: {} as Record<number, string[]>, multiple: pollMultiple };
-    handleSendMessage(undefined, `📊 ${question}`, 'poll', undefined, undefined, { poll });
+    const poll = { question, options, votes: {} as Record<number, string[]>, multiple: pollMultiple };    handleSendMessage(undefined, `📊 ${question}`, 'poll', undefined, undefined, { poll });
     setPollQuestion('');
     setPollOptions(['', '']);
     setPollMultiple(false);
@@ -796,9 +837,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   };
 
   // Pin / Unpin
-  const handleTogglePin = async (msg: ChatMessage) => {
-    try {
-      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
+  const handleTogglePin = async (msg: ChatMessage) => {    try {      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
       setMessagesMap((prev) => ({
         ...prev,
         [activeRoomId]: (prev[activeRoomId] || []).map((m) =>
@@ -1161,8 +1200,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {room.unreadCount > 0 && (
                       <span className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shadow-xs animate-scaleUp">
-                        {room.unreadCount}
-                      </span>
+                        {room.unreadCount}                      </span>
                     )}
                     <CheckCheck className="w-3.5 h-3.5 text-sky-500" />
                   </div>
@@ -1188,8 +1226,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           isDark ? 'bg-slate-950' : 'bg-[#f0f2f5]'
         } relative ${mobileShowChat ? 'flex' : 'hidden md:flex'}`}
       >
-        {/* Header */}
-        <div
+        {/* Header */}        <div
           className={`px-4 py-3 ${chatPanel} border-b ${chatBorder} flex items-center justify-between z-10 shadow-xs`}
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -1197,9 +1234,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               type="button"
               onClick={() => setMobileShowChat(false)}
               className="md:hidden p-2 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-sky-500 hover:bg-slate-200 dark:hover:bg-slate-700"
-              title={isAr ? 'الرجوع للقائمة' : 'Back to list'}
-            >
-              <ChevronRight className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
+              title={isAr ? 'الرجوع للقائمة' : 'Back to list'}            >              <ChevronRight className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
             </button>
             <div className="relative shrink-0">
               <img
@@ -1277,6 +1312,17 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               aria-label={isAr ? 'إضافة عضو أو بدء محادثة مباشرة' : 'Add member or start direct chat'}
             >
               <UserPlus className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowVoiceRoomModal(true)}
+              className={`px-2.5 py-2 rounded-xl ${chatIconButton} text-emerald-500 transition-all hover:scale-105 flex items-center gap-1.5`}
+              title={isAr ? 'غرفة صوتية' : 'Voice Room'}
+              aria-label={isAr ? 'غرفة صوتية' : 'Voice Room'}
+            >
+              <Mic className="w-4 h-4" />
+              <span className="hidden xl:inline text-xs font-bold">{isAr ? 'غرفة صوتية' : 'Voice Room'}</span>
             </button>
 
             <button
@@ -1553,8 +1599,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                                   {msg.poll.multiple
                                     ? isAr
                                       ? 'يمكن اختيار أكثر من إجابة'
-                                      : 'Multiple answers'
-                                    : isAr
+                                      : 'Multiple answers'                                    : isAr
                                     ? 'إجابة واحدة'
                                     : 'Single answer'}
                                 </div>
@@ -1563,9 +1608,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                             <div className="font-bold text-sm leading-relaxed">{msg.poll.question}</div>
                             <div className="space-y-2">
                               {msg.poll.options.map((option, i) => (
-                                <div key={i} className="rounded-xl border border-current/10 p-2.5">
+                                <button type="button" onClick={() => chatService.votePoll(activeRoomId, msg.id, i).catch((e:any)=>alert(e.message||'تعذر تسجيل التصويت'))} className="w-full text-start rounded-xl border border-current/10 p-2.5 hover:bg-current/5 transition">
                                   <span className="font-semibold text-xs">{option}</span>
-                                </div>
+                                </button>
                               ))}
                             </div>
                           </div>
@@ -1579,16 +1624,14 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                             <div
                               className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                                 msg.location.isLive
-                                  ? 'bg-rose-500/20 text-rose-500 animate-pulse'
-                                  : 'bg-slate-900/20 text-current'
+                                  ? 'bg-rose-500/20 text-rose-500 animate-pulse'                                  : 'bg-slate-900/20 text-current'
                               }`}
                             >
                               {msg.location.isLive ? (
                                 <Navigation2 className="w-5 h-5" />
                               ) : (
                                 <MapPin className="w-5 h-5" />
-                              )}
-                            </div>
+                              )}                            </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold text-xs">{msg.text || msg.body}</span>
@@ -1597,8 +1640,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                                     {isAr ? 'مباشر' : 'LIVE'}
                                   </span>
                                 )}
-                              </div>
-                              <span className="text-[10px] opacity-70 font-mono-num block truncate group-hover/loc:underline">
+                              </div>                              <span className="text-[10px] opacity-70 font-mono-num block truncate group-hover/loc:underline">
                                 {isAr ? 'فتح في خرائط جوجل' : 'Open in Google Maps'} ·{' '}
                                 {msg.location.lat.toFixed(4)}, {msg.location.lng.toFixed(4)}
                               </span>
@@ -1606,9 +1648,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                           </a>
                         ) : msg.type === 'voice' ? (
                           <div className="flex items-center gap-3">
-                            <button className="w-8 h-8 rounded-full bg-slate-900/30 flex items-center justify-center text-current">
-                              <Play className="w-4 h-4 fill-current" />
-                            </button>
+                            <audio controls preload="metadata" src={msg.mediaUrl} className="max-w-[220px] h-8" />
                             <div className="flex-1">
                               <div className="h-1 bg-current/30 rounded-full w-32 overflow-hidden">
                                 <div className="h-full bg-current w-2/3" />
@@ -1958,8 +1998,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             }`}
           >
             <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-              <div>
-                <div className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <div>                <div className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {activeCall === 'video'
                     ? isAr
                       ? 'مكالمة فيديو مشفرة'
@@ -1981,15 +2020,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             </div>
             {activeCall === 'video' ? (
               <div className="aspect-video bg-black relative flex items-center justify-center">
-                <Camera className="w-12 h-12 text-slate-500 animate-pulse" />
-                <div className="absolute bottom-3 start-3 px-2 py-1 rounded-lg bg-black/60 text-white text-[10px]">
+                <Camera className="w-12 h-12 text-slate-500 animate-pulse" />                <div className="absolute bottom-3 start-3 px-2 py-1 rounded-lg bg-black/60 text-white text-[10px]">
                   {isAr ? 'جاري تهيئة الفيديو...' : 'Initializing video...'}
                 </div>
               </div>
             ) : (
               <div className="py-16 text-center">
-                <div className="w-20 h-20 mx-auto rounded-full bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-500 animate-pulse">
-                  <Phone className="w-9 h-9" />
+                <div className="w-20 h-20 mx-auto rounded-full bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-500 animate-pulse">                  <Phone className="w-9 h-9" />
                 </div>
                 <div className={`mt-4 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {activeRoom.title || activeRoom.name}
@@ -1997,8 +2034,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 <div className="mt-1 text-xs text-slate-500">
                   {isAr ? 'جاري بدء الاتصال الصوتي…' : 'Starting voice call…'}
                 </div>
-              </div>
-            )}
+              </div>            )}
             <div className="p-4 flex justify-center">
               <button
                 onClick={() => setActiveCall(null)}
@@ -2166,6 +2202,15 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             if (detail?.members) setRoomMembers(detail.members);
           }
         }}
+      />
+
+      <VoiceRoomModal
+        isOpen={showVoiceRoomModal}
+        roomId={activeRoomId}
+        roomTitle={activeRoom.title || activeRoom.name}
+        isHost={isRoomOwner}
+        language={language}
+        onClose={() => setShowVoiceRoomModal(false)}
       />
 
       {/* ========================================================================= */}

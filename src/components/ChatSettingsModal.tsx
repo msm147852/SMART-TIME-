@@ -68,6 +68,9 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
 
   // Form states
   const [title, setTitle] = useState(room.title || room.name || '');
+  const [profileName, setProfileName] = useState(() => localStorage.getItem('smart_time_chat_profile_name') || room.title || '');
+  const [profileBio, setProfileBio] = useState(() => localStorage.getItem('smart_time_chat_profile_bio') || '');
+  const [profilePhone, setProfilePhone] = useState(() => localStorage.getItem('smart_time_chat_profile_phone') || '');
   const [description, setDescription] = useState(room.description || '');
   const [avatar, setAvatar] = useState(room.avatar || '');
   const [isPinned, setIsPinned] = useState(!!room.pinned);
@@ -85,6 +88,9 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
     slowModeSeconds: room.settings?.slowModeSeconds ?? 0,
     approvalRequired: room.settings?.approvalRequired ?? false,
   }));
+
+  const [soundNotifications, setSoundNotifications] = useState(() => localStorage.getItem('smart_time_chat_sound') !== 'false');
+  const [lastSeen, setLastSeen] = useState(() => localStorage.getItem('smart_time_chat_last_seen') !== 'false');
 
   // Background
   const [background, setBackground] = useState<string>(room.background || '');
@@ -211,13 +217,19 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
   };
 
   const handleSaveAll = () => {
+    localStorage.setItem('smart_time_chat_profile_name', profileName);
+    localStorage.setItem('smart_time_chat_profile_bio', profileBio);
+    localStorage.setItem('smart_time_chat_profile_phone', profilePhone);
+    localStorage.setItem('smart_time_chat_sound', String(soundNotifications));
+    localStorage.setItem('smart_time_chat_last_seen', String(lastSeen));
+    localStorage.setItem('smart_time_chat_prefs_' + room.id, JSON.stringify({prefs, soundNotifications, lastSeen, background,backgroundUrl,memberPermissions,adminPermissions,moderatorPermissions}));
     onSave({
       title,
       name: title,
       description,
       avatar,
       pinned: isPinned,
-      settings: prefs,
+      settings: { ...prefs, soundNotifications, lastSeen } as any,
       background,
       backgroundUrl,
       permissions: memberPermissions,
@@ -364,6 +376,15 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                   />
                 </div>
 
+                <div className={`p-4 rounded-2xl border ${cardBg} space-y-3`}>
+                  <div className="flex items-center gap-2"><UserPlus className="w-4 h-4 text-sky-500"/><b className="text-xs">{isAr ? 'البروفايل' : 'Profile'}</b></div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <input value={profileName} onChange={e=>setProfileName(e.target.value)} placeholder={isAr?'الاسم':'Name'} className={`px-3 py-2.5 rounded-xl border text-xs ${inputBg}`}/>
+                    <input value={profilePhone} onChange={e=>setProfilePhone(e.target.value)} placeholder={isAr?'رقم الهاتف':'Phone'} className={`px-3 py-2.5 rounded-xl border text-xs ${inputBg}`}/>
+                  </div>
+                  <textarea value={profileBio} onChange={e=>setProfileBio(e.target.value)} rows={2} placeholder={isAr?'الحالة / Bio':'Status / Bio'} className={`w-full px-3 py-2.5 rounded-xl border text-xs ${inputBg}`}/>
+                </div>
+
                 {/* Pin Room */}
                 <div className={`flex items-center justify-between p-3.5 rounded-2xl border ${cardBg}`}>
                   <div className="flex items-center gap-3">
@@ -381,8 +402,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                     className={`w-11 h-6 rounded-full p-1 transition ${
                       isPinned ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'
                     }`}
-                  >
-                    <div
+                  >                    <div
                       className={`w-4 h-4 rounded-full bg-white transition ${
                         isPinned ? (isAr ? '-translate-x-5' : 'translate-x-5') : ''
                       }`}
@@ -397,8 +417,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                       <Link className="w-3.5 h-3.5 text-sky-500" />
                       {isAr ? 'رابط دعوة الأعضاء' : 'Invite Link'}
                     </span>
-                    <button
-                      type="button"
+                    <button                      type="button"
                       onClick={handleCopyInviteLink}
                       className="px-3 py-1 rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25 text-xs font-bold flex items-center gap-1 transition"
                     >
@@ -570,6 +589,18 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                         {opt.label}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Notifications + Privacy */}
+                <div className="space-y-2">
+                  <div className={`p-3.5 rounded-2xl border ${cardBg} flex items-center justify-between`}>
+                    <div><b className="text-xs block">{isAr ? 'الصوت' : 'Sound'}</b><span className={`text-[10px] ${mutedText}`}>{isAr ? 'تشغيل صوت إشعارات الرسائل' : 'Play message notification sounds'}</span></div>
+                    <button type="button" onClick={() => setSoundNotifications(v => !v)} className={`w-11 h-6 rounded-full p-1 ${soundNotifications?'bg-sky-600':'bg-slate-700'}`}><div className={`w-4 h-4 rounded-full bg-white ${soundNotifications?(isAr?'-translate-x-5':'translate-x-5'):''}`} /></button>
+                  </div>
+                  <div className={`p-3.5 rounded-2xl border ${cardBg} flex items-center justify-between`}>
+                    <div><b className="text-xs block">{isAr ? 'آخر ظهور' : 'Last Seen'}</b><span className={`text-[10px] ${mutedText}`}>{isAr ? 'السماح للآخرين برؤية آخر ظهورك' : 'Allow others to see your last seen'}</span></div>
+                    <button type="button" onClick={() => setLastSeen(v => !v)} className={`w-11 h-6 rounded-full p-1 ${lastSeen?'bg-sky-600':'bg-slate-700'}`}><div className={`w-4 h-4 rounded-full bg-white ${lastSeen?(isAr?'-translate-x-5':'translate-x-5'):''}`} /></button>
                   </div>
                 </div>
 
@@ -782,8 +813,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                               {m.role === 'owner'
                                 ? isAr ? 'مالك الغرفة' : 'Owner'
                                 : m.role === 'admin'
-                                ? isAr ? 'مدير' : 'Admin'
-                                : m.role === 'moderator'
+                                ? isAr ? 'مدير' : 'Admin'                                : m.role === 'moderator'
                                 ? isAr ? 'مشرف' : 'Moderator'
                                 : isAr ? 'عضو' : 'Member'}
                             </span>
@@ -797,8 +827,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                               value={m.role}
                               onChange={(e) => handleRoleChange(m.id, e.target.value as any)}
                               className={`px-2 py-1 rounded-lg border text-xs ${isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-300 text-slate-800'}`}
-                            >
-                              <option value="member">{isAr ? 'عضو' : 'Member'}</option>
+                            >                              <option value="member">{isAr ? 'عضو' : 'Member'}</option>
                               <option value="moderator">{isAr ? 'مشرف' : 'Moderator'}</option>
                               <option value="admin">{isAr ? 'مدير' : 'Admin'}</option>
                             </select>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, X, Check, Contact, Smartphone, Share2 } from 'lucide-react';
 import { ChatMember } from '../types';
 import { chatService } from '../services/chatService';
+import { getStoredSession } from '../services/authService';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -48,7 +49,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const createInviteLink = (name: string, phone: string) => {
     const params = new URLSearchParams({ invite: 'chat', from: 'smart-time', phone, name });
-    return window.location.origin + '/?' + params.toString();
+    const from = getStoredSession()?.user?.id || 'CURRENT_USER_ID';
+    return 'https://smart-time.app/invite?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(phone);
   };
 
   const shareInvite = async (name: string, phone: string) => {
@@ -84,7 +86,11 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const openPhoneContacts = async () => {
     const contactsApi = (navigator as any).contacts;
-    if (!contactsApi?.select) { setContactsMessage(isAr ? 'المتصفح لا يدعم جهات اتصال الهاتف. استخدم البحث عن مستخدم SMART TIME.' : 'This browser does not support phone contacts. Use SMART TIME user search instead.'); return; }
+    if (!contactsApi?.select) {
+      setContactsMessage(isAr ? 'هذا المتصفح لا يدعم Contact Picker؛ تم تفعيل قائمة SMART TIME كبديل.' : 'Contact Picker is unavailable; SMART TIME users are shown as a fallback.');
+      setUsers((prev) => prev.length ? prev : []);
+      return;
+    }
     setContactsLoading(true); setContactsMessage(''); setInviteContact(null);
     try {
       const picked = await contactsApi.select(['name', 'tel'], { multiple: true });
@@ -94,7 +100,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
       const matches = await chatService.lookupContacts(phones);
       if (matches.length) {
         setUsers((prev) => { const map = new Map(prev.map((u) => [u.id, u])); matches.forEach((u) => map.set(u.id, u)); return Array.from(map.values()); });
-        const first = matches[0]; setSelectedUserId(first.id); await handleAdd(first.id); return;
+        setSelectedUserId(matches[0].id); return;
       }
       const firstContact = selectedContacts[0]; await shareInvite(firstContact.name, firstContact.phones[0]);
     } catch (err: any) { if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.')); }
@@ -126,7 +132,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <div className="flex flex-wrap gap-2 mb-3">
+  <button type="button" onClick={openPhoneContacts} disabled={contactsLoading} className="px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-600 text-xs font-bold">📱 {contactsLoading?'جاري المزامنة...':'مزامنة جهات الاتصال'}</button>
+  <button type="button" onClick={() => { const name=window.prompt('اسم جهة الاتصال الجديدة؟')||''; const phone=window.prompt('رقم الهاتف؟')||''; if(phone.trim()) shareInvite(name,phone); }} className="px-3 py-2 rounded-xl bg-sky-500/15 text-sky-600 text-xs font-bold">➕ إضافة جهة اتصال جديدة</button>
+</div>
+
+<button
               type="button"
               onClick={handleAdd}
               disabled={!selectedUserId || submitting}
@@ -195,7 +206,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   key={u.id}
                   type="button"
                   disabled={isAlreadyMember}
-                  onClick={() => { setSelectedUserId(u.id); void handleAdd(u.id); }}
+                  onClick={() => setSelectedUserId(u.id)}
                   className={`w-full p-3 rounded-2xl border text-start flex items-center justify-between transition-all ${
                     isAlreadyMember
                       ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-850/30 border-slate-200 dark:border-slate-800'
@@ -240,21 +251,25 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
         {inviteContact && (
           <div className="px-4 py-3 border-t border-amber-200 dark:border-amber-900/40 bg-amber-500/5 flex items-center justify-between gap-3">
-            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{isAr ? 'يمكن دعوة جهة الاتصال للتسجيل ثم بدء المحادثة.' : 'Invite the contact to register, then start the chat.'}</p>
-            <button type="button" onClick={() => void shareInvite(inviteContact.name, inviteContact.phone)} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-[10px] font-extrabold">
-              <Share2 className="w-4 h-4" />{isAr ? 'مشاركة الدعوة' : 'Share invite'}
-            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{isAr ? 'يمكن دعوة جهة الاتصال للتسجيل ثم بدء المحادثة.' : 'Invite the contact to register, then start the chat.'}</p>
+              <div className="text-[9px] text-slate-500 mt-1 break-all">{createInviteLink(inviteContact.name, inviteContact.phone)}</div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => void navigator.clipboard?.writeText(createInviteLink(inviteContact.name, inviteContact.phone))} className="px-2.5 py-2 rounded-xl bg-slate-800 text-white text-[10px] font-extrabold">{isAr ? 'نسخ' : 'Copy'}</button>
+              <a target="_blank" rel="noopener noreferrer" href={`https://wa.me/?text=${encodeURIComponent((isAr?'انضم إلى SMART TIME: ':'Join SMART TIME: ')+createInviteLink(inviteContact.name, inviteContact.phone))}`} className="px-2.5 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-extrabold">WhatsApp</a>
+              <button type="button" onClick={() => void shareInvite(inviteContact.name, inviteContact.phone)} className="px-2.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-[10px] font-extrabold"><Share2 className="w-4 h-4 inline" /> {isAr ? 'شير' : 'Share'}</button>
+            </div>
+            <img alt="QR" className="w-16 h-16 rounded-lg bg-white p-1" src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(createInviteLink(inviteContact.name, inviteContact.phone))}`} />
           </div>
         )}
 
         {selectedUserId && (
-          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5">
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-              {isAr ? 'سيتم فتح محادثة مباشرة وحفظها تلقائيًا في قائمة المحادثات.' : 'A direct chat will open and be saved automatically.'}
-            </p>
+          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5 flex items-center justify-between gap-3">
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{isAr ? 'جهة الاتصال موجودة على SMART TIME.' : 'Contact is on SMART TIME.'}</p>
+            <button type="button" disabled={submitting} onClick={() => void handleAdd(selectedUserId)} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold disabled:opacity-50">{isAr ? 'دردشة' : 'Chat'}</button>
           </div>
         )}
-
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
           <button
