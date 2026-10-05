@@ -3,6 +3,8 @@ import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { db } from './database.js';
 
 // Types
@@ -193,6 +195,18 @@ export function setupChatWebSocket(httpServer: http.Server) {
             roomSubscriptions.get(roomId)?.delete(ws);
             ws.rooms?.delete(roomId);
           }
+        }
+
+        if (type === 'voice_join' || type === 'voice_leave' || type === 'voice_mute' || type === 'voice_raise_hand') {
+          const { roomId, muted, raised, role } = payload || {};
+          if (roomId && ws.userId) {
+            broadcastToRoom(roomId, { type: 'voice_room_event', payload: { roomId, event:type, userId:ws.userId, userName:ws.userName||'مستخدم', muted:!!muted, raised:!!raised, role:role||'guest' } }, ws);
+          }
+        }
+
+        if (type === 'live_location_update') {
+          const { roomId, location } = payload || {};
+          if (roomId && ws.userId && location) broadcastToRoom(roomId, { type:'live_location_update', payload:{roomId,userId:ws.userId,location} }, ws);
         }
 
         if (type === 'typing') {
@@ -397,8 +411,7 @@ chatRouter.get('/rooms', (req, res) => {
         isOnline,
         settings,
         permissions,
-        adminPermissions,
-        moderatorPermissions,
+        adminPermissions,        moderatorPermissions,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       };
@@ -797,8 +810,7 @@ chatRouter.get('/rooms/:roomId/messages', (req, res) => {
         updatedAt: r.updated_at,
         location: extra?.location,
         poll: extra?.poll,
-      };
-    });
+      };    });
 
     res.json({ messages });
   } catch (err: any) {
@@ -1197,8 +1209,7 @@ chatRouter.delete('/rooms/:roomId/members/:targetUserId', (req, res) => {
 
     broadcastToRoom(roomId, {
       type: 'member_removed',
-      payload: { roomId, userId: targetUserId },
-    });
+      payload: { roomId, userId: targetUserId },    });
 
     res.json({ ok: true, message: 'تمت إزالة العضو بنجاح' });
   } catch (err: any) {
@@ -1271,4 +1282,76 @@ chatRouter.get('/search', (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+function chatRoleAllowed(userId:string, roomId:string, roles:string[]=['owner','admin','moderator','member']) {
+  const access=verifyConversationAccess(userId,roomId);
+  return access.allowed && !!access.role && roles.includes(access.role);
+}
+
+chatRouter.post('/rooms/:roomId/voice/join',(req,res)=>{
+ try{
+  const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+  const {roomId}=req.params; if(!chatRoleAllowed(user.id,roomId))return res.status(403).json({error:'ليس لديك صلاحية دخول الغرفة'});
+  const role=['host','guest','listener'].includes(req.body?.role)?req.body.role:'guest';
+  const conv=db.prepare('SELECT voiceRoomActive, voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
+  const participants=JSON.parse(conv?.voiceParticipants||'[]');
+  const existing=participants.find((p:any)=>p.userId===user.id);
+  const participant=existing||{userId:user.id,name:user.name||'مستخدم',role,muted:role!=='host',handRaised:false,joinedAt:new Date().toISOString()};
+  if(!existing)participants.push(participant);
+  db.prepare('UPDATE conversations SET voiceRoomActive=1, voiceParticipants=? WHERE id=?').run(JSON.stringify(participants),roomId);
+  broadcastToRoom(roomId,{type:'voice_room_updated',payload:{roomId,participants}});
+  res.json({ok:true,participant,participants});
+ }catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.post('/rooms/:roomId/voice/leave',(req,res)=>{
+ try{
+  const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+  const {roomId}=req.params; const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
+  const participants=JSON.parse(conv?.voiceParticipants||'[]').filter((p:any)=>p.userId!==user.id);
+  db.prepare('UPDATE conversations SET voiceRoomActive=?, voiceParticipants=? WHERE id=?').run(participants.length?1:0,JSON.stringify(participants),roomId);
+  broadcastToRoom(roomId,{type:'voice_participant_left',payload:{roomId,userId:user.id,participants}});
+  res.json({ok:true,participants});
+ }catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.post('/rooms/:roomId/voice/mute',(req,res)=>{
+ try{
+  const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+  const {roomId}=req.params; const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
+  const participants=JSON.parse(conv?.voiceParticipants||'[]'); const p=participants.find((x:any)=>x.userId===user.id);
+  if(!p)return res.status(404).json({error:'أنت لست داخل الغرفة الصوتية'});
+  p.muted=!!req.body?.muted; db.prepare('UPDATE conversations SET voiceParticipants=? WHERE id=?').run(JSON.stringify(participants),roomId);
+  broadcastToRoom(roomId,{type:'voice_room_updated',payload:{roomId,participants}});
+  res.json({ok:true,muted:p.muted});
+ }catch(e:any){res.status(500).json({error:e.message})}
+});
+
+chatRouter.post('/upload',(req,res)=>{
+ try{
+  const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+  const data=String(req.body?.data||''); const name=String(req.body?.name||'file'); const mime=String(req.body?.mime||'application/octet-stream');
+  const base64=data.includes(',')?data.split(',')[1]:data; const bytes=Buffer.from(base64,'base64');
+  if(bytes.length>10*1024*1024)return res.status(413).json({error:'الملف أكبر من 10MB'});
+  const safe=path.basename(name).replace(/[^a-zA-Z0-9._-]/g,'_'); const dir=path.join(process.cwd(),'backend','uploads'); fs.mkdirSync(dir,{recursive:true});
+  const fileName=`${Date.now()}_${crypto.randomUUID()}_${safe}`; fs.writeFileSync(path.join(dir,fileName),bytes);
+  res.json({ok:true,url:`/api/chat/uploads/${encodeURIComponent(fileName)}`,name:safe,mime,size:bytes.length});
+ }catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.get('/uploads/:file',(req,res)=>{const file=path.basename(req.params.file);const full=path.join(process.cwd(),'backend','uploads',file);if(!fs.existsSync(full))return res.status(404).end();res.sendFile(full)});
+chatRouter.post('/rooms/:roomId/messages/:messageId/vote',(req,res)=>{
+ try{
+  const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+  const {roomId,messageId}=req.params;const msg=db.prepare('SELECT extra_json FROM messages WHERE id=? AND conversation_id=?').get(messageId,roomId) as any;if(!msg)return res.status(404).json({error:'الرسالة غير موجودة'});
+  const extra=JSON.parse(msg.extra_json||'{}');const poll=extra.poll;if(!poll)return res.status(400).json({error:'ليست رسالة استطلاع'});
+  const option=Number(req.body?.option);if(!Number.isInteger(option)||option<0||option>=poll.options.length)return res.status(400).json({error:'خيار غير صالح'});
+  poll.votes=poll.votes||{};for(const k of Object.keys(poll.votes))poll.votes[k]=(poll.votes[k]||[]).filter((id:string)=>id!==user.id);
+  poll.votes[option]=[...(poll.votes[option]||[]),user.id];extra.poll=poll;db.prepare('UPDATE messages SET extra_json=?,updated_at=? WHERE id=?').run(JSON.stringify(extra),new Date().toISOString(),messageId);
+  broadcastToRoom(roomId,{type:'poll_updated',payload:{roomId,messageId,poll}});res.json({ok:true,poll});
+ }catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.post('/stories',(req,res)=>{
+ try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const id='story_'+crypto.randomUUID();const now=new Date().toISOString();db.prepare('INSERT INTO stories(id,user_id,body,media_url,expires_at,created_at) VALUES(?,?,?,?,?,?)').run(id,user.id,String(req.body?.body||''),req.body?.mediaUrl||null,req.body?.expiresAt||new Date(Date.now()+86400000).toISOString(),now);res.json({ok:true,id})}catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.get('/stories',(req,res)=>{
+ try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const rows=db.prepare('SELECT s.*,u.display_name as name,u.avatar FROM stories s JOIN users u ON u.id=s.user_id WHERE julianday(s.expires_at)>julianday(\'now\') ORDER BY s.created_at DESC').all();res.json({stories:rows})}catch(e:any){res.status(500).json({error:e.message})}
 });
