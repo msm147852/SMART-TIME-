@@ -78,7 +78,7 @@ class ChatService {
           if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({ type: 'ping' }));
           }
-        }, 25000);
+        }, 30000);
       };
 
       this.ws.onmessage = (event) => {
@@ -367,14 +367,17 @@ class ChatService {
     const data = await this.request(`/api/chat/search?q=${encodeURIComponent(q)}`);
     return data.results || [];
   }
-}
-
   async voiceJoin(roomId: string, role: 'host'|'guest'|'listener' = 'guest') { return this.request(`/api/chat/rooms/${roomId}/voice/join`, { method:'POST', body: JSON.stringify({ role }) }); }
   async voiceLeave(roomId: string) { return this.request(`/api/chat/rooms/${roomId}/voice/leave`, { method:'POST' }); }
   async voiceMute(roomId: string, muted: boolean) { return this.request(`/api/chat/rooms/${roomId}/voice/mute`, { method:'POST', body: JSON.stringify({ muted }) }); }
   voiceRaiseHand(roomId: string, raised: boolean) { this.sendWs('voice_raise_hand', { roomId, raised }); }
+  sendVoiceEvent(type: 'voice_join'|'voice_leave'|'voice_mute'|'voice_raise_hand', payload: any) { this.sendWs(type, payload); }
   sendLiveLocationUpdate(roomId:string, location:{lat:number;lng:number}) { this.sendWs('live_location_update',{roomId,location}); }
-  async uploadChatFile(file: File) { const data = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=reject;r.readAsDataURL(file);}); return this.request('/api/chat/upload',{method:'POST',body:JSON.stringify({name:file.name,mime:file.type,data})}); }
+  async uploadChatFile(file: File) {
+    if (file.size > 10 * 1024 * 1024) throw new Error('الملف أكبر من 10MB');
+    const data = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=reject;r.readAsDataURL(file);});
+    return this.request('/api/chat/upload',{method:'POST',body:JSON.stringify({name:file.name,mime:file.type,data})});
+  }
   async votePoll(roomId:string,messageId:string,option:number){ return this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/vote`,{method:'POST',body:JSON.stringify({option})}); }
 
-export const chatService = new ChatService();
+}
