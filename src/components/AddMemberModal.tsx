@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, X, Check, Contact, Smartphone, Share2 } from 'lucide-react';
 import { ChatMember } from '../types';
 import { chatService } from '../services/chatService';
+import { getStoredSession } from '../services/authService';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -48,7 +49,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const createInviteLink = (name: string, phone: string) => {
     const params = new URLSearchParams({ invite: 'chat', from: 'smart-time', phone, name });
-    return window.location.origin + '/?' + params.toString();
+    const from = getStoredSession()?.user?.id || 'CURRENT_USER_ID';
+    return 'https://smart-time.app/invite?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(phone);
   };
 
   const shareInvite = async (name: string, phone: string) => {
