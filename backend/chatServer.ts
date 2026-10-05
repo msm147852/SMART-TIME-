@@ -200,7 +200,20 @@ export function setupChatWebSocket(httpServer: http.Server) {
         if (type === 'voice_join' || type === 'voice_leave' || type === 'voice_mute' || type === 'voice_raise_hand') {
           const { roomId, muted, raised, role } = payload || {};
           if (roomId && ws.userId) {
-            broadcastToRoom(roomId, { type: 'voice_room_event', payload: { roomId, event:type, userId:ws.userId, userName:ws.userName||'مستخدم', muted:!!muted, raised:!!raised, role:role||'guest' } }, ws);
+            const access = verifyConversationAccess(ws.userId, roomId);
+            if (!access.allowed) {
+              ws.send(JSON.stringify({ type: 'voice_error', payload: { roomId, message: 'ليس لديك صلاحية دخول الغرفة الصوتية' } }));
+            } else {
+              const conv = db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
+              const participants = JSON.parse(conv?.voiceParticipants || '[]');
+              const idx = participants.findIndex((p:any) => p.userId === ws.userId);
+              if (type === 'voice_join' && idx < 0) participants.push({ userId: ws.userId, name: ws.userName || 'مستخدم', role: ['host','guest','listener'].includes(role) ? role : 'guest', muted: role !== 'host', handRaised: false, joinedAt: new Date().toISOString() });
+              if (type === 'voice_leave' && idx >= 0) participants.splice(idx, 1);
+              if (type === 'voice_mute' && idx >= 0) participants[idx].muted = !!muted;
+              if (type === 'voice_raise_hand' && idx >= 0) participants[idx].handRaised = !!raised;
+              db.prepare('UPDATE conversations SET voiceRoomActive=?, voiceParticipants=? WHERE id=?').run(participants.length ? 1 : 0, JSON.stringify(participants), roomId);
+              broadcastToRoom(roomId, { type: 'voice_room_updated', payload: { roomId, participants } });
+            }
           }
         }
 
@@ -397,8 +410,7 @@ chatRouter.get('/rooms', (req, res) => {
         id: r.id,
         title: title || r.name || 'محادثة',
         name: title || r.name || 'محادثة',
-        description: r.description || '',
-        type: r.type || 'group',
+        description: r.description || '',        type: r.type || 'group',
         avatar: avatar || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=120&auto=format&fit=crop&q=80',
         creatorId: r.creator_id,
         pinned: !!r.pinned,
@@ -797,8 +809,7 @@ chatRouter.get('/rooms/:roomId/messages', (req, res) => {
         body: r.body,
         mediaUrl: r.media_url || undefined,
         type: r.type || 'text',
-        status: r.status || 'sent',
-        isPinned: !!r.is_pinned,
+        status: r.status || 'sent',        isPinned: !!r.is_pinned,
         pinnedBy: r.pinned_by,
         pinnedAt: r.pinned_at,
         isEdited: !!r.is_edited,
@@ -1197,7 +1208,6 @@ chatRouter.delete('/rooms/:roomId/members/:targetUserId', (req, res) => {
   try {
     const user = getAuthUser(req);
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
-
     const { roomId, targetUserId } = req.params;
 
     const access = verifyConversationAccess(user.id, roomId);
