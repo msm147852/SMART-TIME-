@@ -2214,7 +2214,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* CHAT SETTINGS MODAL */
+      {/* CHAT SETTINGS MODAL */}
       {/* ========================================================================= */}
       <ChatSettingsModal
         isOpen={showRoomInfoModal}
