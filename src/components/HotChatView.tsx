@@ -280,7 +280,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const [liveLocationWatchId, setLiveLocationWatchId] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [liveLocationWatchId, setLiveLocationWatchId] = useState<number | null>(null);
   const [liveLocationMsgId, setLiveLocationMsgId] = useState<string | null>(null);
 
   // Window state
@@ -810,7 +810,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   const handleStopLiveLocation = () => {
     if (liveLocationWatchId !== null) {
-      clearInterval(liveLocationWatchId);
+      navigator.geolocation.clearWatch(liveLocationWatchId);
       setLiveLocationWatchId(null);
     }
   };
