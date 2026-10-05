@@ -381,3 +381,5 @@ class ChatService {
   async votePoll(roomId:string,messageId:string,option:number){ return this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/vote`,{method:'POST',body:JSON.stringify({option})}); }
 
 }
+
+export const chatService = new ChatService();
