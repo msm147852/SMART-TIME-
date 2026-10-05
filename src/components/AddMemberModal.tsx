@@ -100,7 +100,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
       const matches = await chatService.lookupContacts(phones);
       if (matches.length) {
         setUsers((prev) => { const map = new Map(prev.map((u) => [u.id, u])); matches.forEach((u) => map.set(u.id, u)); return Array.from(map.values()); });
-        const first = matches[0]; setSelectedUserId(first.id); await handleAdd(first.id); return;
+        setSelectedUserId(matches[0].id); return;
       }
       const firstContact = selectedContacts[0]; await shareInvite(firstContact.name, firstContact.phones[0]);
     } catch (err: any) { if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.')); }
@@ -206,7 +206,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   key={u.id}
                   type="button"
                   disabled={isAlreadyMember}
-                  onClick={() => { setSelectedUserId(u.id); void handleAdd(u.id); }}
+                  onClick={() => setSelectedUserId(u.id)}
                   className={`w-full p-3 rounded-2xl border text-start flex items-center justify-between transition-all ${
                     isAlreadyMember
                       ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-850/30 border-slate-200 dark:border-slate-800'
@@ -265,7 +265,11 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
         )}
 
         {selectedUserId && (
-          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5">
+          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5 flex items-center justify-between gap-3">
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{isAr ? 'جهة الاتصال موجودة على SMART TIME.' : 'Contact is on SMART TIME.'}</p>
+            <button type="button" disabled={submitting} onClick={() => void handleAdd(selectedUserId)} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold disabled:opacity-50">{isAr ? 'دردشة' : 'Chat'}</button>
+          </div>
+          <div className="hidden">
             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
               {isAr ? 'سيتم فتح محادثة مباشرة وحفظها تلقائيًا في قائمة المحادثات.' : 'A direct chat will open and be saved automatically.'}
             </p>
