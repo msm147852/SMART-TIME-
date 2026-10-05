@@ -269,13 +269,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{isAr ? 'جهة الاتصال موجودة على SMART TIME.' : 'Contact is on SMART TIME.'}</p>
             <button type="button" disabled={submitting} onClick={() => void handleAdd(selectedUserId)} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold disabled:opacity-50">{isAr ? 'دردشة' : 'Chat'}</button>
           </div>
-          <div className="hidden">
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-              {isAr ? 'سيتم فتح محادثة مباشرة وحفظها تلقائيًا في قائمة المحادثات.' : 'A direct chat will open and be saved automatically.'}
-            </p>
-          </div>
         )}
-
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
           <button
