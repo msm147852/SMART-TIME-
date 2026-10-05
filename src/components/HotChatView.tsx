@@ -795,11 +795,16 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           'location',
           { lat: pos.coords.latitude, lng: pos.coords.longitude, isLive: true }
         );
+        let lastSentAt = 0;
         const watchId = navigator.geolocation.watchPosition(
-          (watchPos) => {            chatService.sendLiveLocationUpdate(activeRoomId, { lat: watchPos.coords.latitude, lng: watchPos.coords.longitude });
+          (watchPos) => {
+            const now = Date.now();
+            if (now - lastSentAt < 5000) return;
+            lastSentAt = now;
+            chatService.sendLiveLocationUpdate(activeRoomId, { lat: watchPos.coords.latitude, lng: watchPos.coords.longitude });
           },
           () => {},
-          { enableHighAccuracy: true }
+          { enableHighAccuracy: true, maximumAge: 3000 }
         );
         setLiveLocationWatchId(watchId);
       },
