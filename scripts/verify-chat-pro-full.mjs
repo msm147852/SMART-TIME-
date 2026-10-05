@@ -19,7 +19,7 @@ const checks=[
  ['voice persistence',files.db.includes('voiceRoomActive') && files.db.includes('voiceParticipants')],
  ['contacts picker',files.contacts.includes('navigator as any).contacts') && files.service.includes('lookupContacts')],
  ['direct chat',files.service.includes("type: 'direct'") && files.server.includes("type === 'direct'")],
- ['storage pipeline',files.server.includes("chatRouter.post('/upload'") && files.server.includes('backend','uploads')],
+ ['storage pipeline',files.server.includes("chatRouter.post('/upload'") && files.server.includes("path.join(process.cwd(),'backend','uploads')")],
  ['storage limit',files.server.includes('10*1024*1024') && files.service.includes('10 * 1024 * 1024')],
  ['voice messaging',files.hot.includes('MediaRecorder') && files.hot.includes('uploadChatFile')],
  ['live location 5s',files.hot.includes('now - lastSentAt < 5000') && files.hot.includes('watchPosition')],
