@@ -231,6 +231,11 @@ try { db.exec('ALTER TABLE users ADD COLUMN trip_free_searches INTEGER NOT NULL 
 try { db.exec('ALTER TABLE users ADD COLUMN trip_gift_claimed_at TEXT'); } catch {}
 try { db.exec('ALTER TABLE trip_gift_claims ADD COLUMN phone_hash TEXT'); } catch {}
 
+try { db.exec('ALTER TABLE conversations ADD COLUMN voiceRoomActive INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN voiceParticipants TEXT NOT NULL DEFAULT '[]'"); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS stories (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, body TEXT, media_url TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stories_user_expires ON stories(user_id, expires_at)'); } catch {}
+
 // Safe migrations for conversations
 try { db.exec('ALTER TABLE conversations ADD COLUMN title TEXT'); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN description TEXT'); } catch {}
@@ -397,8 +402,7 @@ export function seedDefaultChatRooms() {
     });
 
     for (const r of defaultRooms) {
-      db.prepare(`
-        INSERT INTO conversations (id, title, description, type, avatar, creator_id, pinned, settings_json, permissions_json, last_message, last_message_time, created_at, updated_at)
+      db.prepare(`        INSERT INTO conversations (id, title, description, type, avatar, creator_id, pinned, settings_json, permissions_json, last_message, last_message_time, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(r.id, r.title, r.description, r.type, r.avatar, r.creator_id, r.pinned, defaultSettings, defaultPerms, r.last_message, r.last_message_time, now, now);
 
