@@ -126,7 +126,16 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <div className="flex flex-wrap gap-2 mb-3">
+  <button type="button" onClick={() => openPhoneContacts()} className="px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-600 text-xs font-bold">📱 مزامنة جهات الاتصال</button>
+  <button type="button" onClick={() => {
+    const name=window.prompt('اسم جهة الاتصال الجديدة؟')||'';
+    const phone=window.prompt('رقم الهاتف؟')||'';
+    if(phone.trim()) { const invite='https://smart-time.app/invite?from='+encodeURIComponent(String(currentUserId||''))+'&to='+encodeURIComponent(phone.trim()); navigator.clipboard?.writeText(invite); setInviteTarget({name,phone}); setInviteLink(invite); }
+  }} className="px-3 py-2 rounded-xl bg-sky-500/15 text-sky-600 text-xs font-bold">➕ إضافة جهة اتصال جديدة</button>
+</div>
+
+<button
               type="button"
               onClick={handleAdd}
               disabled={!selectedUserId || submitting}
