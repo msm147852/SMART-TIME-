@@ -206,6 +206,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   // Modals & Panels
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
@@ -734,7 +735,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
 
   const handleLiveCameraCapture = async (file: File, caption?: string) => {
     try {
-      const uploaded = await chatService.uploadChatFile(file);
+      const uploaded = await chatService.uploadChatFile(file, activeRoomId);
       await handleSendMessage(
         undefined,
         caption || (isAr ? '📷 صورة بالكاميرا' : '📷 Camera photo'),
@@ -1319,7 +1320,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             </button>
 
             <button
-              onClick={() => setActiveCall('voice')}
+              onClick={() => setShowVoiceRoomModal(true)}
               className={`p-2 sm:p-2.5 rounded-xl ${chatIconButton} text-sky-500 transition-all hover:scale-105`}
               title={isAr ? 'مكالمة صوتية' : 'Voice Call'}
             >
@@ -1422,7 +1423,10 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             isDark={isDark}
             onAddMember={() => setShowAddMemberModal(true)}
             onTagMember={(m) => setInputText((prev) => `${prev ? prev + ' ' : ''}@${m.name} `)}
-            onStartCall={(kind) => setActiveCall(kind)}
+            onStartCall={(kind) => {
+              if (kind === 'voice') setShowVoiceRoomModal(true);
+              else setActiveCall('video');
+            }}
             onChangeRole={async (id, role) => {
               try {
                 await chatService.updateMemberRole(activeRoomId, id, role);
@@ -1441,8 +1445,17 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 alert(err.message || 'فشل إزالة العضو');
               }
             }}
-            onBanMember={() => {}}
-            onSaveContact={() => {}}
+            onBanMember={async (id) => {
+              try {
+                await chatService.banMember(activeRoomId, id);
+                setRoomMembers((prev) => prev.map((m) => (m.id === id ? { ...m, banned: true } : m)));
+              } catch (err: any) {
+                alert(err.message || 'فشل حظر العضو');
+              }
+            }}
+            onSaveContact={() => {
+              alert(isAr ? 'حفظ جهات الاتصال يعتمد على دعم نظام التشغيل والمتصفح.' : 'Saving contacts depends on browser and operating-system support.');
+            }}
           />
 
           {/* Middle: Chat Messages Stream + Message Input Bar */}
@@ -1929,6 +1942,36 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                       <Paperclip className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full start-0 mb-2 w-64 rounded-2xl border border-sky-500/30 bg-white dark:bg-slate-900 shadow-2xl p-2 z-30">
+                      <div className="grid grid-cols-8 gap-1">
+                        {['😀','😂','😍','😊','😎','🤔','👍','❤️','🔥','🎉','👏','🙏','💯','😢','😡','🤍'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              setInputText((prev) => prev + emoji);
+                              setShowEmojiPicker(false);
+                            }}
+                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-lg"
+                            aria-label={emoji}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker((v) => !v)}
+                    className="p-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-sky-500 transition-colors"
+                    title={isAr ? 'إيموجي' : 'Emoji'}
+                  >
+                    <Smile className="w-4 h-4" />
+                  </button>
 
                   <button
                     type="button"
