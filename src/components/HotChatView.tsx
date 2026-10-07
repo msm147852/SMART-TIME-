@@ -705,7 +705,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       try {
         const ext = (recorder.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
         const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: recorder.mimeType || 'audio/webm' });
-        const uploaded = await chatService.uploadChatFile(file);
+        const uploaded = await chatService.uploadChatFile(file, activeRoomId);
         await handleSendMessage(undefined, isAr ? `🎤 رسالة صوتية (${seconds} ثانية)` : `🎤 Voice note (${seconds}s)`, 'voice', undefined, uploaded.url, { waveform: [12,22,34,26,40,30,18,36,28,44], duration: seconds });
       } catch (e: any) {
         alert(e?.message || (isAr ? 'تعذر رفع الرسالة الصوتية.' : 'Could not upload voice message.'));
@@ -731,7 +731,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       return;
     }
     try {
-      const uploaded = await chatService.uploadChatFile(file);
+      const uploaded = await chatService.uploadChatFile(file, activeRoomId);
       const label = kind === 'image' ? `🖼️ ${file.name}` : kind === 'video' ? `🎬 ${file.name}` : `📄 ${file.name}`;
       await handleSendMessage(undefined, label, kind, undefined, uploaded.url);
     } catch {
