@@ -1,6 +1,5 @@
 import express from 'express';
-import { WebSocketServer } from 'ws';
-import type { WebSocket as WsWebSocket } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -8,7 +7,7 @@ import path from 'node:path';
 import { db } from './database.js';
 
 // Types
-export type WsClient = WsWebSocket & {
+export type WsClient = WebSocket & {
   userId?: string;
   userName?: string;
   userAvatar?: string;
@@ -30,7 +29,7 @@ export function isUserOnline(userId: string): boolean {
 }
 
 // Helpers to broadcast
-export function broadcastToRoom(roomId: string, payload: any, excludeWs?: WsWebSocket) {
+export function broadcastToRoom(roomId: string, payload: any, excludeWs?: WebSocket) {
   const clients = roomSubscriptions.get(roomId);
   if (!clients) return;
   const msg = JSON.stringify(payload);
