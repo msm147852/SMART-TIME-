@@ -1204,6 +1204,9 @@ chatRouter.post('/rooms/:roomId/members', (req, res) => {
     if (!access.allowed || !chatPermissionAllowed(user.id, roomId, 'addMembers') || (access.role !== 'owner' && access.role !== 'admin' && access.role !== 'moderator')) {
       return res.status(403).json({ error: 'ليس لديك صلاحية إضافة أعضاء' });
     }
+    if (role === 'owner' || (role === 'admin' && access.role !== 'owner') || (role === 'moderator' && access.role === 'moderator')) {
+      return res.status(403).json({ error: 'لا يمكنك منح هذا الدور' });
+    }
 
     const existing = db.prepare('SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(roomId, targetUserId) as any;
     if (existing) {
@@ -1280,6 +1283,7 @@ chatRouter.put('/rooms/:roomId/members/:targetUserId/role', (req, res) => {
     if (!access.allowed || access.role !== 'owner') {
       return res.status(403).json({ error: 'فقط مالك الغرفة يمكنه تعديل الأدوار' });
     }
+    if (!['admin','moderator','member'].includes(role)) return res.status(400).json({ error: 'لا يمكن تعيين هذا الدور من خلال هذا المسار' });
 
     db.prepare('UPDATE conversation_members SET role = ? WHERE conversation_id = ? AND user_id = ?').run(role, roomId, targetUserId);
 
