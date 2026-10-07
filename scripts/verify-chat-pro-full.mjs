@@ -15,7 +15,7 @@ const files={
 const checks=[
  ['voice component',files.voice.includes('getUserMedia') && files.voice.includes('voiceJoin') && files.voice.includes('voiceMute')],
  ['voice REST', ['/rooms/:roomId/voice/join','/rooms/:roomId/voice/leave','/rooms/:roomId/voice/mute'].every(x=>files.server.includes(x))],
- ['voice WS', ['voice_join','voice_leave','voice_mute','voice_raise_hand'].every(x=>files.server.includes(x))],
+ ['voice WS + WebRTC signaling', ['voice_join','voice_leave','voice_mute','voice_raise_hand','voice_signal','sendToUser'].every(x=>files.server.includes(x)) && files.service.includes('sendVoiceSignal') && files.voice.includes('RTCPeerConnection')],
  ['voice persistence',files.db.includes('voiceRoomActive') && files.db.includes('voiceParticipants')],
  ['contacts picker',files.contacts.includes('navigator as any).contacts') && files.service.includes('lookupContacts')],
  ['direct chat',files.service.includes("'direct'") && files.server.includes("type === 'direct'")],
@@ -28,8 +28,12 @@ const checks=[
  ['heartbeat/reconnect',files.service.includes('30000') && files.service.includes('scheduleReconnect')],
  ['presence/read receipts',files.server.includes('presence_update') && files.server.includes('message_reads')],
  ['stories',files.server.includes("chatRouter.post('/stories'") && files.server.includes("chatRouter.get('/stories'") && files.db.includes('CREATE TABLE IF NOT EXISTS stories')],
- ['role authorization',files.server.includes('verifyConversationAccess') && files.server.includes('conversation_members')],
+ ['role authorization + API enforcement',files.server.includes('verifyConversationAccess') && files.server.includes('chatPermissionAllowed') && files.server.includes('conversation_members')],
  ['settings persistence',files.settings.includes('localStorage.setItem') && files.service.includes('updateRoom')],
+ ['poll authorization',files.server.includes("chatPermissionAllowed(user.id,roomId,'sendMessages')")],
+ ['saved-message authorization',files.server.includes("SELECT conversation_id FROM messages WHERE id = ? AND is_deleted = 0")],
+ ['WS room authorization',files.server.includes("live_location_error") && files.server.includes("typing_error")],
+
 ];
 for (const [name,ok] of checks) assert.ok(ok,name);
 console.log('CHAT_PRO_FULL_CONTRACT_PASS',checks.length);
