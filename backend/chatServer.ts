@@ -189,6 +189,7 @@ export function setupChatWebSocket(httpServer: http.Server) {
             }));
           }
         }
+      }
 
         if (type === 'leave_room') {
           const { roomId } = payload || {};
