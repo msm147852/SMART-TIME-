@@ -1,6 +1,8 @@
 name: Chat Pro Full CI
 
 on:
+  push:
+    branches: [main, feat/chat-pro-full]
   pull_request:
     branches: [main]
     paths:
@@ -14,8 +16,6 @@ on:
       - 'scripts/verify-chat-pro-full.mjs'
       - 'package.json'
       - '.github/workflows/chat-pro-full.yml'
-  push:
-    branches: [feat/chat-pro-full]
 
 jobs:
   chat-pro-full:
