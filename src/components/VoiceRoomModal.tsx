@@ -19,6 +19,10 @@ interface Props {
   language?: Language;
 }
 
+const rtcConfig: RTCConfiguration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+};
+
 export const VoiceRoomModal: React.FC<Props> = ({
   isOpen, roomId, roomTitle, isHost = false, onClose, language = 'ar',
 }) => {
@@ -29,6 +33,81 @@ export const VoiceRoomModal: React.FC<Props> = ({
   const [joining, setJoining] = useState(false);
   const [micError, setMicError] = useState('');
   const streamRef = useRef<MediaStream | null>(null);
+  const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const audioRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const selfIdRef = useRef<string>('');
+
+  const closePeer = (userId: string) => {
+    peersRef.current.get(userId)?.close();
+    peersRef.current.delete(userId);
+    const audio = audioRef.current.get(userId);
+    if (audio) {
+      audio.pause();
+      audio.srcObject = null;
+    }
+    audioRef.current.delete(userId);
+  };
+
+  const wirePeer = (remoteId: string, pc: RTCPeerConnection) => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => pc.addTrack(track, streamRef.current!));
+    }
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        chatService.sendVoiceSignal(roomId, remoteId, { candidate: event.candidate.toJSON() });
+      }
+    };
+    pc.ontrack = (event) => {
+      const audio = audioRef.current.get(remoteId) || new Audio();
+      audio.autoplay = true;
+      audio.playsInline = true;
+      audio.srcObject = event.streams[0];
+      audioRef.current.set(remoteId, audio);
+      void audio.play().catch(() => {});
+    };
+    pc.onconnectionstatechange = () => {
+      if (['failed', 'closed'].includes(pc.connectionState)) closePeer(remoteId);
+    };
+  };
+
+  const createPeer = async (remoteId: string) => {
+    if (!streamRef.current || !remoteId || remoteId === selfIdRef.current) return;
+    if (peersRef.current.has(remoteId)) return;
+    const pc = new RTCPeerConnection(rtcConfig);
+    peersRef.current.set(remoteId, pc);
+    wirePeer(remoteId, pc);
+    if (selfIdRef.current < remoteId) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      chatService.sendVoiceSignal(roomId, remoteId, { type: 'offer', sdp: offer.sdp });
+    }
+  };
+
+  const handleSignal = async (payload: any) => {
+    if (payload?.roomId !== roomId || !streamRef.current || !payload.fromUserId) return;
+    const remoteId = String(payload.fromUserId);
+    let pc = peersRef.current.get(remoteId);
+    if (!pc) {
+      pc = new RTCPeerConnection(rtcConfig);
+      peersRef.current.set(remoteId, pc);
+      wirePeer(remoteId, pc);
+    }
+    const signal = payload.signal || {};
+    try {
+      if (signal.type === 'offer') {
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: signal.sdp }));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        chatService.sendVoiceSignal(roomId, remoteId, { type: 'answer', sdp: answer.sdp });
+      } else if (signal.type === 'answer') {
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.sdp }));
+      } else if (signal.candidate) {
+        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      }
+    } catch (err) {
+      console.warn('Voice WebRTC signaling error:', err);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !roomId) return;
@@ -39,40 +118,69 @@ export const VoiceRoomModal: React.FC<Props> = ({
       try {
         const role = isHost ? 'host' : 'guest';
         const r: any = await chatService.voiceJoin(roomId, role);
-        if (!disposed) {
-          setParticipants(r?.participants || []);
-          setMuted(r?.participant?.muted ?? !isHost);
+        if (disposed) return;
+        selfIdRef.current = r?.participant?.userId || '';
+        setParticipants(r?.participants || []);
+        setMuted(r?.participant?.muted ?? !isHost);
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error(isAr ? 'المتصفح لا يدعم الميكروفون.' : 'Microphone is not supported.');
         }
-        if (navigator.mediaDevices?.getUserMedia) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            streamRef.current = stream;
-            stream.getAudioTracks().forEach((track) => { track.enabled = isHost; });
-          } catch (err: any) {
-            if (!disposed) setMicError(err?.name === 'NotAllowedError'
-              ? (isAr ? 'تم رفض إذن الميكروفون.' : 'Microphone permission was denied.')
-              : (isAr ? 'تعذر تشغيل الميكروفون.' : 'Could not access the microphone.'));
-          }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (disposed) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        stream.getAudioTracks().forEach((track) => { track.enabled = isHost; });
+
+        for (const p of (r?.participants || []) as VoiceParticipant[]) {
+          if (p.userId !== selfIdRef.current) await createPeer(p.userId);
         }
       } catch (err: any) {
-        if (!disposed) setMicError(err?.message || (isAr ? 'تعذر دخول الغرفة.' : 'Could not join the room.'));
+        if (!disposed) {
+          setMicError(err?.name === 'NotAllowedError'
+            ? (isAr ? 'تم رفض إذن الميكروفون.' : 'Microphone permission was denied.')
+            : (err?.message || (isAr ? 'تعذر تشغيل الغرفة الصوتية.' : 'Could not start the voice room.')));
+        }
       } finally {
         if (!disposed) setJoining(false);
       }
     };
     void start();
 
-    const off = chatService.on('voice_room_updated', (p: any) => {
-      if (p?.roomId === roomId) setParticipants(p.participants || []);
+    const offRoom = chatService.on('voice_room_updated', async (p: any) => {
+      if (p?.roomId !== roomId) return;
+      const next = (p.participants || []) as VoiceParticipant[];
+      setParticipants(next);
+      if (!selfIdRef.current || !streamRef.current) return;
+      for (const remote of next) {
+        if (remote.userId !== selfIdRef.current && !peersRef.current.has(remote.userId)) {
+          await createPeer(remote.userId);
+        }
+      }
+      for (const existing of Array.from(peersRef.current.keys())) {
+        if (!next.some((x) => x.userId === existing)) closePeer(existing);
+      }
     });
+
     const offLeft = chatService.on('voice_participant_left', (p: any) => {
-      if (p?.roomId === roomId) setParticipants(p.participants || []);
+      if (p?.roomId !== roomId) return;
+      setParticipants(p.participants || []);
+      if (p.userId) closePeer(String(p.userId));
     });
+
+    const offSignal = chatService.on('voice_signal', (p: any) => { void handleSignal(p); });
 
     return () => {
       disposed = true;
-      off();
+      offRoom();
       offLeft();
+      offSignal();
+      peersRef.current.forEach((pc) => pc.close());
+      peersRef.current.clear();
+      audioRef.current.forEach((audio) => { audio.pause(); audio.srcObject = null; });
+      audioRef.current.clear();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       void chatService.voiceLeave(roomId).catch(() => {});
@@ -88,13 +196,15 @@ export const VoiceRoomModal: React.FC<Props> = ({
   };
 
   const toggleMute = () => void setMicEnabled(muted);
-  const raiseHand = async () => {
+  const raiseHand = () => {
     const next = !handRaised;
     setHandRaised(next);
     chatService.sendVoiceEvent('voice_raise_hand', { roomId, raised: next });
   };
   const leave = async () => {
     await chatService.voiceLeave(roomId).catch(() => {});
+    peersRef.current.forEach((pc) => pc.close());
+    peersRef.current.clear();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     onClose();
@@ -117,15 +227,11 @@ export const VoiceRoomModal: React.FC<Props> = ({
           </div>
           <button onClick={leave} className="p-2 rounded-xl hover:bg-slate-800" aria-label={isAr ? 'إغلاق' : 'Close'}><X /></button>
         </div>
-
         {micError && <div className="mx-5 mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">{micError}</div>}
-
         <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
           {(['host', 'guest', 'listener'] as const).map((role) => (
             <div key={role} className="rounded-2xl border border-slate-700 bg-slate-900/60 p-3">
-              <h3 className="text-xs font-bold mb-3">
-                {role === 'host' ? (isAr ? 'المضيف' : 'Host') : role === 'guest' ? (isAr ? 'الضيوف' : 'Guests') : (isAr ? 'المستمعون' : 'Listeners')}
-              </h3>
+              <h3 className="text-xs font-bold mb-3">{role === 'host' ? (isAr ? 'المضيف' : 'Host') : role === 'guest' ? (isAr ? 'الضيوف' : 'Guests') : (isAr ? 'المستمعون' : 'Listeners')}</h3>
               <div className="space-y-2 min-h-16">
                 {participants.filter((p) => p.role === role).map((p) => (
                   <div key={p.userId} className="flex items-center justify-between gap-2 text-xs">
@@ -136,7 +242,6 @@ export const VoiceRoomModal: React.FC<Props> = ({
             </div>
           ))}
         </div>
-
         <div className="px-5 py-4 border-t border-slate-700 flex flex-wrap gap-2 justify-center">
           <button disabled={joining || !!micError} onClick={toggleMute} className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold flex items-center gap-2">
             {muted ? <MicOff /> : <Mic />}{muted ? (isAr ? 'فتح الميك' : 'Unmute') : (isAr ? 'كتم الميك' : 'Mute')}
