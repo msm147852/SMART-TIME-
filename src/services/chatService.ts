@@ -382,10 +382,10 @@ class ChatService {
     this.sendWs('voice_signal', { roomId, targetUserId, signal });
   }
   sendLiveLocationUpdate(roomId:string, location:{lat:number;lng:number}) { this.sendWs('live_location_update',{roomId,location}); }
-  async uploadChatFile(file: File) {
+  async uploadChatFile(file: File, roomId?: string) {
     if (file.size > 10 * 1024 * 1024) throw new Error('الملف أكبر من 10MB');
     const data = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=reject;r.readAsDataURL(file);});
-    return this.request('/api/chat/upload',{method:'POST',body:JSON.stringify({name:file.name,mime:file.type,data})});
+    return this.request('/api/chat/upload',{method:'POST',body:JSON.stringify({name:file.name,mime:file.type,data,roomId})});
   }
   async votePoll(roomId:string,messageId:string,option:number){ return this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/vote`,{method:'POST',body:JSON.stringify({option})}); }
 
