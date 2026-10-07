@@ -372,7 +372,13 @@ class ChatService {
   async voiceMute(roomId: string, muted: boolean) { return this.request(`/api/chat/rooms/${roomId}/voice/mute`, { method:'POST', body: JSON.stringify({ muted }) }); }
   voiceRaiseHand(roomId: string, raised: boolean) { this.sendWs('voice_raise_hand', { roomId, raised }); }
   sendVoiceEvent(type: 'voice_join'|'voice_leave'|'voice_mute'|'voice_raise_hand', payload: any) { this.sendWs(type, payload); }
-  sendVoiceSignal(roomId: string, targetUserId: string, signal: RTCSessionDescriptionInit | RTCIceCandidateInit) {
+  sendVoiceSignal(
+    roomId: string,
+    targetUserId: string,
+    signal:
+      | { type: 'offer' | 'answer'; sdp: string | null }
+      | { candidate: RTCIceCandidateInit },
+  ) {
     this.sendWs('voice_signal', { roomId, targetUserId, signal });
   }
   sendLiveLocationUpdate(roomId:string, location:{lat:number;lng:number}) { this.sendWs('live_location_update',{roomId,location}); }
