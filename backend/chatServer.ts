@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db } from './database.js';
+import { getChatUploadPath, uploadChatImage } from './storage.js';
 
 // Types
 export type WsClient = WebSocket & {
@@ -864,10 +865,14 @@ chatRouter.post('/rooms/:roomId/messages', (req, res) => {
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول لإرسال رسالة' });
 
     const { roomId } = req.params;
-    const { text, body, type = 'text', mediaUrl, extra } = req.body;
+    const { text, body, type = 'text', mediaUrl, data, extra } = req.body;
+    let resolvedMediaUrl = mediaUrl ? String(mediaUrl) : '';
+    if (type === 'image' && data && typeof data === 'string') {
+      resolvedMediaUrl = await uploadChatImage(data, roomId);
+    }
     const messageText = String(text || body || '').trim();
 
-    if (!messageText && !mediaUrl) {
+    if (!messageText && !resolvedMediaUrl) {
       return res.status(400).json({ error: 'نص الرسالة أو المرفق مطلوب' });
     }
 
@@ -904,7 +909,7 @@ chatRouter.post('/rooms/:roomId/messages', (req, res) => {
       user.name || 'مستخدم',
       user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
       messageText,
-      mediaUrl || null,
+      resolvedMediaUrl || null,
       type,
       extraJson,
       now,
@@ -928,7 +933,7 @@ chatRouter.post('/rooms/:roomId/messages', (req, res) => {
       senderAvatar: user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
       text: messageText,
       body: messageText,
-      mediaUrl,
+      mediaUrl: resolvedMediaUrl || undefined,
       type,
       status: 'sent',
       isPinned: false,
@@ -1403,18 +1408,30 @@ chatRouter.post('/rooms/:roomId/voice/mute',(req,res)=>{
  }catch(e:any){res.status(500).json({error:e.message})}
 });
 
-chatRouter.post('/upload',(req,res)=>{
+chatRouter.post('/upload', async (req,res)=>{
  try{
   const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
   const data=String(req.body?.data||''); const name=String(req.body?.name||'file'); const mime=String(req.body?.mime||'application/octet-stream');
+  if(!data)return res.status(400).json({error:'الملف مطلوب'});
   const base64=data.includes(',')?data.split(',')[1]:data; const bytes=Buffer.from(base64,'base64');
   if(bytes.length>10*1024*1024)return res.status(413).json({error:'الملف أكبر من 10MB'});
-  const safe=path.basename(name).replace(/[^a-zA-Z0-9._-]/g,'_'); const dir=path.join(process.cwd(),'backend','uploads'); fs.mkdirSync(dir,{recursive:true});
+  if(mime.startsWith('image/')){
+    const roomId=String(req.body?.roomId||'uploads');
+    const url=await uploadChatImage(data,roomId);
+    return res.json({ok:true,url,name,mime,size:bytes.length});
+  }
+  const safe=path.basename(name).replace(/[^a-zA-Z0-9._-]/g,'_');
+  const dir=path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(process.cwd(),'backend','uploads'));
+  fs.mkdirSync(dir,{recursive:true});
   const fileName=`${Date.now()}_${crypto.randomUUID()}_${safe}`; fs.writeFileSync(path.join(dir,fileName),bytes);
   res.json({ok:true,url:`/api/chat/uploads/${encodeURIComponent(fileName)}`,name:safe,mime,size:bytes.length});
  }catch(e:any){res.status(500).json({error:e.message})}
 });
-chatRouter.get('/uploads/:file',(req,res)=>{const file=path.basename(req.params.file);const full=path.join(process.cwd(),'backend','uploads',file);if(!fs.existsSync(full))return res.status(404).end();res.sendFile(full)});
+chatRouter.get('/uploads/:file',(req,res)=>{
+ const full=getChatUploadPath(req.params.file);
+ if(!fs.existsSync(full))return res.status(404).end();
+ res.sendFile(full);
+});
 chatRouter.post('/rooms/:roomId/messages/:messageId/vote',(req,res)=>{
  try{
   const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
