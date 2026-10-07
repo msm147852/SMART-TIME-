@@ -716,13 +716,6 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   };
 
   // File Upload Helper
-  const fileToDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
 
   const handleFileAttachment = async (file: File, kind: 'image' | 'video' | 'file') => {
     setShowAttachMenu(false);
