@@ -160,7 +160,7 @@ export const VoiceRoomModal: React.FC<Props> = ({
         }
       }
       for (const existing of Array.from(peersRef.current.keys())) {
-        if (!next.some((x) => x.userId === existing)) closePeer(existing);
+        if (!next.some((x) => x.userId === existing)) closePeer(String(existing));
       }
     });
 
