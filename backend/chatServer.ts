@@ -179,10 +179,9 @@ export function setupChatWebSocket(httpServer: http.Server) {
             const access = verifyConversationAccess(ws.userId, roomId);
             if (!access.allowed) {
               ws.send(JSON.stringify({ type: 'room_error', payload: { roomId, message: 'ليس لديك صلاحية الوصول لهذه المحادثة' } }));
-            } else if (!roomSubscriptions.has(roomId)) {
-              roomSubscriptions.set(roomId, new Set());
-            }
-            roomSubscriptions.get(roomId)!.add(ws);
+            } else {
+              if (!roomSubscriptions.has(roomId)) roomSubscriptions.set(roomId, new Set());
+              roomSubscriptions.get(roomId)!.add(ws);
             ws.rooms?.add(roomId);
 
             ws.send(JSON.stringify({
@@ -204,8 +203,8 @@ export function setupChatWebSocket(httpServer: http.Server) {
           const { roomId, muted, raised, role } = payload || {};
           if (roomId && ws.userId) {
             const access = verifyConversationAccess(ws.userId, roomId);
-            if (!access.allowed) {
-              ws.send(JSON.stringify({ type: 'voice_error', payload: { roomId, message: 'ليس لديك صلاحية دخول الغرفة الصوتية' } }));
+            if (!access.allowed || !chatPermissionAllowed(ws.userId, roomId, 'startCalls')) {
+              ws.send(JSON.stringify({ type: 'voice_error', payload: { roomId, message: 'ليس لديك صلاحية استخدام الصوت في هذه الغرفة' } }));
             } else {
               const conv = db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
               const participants = JSON.parse(conv?.voiceParticipants || '[]');
@@ -220,23 +219,48 @@ export function setupChatWebSocket(httpServer: http.Server) {
           }
         }
 
+        if (type === 'voice_signal') {
+          const { roomId, targetUserId, signal } = payload || {};
+          if (roomId && ws.userId && targetUserId && signal) {
+            const access = verifyConversationAccess(ws.userId, roomId);
+            const targetAccess = verifyConversationAccess(String(targetUserId), roomId);
+            if (!access.allowed || !targetAccess.allowed || !chatPermissionAllowed(ws.userId, roomId, 'startCalls')) {
+              ws.send(JSON.stringify({ type: 'voice_error', payload: { roomId, message: 'إشارة صوتية غير مصرح بها' } }));
+            } else {
+              sendToUser(String(targetUserId), { type: 'voice_signal', payload: { roomId, fromUserId: ws.userId, signal } });
+            }
+          }
+        }
+
         if (type === 'live_location_update') {
           const { roomId, location } = payload || {};
-          if (roomId && ws.userId && location) broadcastToRoom(roomId, { type:'live_location_update', payload:{roomId,userId:ws.userId,location} }, ws);
+          if (roomId && ws.userId && location) {
+            const access = verifyConversationAccess(ws.userId, roomId);
+            if (access.allowed && chatPermissionAllowed(ws.userId, roomId, 'sendMedia')) {
+              broadcastToRoom(roomId, { type:'live_location_update', payload:{roomId,userId:ws.userId,location} }, ws);
+            } else {
+              ws.send(JSON.stringify({ type:'live_location_error', payload:{roomId,message:'ليس لديك صلاحية مشاركة الموقع في هذه الغرفة'} }));
+            }
+          }
         }
 
         if (type === 'typing') {
           const { roomId, isTyping } = payload || {};
           if (roomId && ws.userId) {
-            broadcastToRoom(roomId, {
-              type: 'user_typing',
-              payload: {
-                roomId,
-                userId: ws.userId,
-                userName: ws.userName || 'مستخدم',
-                isTyping: !!isTyping,
-              },
-            }, ws);
+            const access = verifyConversationAccess(ws.userId, roomId);
+            if (!access.allowed) {
+              ws.send(JSON.stringify({ type:'typing_error', payload:{roomId,message:'ليس لديك صلاحية الوصول لهذه الغرفة'} }));
+            } else {
+              broadcastToRoom(roomId, {
+                type: 'user_typing',
+                payload: {
+                  roomId,
+                  userId: ws.userId,
+                  userName: ws.userName || 'مستخدم',
+                  isTyping: !!isTyping,
+                },
+              }, ws);
+            }
           }
         }
       } catch (err) {
@@ -278,6 +302,7 @@ export const chatRouter = express.Router();
 chatRouter.get('/users', (req, res) => {
   try {
     const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
     const users = db.prepare(`
       SELECT id, display_name as name, email, avatar, phone
       FROM users
@@ -850,6 +875,12 @@ chatRouter.post('/rooms/:roomId/messages', (req, res) => {
     if (!access.allowed && !access.isPublic) {
       return res.status(403).json({ error: 'ليس لديك صلاحية الإرسال في هذه الغرفة' });
     }
+    if (access.allowed && !chatPermissionAllowed(user.id, roomId, 'sendMessages')) {
+      return res.status(403).json({ error: 'إرسال الرسائل غير مسموح به في هذه الغرفة' });
+    }
+    if (access.allowed && type !== 'text' && !chatPermissionAllowed(user.id, roomId, 'sendMedia')) {
+      return res.status(403).json({ error: 'إرسال الوسائط غير مسموح به في هذه الغرفة' });
+    }
 
     // Auto-join public room if not already a member
     if (access.isPublic) {
@@ -1127,6 +1158,9 @@ chatRouter.post('/saved-messages/:messageId', (req, res) => {
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
 
     const { messageId } = req.params;
+    const message = db.prepare('SELECT conversation_id FROM messages WHERE id = ? AND is_deleted = 0').get(messageId) as any;
+    if (!message) return res.status(404).json({ error: 'الرسالة غير موجودة' });
+    if (!verifyConversationAccess(user.id, message.conversation_id).allowed) return res.status(403).json({ error: 'ليس لديك صلاحية الوصول إلى هذه الرسالة' });
     const now = new Date().toISOString();
 
     db.prepare(`
@@ -1146,6 +1180,8 @@ chatRouter.delete('/saved-messages/:messageId', (req, res) => {
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
 
     const { messageId } = req.params;
+    const message = db.prepare('SELECT conversation_id FROM messages WHERE id = ?').get(messageId) as any;
+    if (message && !verifyConversationAccess(user.id, message.conversation_id).allowed) return res.status(403).json({ error: 'ليس لديك صلاحية الوصول إلى هذه الرسالة' });
     db.prepare('DELETE FROM saved_messages WHERE user_id = ? AND message_id = ?').run(user.id, messageId);
 
     res.json({ ok: true, messageId, saved: false });
@@ -1162,9 +1198,10 @@ chatRouter.post('/rooms/:roomId/members', (req, res) => {
 
     const { roomId } = req.params;
     const { userId: targetUserId, role = 'member' } = req.body;
+    if (!targetUserId || !['owner','admin','moderator','member'].includes(role)) return res.status(400).json({ error: 'بيانات العضو أو الدور غير صالحة' });
 
     const access = verifyConversationAccess(user.id, roomId);
-    if (!access.allowed || (access.role !== 'owner' && access.role !== 'admin' && access.role !== 'moderator')) {
+    if (!access.allowed || !chatPermissionAllowed(user.id, roomId, 'addMembers') || (access.role !== 'owner' && access.role !== 'admin' && access.role !== 'moderator')) {
       return res.status(403).json({ error: 'ليس لديك صلاحية إضافة أعضاء' });
     }
 
@@ -1237,6 +1274,7 @@ chatRouter.put('/rooms/:roomId/members/:targetUserId/role', (req, res) => {
 
     const { roomId, targetUserId } = req.params;
     const { role } = req.body;
+    if (!['owner','admin','moderator','member'].includes(role)) return res.status(400).json({ error: 'دور غير صالح' });
 
     const access = verifyConversationAccess(user.id, roomId);
     if (!access.allowed || access.role !== 'owner') {
@@ -1297,6 +1335,24 @@ chatRouter.get('/search', (req, res) => {
   }
 });
 
+function getConversationPermissions(roomId:string, role?:string): Record<string, boolean> {
+  try {
+    const row = db.prepare('SELECT permissions_json, admin_permissions_json, moderator_permissions_json FROM conversations WHERE id=?').get(roomId) as any;
+    const parse = (value:any) => { try { return value ? JSON.parse(value) : {}; } catch { return {}; } };
+    const base = parse(row?.permissions_json);
+    if (role === 'owner') return { ...base, sendMessages:true, sendMedia:true, addMembers:true, pinMessages:true, editRoom:true, deleteMessages:true, startCalls:true, mentionEveryone:true };
+    if (role === 'admin') return { ...base, ...parse(row?.admin_permissions_json) };
+    if (role === 'moderator') return { ...base, ...parse(row?.moderator_permissions_json) };
+    return base;
+  } catch { return {}; }
+}
+
+function chatPermissionAllowed(userId:string, roomId:string, permission:string): boolean {
+  const access = verifyConversationAccess(userId, roomId);
+  if (!access.allowed) return false;
+  return getConversationPermissions(roomId, access.role)[permission] !== false;
+}
+
 function chatRoleAllowed(userId:string, roomId:string, roles:string[]=['owner','admin','moderator','member']) {
   const access=verifyConversationAccess(userId,roomId);
   return access.allowed && !!access.role && roles.includes(access.role);
@@ -1309,6 +1365,7 @@ chatRouter.post('/rooms/:roomId/voice/join',(req,res)=>{
   const access=verifyConversationAccess(user.id,roomId);
   if (!access.allowed) return res.status(403).json({error:'ليس لديك صلاحية دخول الغرفة'});
   const requestedRole=['host','guest','listener'].includes(req.body?.role)?req.body.role:'guest';
+  if (!chatPermissionAllowed(user.id, roomId, 'startCalls')) return res.status(403).json({error:'الاتصال الصوتي غير مسموح به في هذه الغرفة'});
   const role=(access.role==='owner'||access.role==='admin') ? 'host' : requestedRole;
   const conv=db.prepare('SELECT voiceRoomActive, voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
   const participants=JSON.parse(conv?.voiceParticipants||'[]');
@@ -1333,7 +1390,7 @@ chatRouter.post('/rooms/:roomId/voice/leave',(req,res)=>{
 chatRouter.post('/rooms/:roomId/voice/mute',(req,res)=>{
  try{
   const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
-  const {roomId}=req.params; const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
+  const {roomId}=req.params; const access=verifyConversationAccess(user.id,roomId); if(!access.allowed || !chatPermissionAllowed(user.id,roomId,'startCalls'))return res.status(403).json({error:'ليس لديك صلاحية استخدام الصوت في هذه الغرفة'}); const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
   const participants=JSON.parse(conv?.voiceParticipants||'[]'); const p=participants.find((x:any)=>x.userId===user.id);
   if(!p)return res.status(404).json({error:'أنت لست داخل الغرفة الصوتية'});
   p.muted=!!req.body?.muted; db.prepare('UPDATE conversations SET voiceParticipants=? WHERE id=?').run(JSON.stringify(participants),roomId);
@@ -1357,7 +1414,7 @@ chatRouter.get('/uploads/:file',(req,res)=>{const file=path.basename(req.params.
 chatRouter.post('/rooms/:roomId/messages/:messageId/vote',(req,res)=>{
  try{
   const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
-  const {roomId,messageId}=req.params;const msg=db.prepare('SELECT extra_json FROM messages WHERE id=? AND conversation_id=?').get(messageId,roomId) as any;if(!msg)return res.status(404).json({error:'الرسالة غير موجودة'});
+  const {roomId,messageId}=req.params;const access=verifyConversationAccess(user.id,roomId);if(!access.allowed)return res.status(403).json({error:'ليس لديك صلاحية التصويت في هذه الغرفة'});if(!chatPermissionAllowed(user.id,roomId,'sendMessages'))return res.status(403).json({error:'التصويت غير مسموح به في هذه الغرفة'});const msg=db.prepare('SELECT extra_json FROM messages WHERE id=? AND conversation_id=?').get(messageId,roomId) as any;if(!msg)return res.status(404).json({error:'الرسالة غير موجودة'});
   const extra=JSON.parse(msg.extra_json||'{}');const poll=extra.poll;if(!poll)return res.status(400).json({error:'ليست رسالة استطلاع'});
   const option=Number(req.body?.option);if(!Number.isInteger(option)||option<0||option>=poll.options.length)return res.status(400).json({error:'خيار غير صالح'});
   poll.votes=poll.votes||{};for(const k of Object.keys(poll.votes))poll.votes[k]=(poll.votes[k]||[]).filter((id:string)=>id!==user.id);
