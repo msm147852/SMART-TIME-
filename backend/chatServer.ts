@@ -859,7 +859,7 @@ chatRouter.get('/rooms/:roomId/messages', (req, res) => {
 });
 
 // 10. POST /api/chat/rooms/:roomId/messages - Send real message
-chatRouter.post('/rooms/:roomId/messages', (req, res) => {
+chatRouter.post('/rooms/:roomId/messages', async (req, res) => {
   try {
     const user = getAuthUser(req);
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول لإرسال رسالة' });
