@@ -1252,6 +1252,26 @@ chatRouter.post('/rooms/:roomId/members', (req, res) => {
   }
 });
 
+chatRouter.post('/rooms/:roomId/members/:targetUserId/ban', (req, res) => {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+    const { roomId, targetUserId } = req.params;
+    const access = verifyConversationAccess(user.id, roomId);
+    if (!access.allowed || access.role !== 'owner') {
+      return res.status(403).json({ error: 'فقط مالك الغرفة يمكنه حظر الأعضاء' });
+    }
+    const target = db.prepare('SELECT role FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(roomId, targetUserId) as any;
+    if (!target) return res.status(404).json({ error: 'العضو غير موجود في الغرفة' });
+    if (target.role === 'owner') return res.status(400).json({ error: 'لا يمكن حظر مالك الغرفة' });
+    db.prepare('UPDATE conversation_members SET banned = 1 WHERE conversation_id = ? AND user_id = ?').run(roomId, targetUserId);
+    broadcastToRoom(roomId, { type: 'member_banned', payload: { roomId, userId: targetUserId } });
+    res.json({ ok: true, message: 'تم حظر العضو من الغرفة' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 chatRouter.delete('/rooms/:roomId/members/:targetUserId', (req, res) => {
   try {
     const user = getAuthUser(req);
