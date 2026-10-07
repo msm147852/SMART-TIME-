@@ -1,4 +1,3 @@
-// @ts-nocheck
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'node:http';
