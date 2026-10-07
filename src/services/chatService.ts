@@ -315,6 +315,12 @@ class ChatService {
     });
   }
 
+  async banMember(roomId: string, userId: string): Promise<void> {
+    await this.request(`/api/chat/rooms/${roomId}/members/${userId}/ban`, {
+      method: 'POST',
+    });
+  }
+
   async updateMemberRole(roomId: string, userId: string, role: string): Promise<void> {
     await this.request(`/api/chat/rooms/${roomId}/members/${userId}/role`, {
       method: 'PUT',
