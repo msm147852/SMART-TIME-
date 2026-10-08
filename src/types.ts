@@ -689,6 +689,9 @@ export interface ChatRoom {
   inviteLink?: string;
   pinned?: boolean;
   currentUserRole?: string;
+  isArchived?: boolean;
+  autoDeleteDuration?: number;
+  maxParticipants?: number;
   createdAt?: string;
   updatedAt?: string;
 }
