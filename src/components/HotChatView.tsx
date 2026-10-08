@@ -1238,11 +1238,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           ) : (
             filteredRooms.map((room) => {
               const isSelected = room.id === activeRoomId;
-              const isVoiceRoom = room.type === 'voice' || room.isVoice === true;
+              const isLiveRoom = room.type === 'voice' || room.type === 'video' || room.isVoice === true || room.isVideo === true;
               const roomMembers = Array.isArray(room.members) ? room.members : [];
               const listenerCount = room.membersCount ?? roomMembers.length ?? 0;
 
-              if (isVoiceRoom) {
+              if (isLiveRoom) {
                 return (
                   <button
                     key={room.id}
@@ -1250,6 +1250,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                     onClick={() => {
                       setActiveRoomId(room.id);
                       setMobileShowChat(true);
+                      if (room.type === 'voice' || room.isVoice) {
+                        setShowVoiceRoomModal(true);
+                      } else if (room.type === 'video' || room.isVideo) {
+                        setActiveCall('video');
+                      }
                     }}
                     className="w-full text-start bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm mb-2.5 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                   >
