@@ -188,6 +188,7 @@ class ChatService {
     backgroundUrl?: string;
     settings?: any;
     permissions?: any;
+    maxParticipants?: number;
   }): Promise<{ roomId: string; isExisting?: boolean }> {
     const data = await this.request('/api/chat/rooms', {
       method: 'POST',
@@ -422,6 +423,7 @@ class ChatService {
     const data=await this.request(`/api/chat/rooms/${targetRoomId}/messages`,{method:'POST',body:JSON.stringify({text: message.text||message.body||'',body:message.text||message.body||'',type:message.type||'text',mediaUrl:message.mediaUrl,forwarded:true,originalMessageId:message.id,originalSender:message.senderName})});
     return data.message;
   }
+  async getVoiceToken(roomId: string): Promise<any> { return this.request(`/api/chat/rooms/${roomId}/voice/token`); }
   async getLiveKitToken(roomId: string): Promise<{token:string;url:string}> { return this.request(`/api/chat/rooms/${roomId}/voice/token`); }
 
   async toggleReaction(roomId: string, messageId: string, reaction: string): Promise<{ active: boolean; reactions: Record<string, number> }> {
