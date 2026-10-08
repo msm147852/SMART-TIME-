@@ -249,6 +249,8 @@ try { db.exec('ALTER TABLE conversations ADD COLUMN last_message TEXT'); } catch
 try { db.exec('ALTER TABLE conversations ADD COLUMN last_message_time TEXT'); } catch {}
 try { db.exec("ALTER TABLE conversations ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"); } catch {}
 
+// Safe migrations for session role isolation
+try { db.exec("ALTER TABLE sessions ADD COLUMN session_role TEXT NOT NULL DEFAULT 'user'"); } catch {}
 // Safe migrations for conversation_members
 try { db.exec("ALTER TABLE conversation_members ADD COLUMN role TEXT NOT NULL DEFAULT 'member'"); } catch {}
 try { db.exec("ALTER TABLE conversation_members ADD COLUMN joined_at TEXT NOT NULL DEFAULT ''"); } catch {}
