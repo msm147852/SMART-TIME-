@@ -350,6 +350,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     }).catch(() => {});
   }, []);
 
+  useEffect(() => { void loadRooms(); }, [activeTab]);
+
   // Load Messages for Active Room
   const loadMessagesForRoom = async (roomId: string) => {
     if (!roomId) return;
@@ -1272,7 +1274,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'private' | 'group' | 'rooms' | 'archived');
-                  void loadRooms();}
+}
                 className={`flex-1 ${
                   activeTab === tab.id
                     ? 'bg-white dark:bg-slate-700 shadow-sm rounded-full px-4 py-1.5 text-sm font-medium text-slate-900 dark:text-white'
