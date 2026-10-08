@@ -490,7 +490,13 @@ chatRouter.get('/rooms', (req, res) => {
         id: r.id,
         title: title || r.name || 'محادثة',
         name: title || r.name || 'محادثة',
-        description: r.description || '',        type: r.type || 'group',
+        description: r.description || '',
+        type: r.room_type || r.type || 'group',
+        roomType: r.room_type || r.type || 'group',
+        topic: r.topic || '',
+        isVoice: !!r.is_voice || r.type === 'voice',
+        isVideo: !!r.is_video || r.type === 'video',
+        isLive: !!r.is_live || !!r.voiceRoomActive || r.type === 'voice' || r.type === 'video',
         avatar: avatar || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=120&auto=format&fit=crop&q=80',
         creatorId: r.creator_id,
         pinned: !!r.pinned,
@@ -525,6 +531,11 @@ chatRouter.post('/rooms', (req, res) => {
       title,
       description = '',
       type = 'group',
+      roomType = type,
+      topic = '',
+      isVoice = type === 'voice',
+      isVideo = type === 'video',
+      isLive = type === 'voice' || type === 'video',
       avatar,
       memberIds = [],
       background = '',
@@ -532,6 +543,16 @@ chatRouter.post('/rooms', (req, res) => {
       settings,
       permissions,
     } = req.body;
+
+    const allowedTypes = new Set(['direct', 'group', 'public', 'voice', 'video']);
+    const normalizedType = String(type || roomType || 'group').toLowerCase();
+    const normalizedRoomType = String(roomType || normalizedType).toLowerCase();
+    if (!allowedTypes.has(normalizedType) || !allowedTypes.has(normalizedRoomType)) {
+      return res.status(400).json({ error: 'نوع الغرفة غير صالح' });
+    }
+    const voiceFlag = Boolean(isVoice || normalizedType === 'voice' || normalizedRoomType === 'voice');
+    const videoFlag = Boolean(isVideo || normalizedType === 'video' || normalizedRoomType === 'video');
+    const liveFlag = Boolean(isLive || voiceFlag || videoFlag);
 
     const roomId = `room_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
@@ -575,15 +596,22 @@ chatRouter.post('/rooms', (req, res) => {
     });
 
     const defaultAvatar = avatar || (
-      type === 'direct'
+      normalizedType === 'direct'
         ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'
         : 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=120&auto=format&fit=crop&q=80'
     );
 
     db.prepare(`
-      INSERT INTO conversations (id, title, description, type, avatar, background, background_url, creator_id, pinned, settings_json, permissions_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
-    `).run(roomId, title || 'محادثة جديدة', description, type, defaultAvatar, background, backgroundUrl, user.id, defaultSettings, defaultPerms, now, now);
+      INSERT INTO conversations (
+        id, title, description, type, room_type, topic, is_voice, is_video, is_live,
+        avatar, background, background_url, creator_id, pinned, settings_json, permissions_json, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+    `).run(
+      roomId, title || 'محادثة جديدة', description, normalizedType, normalizedRoomType, topic,
+      voiceFlag ? 1 : 0, videoFlag ? 1 : 0, liveFlag ? 1 : 0,
+      defaultAvatar, background, backgroundUrl, user.id, defaultSettings, defaultPerms, now, now
+    );
 
     // Add creator as owner
     db.prepare(`
@@ -603,7 +631,17 @@ chatRouter.post('/rooms', (req, res) => {
     // Broadcast room created to members
     const newRoomPayload = {
       type: 'room_created',
-      payload: { roomId, type, creatorId: user.id, title: title || 'محادثة جديدة' },
+      payload: {
+        roomId,
+        type: normalizedType,
+        roomType: normalizedRoomType,
+        topic,
+        isVoice: voiceFlag,
+        isVideo: videoFlag,
+        isLive: liveFlag,
+        creatorId: user.id,
+        title: title || 'محادثة جديدة',
+      },
     };
     sendToUser(user.id, newRoomPayload);
     for (const mId of allMembers) {

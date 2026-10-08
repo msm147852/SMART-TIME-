@@ -225,7 +225,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   // Create room state
   const [newRoomTitle, setNewRoomTitle] = useState('');
   const [newRoomDescription, setNewRoomDescription] = useState('');
-  const [newRoomType, setNewRoomType] = useState<'group' | 'direct' | 'public'>('group');
+  const [newRoomType, setNewRoomType] = useState<'group' | 'direct' | 'public' | 'voice' | 'video'>('group');
   const [newRoomAvatar, setNewRoomAvatar] = useState(
     'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=120&auto=format&fit=crop&q=80'
   );
@@ -937,6 +937,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         title: newRoomTitle,
         description: newRoomDescription,
         type: newRoomType,
+        roomType: newRoomType,
+        topic: newRoomDescription,
+        isVoice: newRoomType === 'voice',
+        isVideo: newRoomType === 'video',
+        isLive: newRoomType === 'voice' || newRoomType === 'video',
         avatar: newRoomAvatar,
       });
 
@@ -945,6 +950,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       setNewRoomDescription('');
       await loadRooms();
       setActiveRoomId(res.roomId);
+      if (newRoomType === 'voice') {
+        setShowVoiceRoomModal(true);
+      } else if (newRoomType === 'video') {
+        setActiveCall('video');
+      }
     } catch (err: any) {
       alert(err.message || 'فشل إنشاء الغرفة');
     }
@@ -1001,7 +1011,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     if (activeTab === 'private') return r.type === 'direct';
     if (activeTab === 'group') return r.type === 'group' || r.type === 'public';
     if (activeTab === 'rooms') {
-      return r.type === 'group' || r.type === 'public' || (r as any).isVoice || (r as any).type === 'voice';
+      return r.type === 'voice' || r.type === 'video' || r.isVoice === true || r.isVideo === true;
     }
     return r.type === 'direct';
   });
@@ -1150,10 +1160,10 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 <button type="button" onClick={() => { setNewRoomType('group'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
                   مجموعة جديدة
                 </button>
-                <button type="button" onClick={() => { setNewRoomType('public'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
+                <button type="button" onClick={() => { setNewRoomType('voice'); setNewRoomTitle('غرفة صوتية جديدة'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
                   غرفة صوتية
                 </button>
-                <button type="button" onClick={() => { setNewRoomType('public'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
+                <button type="button" onClick={() => { setNewRoomType('video'); setNewRoomTitle('غرفة فيديو جديدة'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
                   غرفة فيديو
                 </button>
               </div>
@@ -1217,7 +1227,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           ) : (
             filteredRooms.map((room) => {
               const isSelected = room.id === activeRoomId;
-              const isVoiceRoom = activeTab === 'rooms' || Boolean((room as any).isVoice) || (room as any).type === 'voice';
+              const isVoiceRoom = room.type === 'voice' || room.isVoice === true;
               const roomMembers = Array.isArray(room.members) ? room.members : [];
               const listenerCount = room.membersCount ?? roomMembers.length ?? 0;
 
@@ -1236,7 +1246,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                         <span className="text-xs font-semibold text-red-600 dark:text-red-400">
-                          {isAr ? 'مباشر الآن' : 'Live now'}
+                          {room.type === 'video'
+                            ? (isAr ? 'فيديو مباشر' : 'Live video')
+                            : (isAr ? 'صوت مباشر' : 'Live voice')}
                         </span>
                       </div>
                       <span className="text-xs text-slate-500 dark:text-slate-400">

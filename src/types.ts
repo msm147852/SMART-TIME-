@@ -665,7 +665,12 @@ export interface ChatRoom {
   title?: string;
   name?: string;
   description?: string;
-  type: 'public' | 'direct' | 'group';
+  roomType?: 'direct' | 'group' | 'public' | 'voice' | 'video';
+  topic?: string;
+  isVoice?: boolean;
+  isVideo?: boolean;
+  isLive?: boolean;
+  type: 'public' | 'direct' | 'group' | 'voice' | 'video';
   avatar: string;
   creatorId?: string;
   lastMessage?: string;

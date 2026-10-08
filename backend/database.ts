@@ -232,6 +232,12 @@ try { db.exec('ALTER TABLE users ADD COLUMN trip_gift_claimed_at TEXT'); } catch
 try { db.exec('ALTER TABLE trip_gift_claims ADD COLUMN phone_hash TEXT'); } catch {}
 
 try { db.exec('ALTER TABLE conversations ADD COLUMN voiceRoomActive INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN room_type TEXT"); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN topic TEXT"); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN is_voice INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN is_video INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN is_live INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_conversations_type ON conversations(type, room_type)"); } catch {}
 try { db.exec("ALTER TABLE conversations ADD COLUMN voiceParticipants TEXT NOT NULL DEFAULT '[]'"); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS stories (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, body TEXT, media_url TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stories_user_expires ON stories(user_id, expires_at)'); } catch {}

@@ -176,7 +176,12 @@ class ChatService {
   async createRoom(params: {
     title: string;
     description?: string;
-    type?: 'direct' | 'group' | 'public';
+    type?: 'direct' | 'group' | 'public' | 'voice' | 'video';
+    roomType?: 'direct' | 'group' | 'public' | 'voice' | 'video';
+    topic?: string;
+    isVoice?: boolean;
+    isVideo?: boolean;
+    isLive?: boolean;
     avatar?: string;
     memberIds?: string[];
     background?: string;
