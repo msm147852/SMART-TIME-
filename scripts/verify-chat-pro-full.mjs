@@ -6,6 +6,7 @@ const files={
   server:read('backend/chatServer.ts'),
   db:read('backend/database.ts'),
   voice:read('src/components/VoiceRoomModal.tsx'),
+  livekit:read('src/components/LiveKitCallModal.tsx'),
   contacts:read('src/components/AddMemberModal.tsx'),
   settings:read('src/components/ChatSettingsModal.tsx'),
   hot:read('src/components/HotChatView.tsx'),
@@ -34,6 +35,13 @@ const checks=[
  ['saved-message authorization',files.server.includes("SELECT conversation_id FROM messages WHERE id = ? AND is_deleted = 0")],
  ['WS room authorization',files.server.includes("live_location_error") && files.server.includes("typing_error")],
 
+  ['archive P2',files.db.includes('archived_rooms') && files.server.includes("chatRouter.put('/rooms/:roomId/archive'") && files.hot.includes('handleArchiveRoom')],
+ ['block P2',files.db.includes('blocked_users') && files.server.includes("chatRouter.post('/users/:id/block'") && files.server.includes("chatRouter.post('/users/:id/unblock'") && files.hot.includes('handleBlockActiveUser')],
+ ['forward P2',files.db.includes('original_message_id') && files.server.includes('forwarded') && files.service.includes('forwardMessage') && files.hot.includes('selectedForwardRooms')],
+ ['reactions P2',files.db.includes('message_reactions') && files.server.includes('message_reactions_updated') && files.hot.includes("['❤️','😂','😮','😢','🙏']")],
+ ['auto-delete P2',files.db.includes('auto_delete_duration') && files.server.includes("chatRouter.put('/rooms/:roomId/auto-delete'") && files.server.includes('purgeExpiredChatMessages') && files.settings.includes('autoDeleteDuration')],
+ ['notification/wallpaper P2',files.db.includes('room_settings') && files.server.includes("chatRouter.put('/rooms/:roomId/settings'") && files.hot.includes('updateRoomSettings')],
+ ['oracle6 LiveKit',files.livekit.includes("room.connect") && files.livekit.includes('createTracks') && files.server.includes("voice/token") && files.hot.includes('LiveKitCallModal') && files.service.includes('getLiveKitToken')],
 ];
 for (const [name,ok] of checks) assert.ok(ok,name);
 console.log('CHAT_PRO_FULL_CONTRACT_PASS',checks.length);
