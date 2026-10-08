@@ -3,7 +3,7 @@ import http from "node:http";
 import path from "path";
 import dotenv from "dotenv";
 import crypto from "node:crypto";
-import { WebSocket } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { Buffer } from "node:buffer";
 import { db, seedDefaultChatRooms } from "./backend/database.js";
 import { getCache, setCache } from "./backend/cache.js";
@@ -2315,7 +2315,7 @@ async function startServer() {
       try {
         const targetUrl = new URL(requestUrl.replace(/^\/livekit/, ""), liveKitOrigin);
         const upstream = new WebSocket(targetUrl.toString());
-        const client = new WebSocket.Server({ noServer: true });
+        const client = new WebSocketServer({ noServer: true });
 
         const reject = () => {
           try { socket.destroy(); } catch {}
