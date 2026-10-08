@@ -1688,19 +1688,30 @@ chatRouter.post('/rooms/:roomId/messages/:messageId/reactions', (req, res) => {
   } catch (err:any) { res.status(500).json({ error: err.message }); }
 });
 
-chatRouter.get('/rooms/:roomId/messages/:messageId/reactions', (req, res) => {
-  try {
-    const user = getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
-    const { roomId, messageId } = req.params;
-    const access = verifyConversationAccess(user.id, roomId);
-    if (!access.allowed && !access.isPublic) return res.status(403).json({ error: 'ليس لديك صلاحية' });
-    const rows = db.prepare('SELECT reaction, COUNT(*) as count FROM message_reactions WHERE message_id = ? GROUP BY reaction').all(messageId) as any[];
-    const reactions = rows.reduce((acc:any,r:any)=>{acc[r.reaction]=Number(r.count);return acc;},{});
-    res.json({ reactions });
-  } catch (err:any) { res.status(500).json({ error: err.message }); }
+chatRouter.get('/rooms/:roomId/messages/:messageId/reactions',(req,res)=>{
+  try{
+    const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const {roomId,messageId}=req.params; const access=verifyConversationAccess(user.id,roomId); if(!access.allowed&&!access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const rows=db.prepare('SELECT mr.reaction, mr.user_id, COALESCE(u.display_name,u.email, mr.user_id) as name FROM message_reactions mr LEFT JOIN users u ON u.id=mr.user_id WHERE mr.message_id=?').all(messageId) as any[];
+    const reactions=rows.reduce((a:any,r:any)=>{a[r.reaction]=(a[r.reaction]||0)+1;return a;},{});
+    const users=rows.map((r:any)=>({userId:r.user_id,name:r.name,reaction:r.reaction}));
+    res.json({reactions,users});
+  }catch(e:any){res.status(500).json({error:e.message})}
 });
 
+chatRouter.delete('/rooms/:roomId/messages/:messageId/reactions',(req,res)=>{
+  try{
+    const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const {roomId,messageId}=req.params; const reaction=String(req.query.reaction||'').trim();
+    const access=verifyConversationAccess(user.id,roomId); if(!access.allowed&&!access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    if(!reaction)return res.status(400).json({error:'التفاعل مطلوب'});
+    db.prepare('DELETE FROM message_reactions WHERE message_id=? AND user_id=? AND reaction=?').run(messageId,user.id,reaction);
+    const rows=db.prepare('SELECT reaction, COUNT(*) as count FROM message_reactions WHERE message_id=? GROUP BY reaction').all(messageId) as any[];
+    const reactions=rows.reduce((a:any,r:any)=>{a[r.reaction]=Number(r.count);return a;},{});
+    broadcastToRoom(roomId,{type:'message_reactions_updated',payload:{roomId,messageId,reactions}});
+    res.json({ok:true,active:false,reaction,reactions});
+  }catch(e:any){res.status(500).json({error:e.message})}
+});
 chatRouter.get('/rooms/:roomId/voice/token',(req,res)=>{
   try{
     const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
