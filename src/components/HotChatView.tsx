@@ -1271,8 +1271,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'private' | 'group' | 'rooms' | 'archived');
-}
+                onClick={() => setActiveTab(tab.id as 'private' | 'group' | 'rooms' | 'archived')}
                 className={`flex-1 ${
                   activeTab === tab.id
                     ? 'bg-white dark:bg-slate-700 shadow-sm rounded-full px-4 py-1.5 text-sm font-medium text-slate-900 dark:text-white'
