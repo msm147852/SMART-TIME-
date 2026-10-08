@@ -167,8 +167,8 @@ class ChatService {
   // REST API Methods
 
   // 1. Get all rooms
-  async getRooms(): Promise<ChatRoom[]> {
-    const data = await this.request('/api/chat/rooms');
+  async getRooms(archived = false): Promise<ChatRoom[]> {
+    const data = await this.request(`/api/chat/rooms?archived=${archived ? 'true' : 'false'}`);
     return data.rooms || [];
   }
 
