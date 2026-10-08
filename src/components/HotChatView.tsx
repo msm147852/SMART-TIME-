@@ -411,6 +411,24 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     // New real-time message received
     const unsubMsg = chatService.on('new_message', ({ message, roomId }) => {
       if (!message || !roomId) return;
+      if (message.senderId !== currentUserId) {
+        try {
+          const raw = localStorage.getItem('smart_time_room_settings_' + roomId);
+          const settings = raw ? JSON.parse(raw) : null;
+          const muteUntil = settings?.custom_mute_until ? new Date(settings.custom_mute_until).getTime() : 0;
+          const muted = !!settings?.mute && (!muteUntil || muteUntil > Date.now());
+          if (!muted && typeof window !== 'undefined' && 'AudioContext' in window) {
+            const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+            const ctx = new Ctx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = 880; gain.gain.value = 0.025;
+            osc.connect(gain); gain.connect(ctx.destination); osc.start();
+            osc.stop(ctx.currentTime + 0.06);
+            void ctx.close?.();
+          }
+        } catch {}
+      }
 
       setMessagesMap((prev) => {
         const currentList = prev[roomId] || [];
@@ -2272,9 +2290,9 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         <>
           <LiveKitCallModal isOpen={showVoiceRoomModal || activeCall !== null} roomId={activeRoomId} roomTitle={activeRoom.title || activeRoom.name} mode={activeCall || 'voice'} language={language} onClose={() => { setShowVoiceRoomModal(false); setActiveCall(null); }} />
         </>
-      ) : (
+      ) : (showVoiceRoomModal || activeCall !== null) ? (
         <VoiceRoomView room={activeRoom} isVideo={activeCall === 'video'} language={language} onClose={() => { setShowVoiceRoomModal(false); setActiveCall(null); }} />
-      )}
+      ) : null}
 
       {showRoomInfoModal && (
         <div className="fixed inset-0 z-[140] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onMouseDown={()=>setShowRoomInfoModal(false)}>
@@ -2292,7 +2310,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               <div className="rounded-2xl border border-slate-700/50 p-3">
                 <div className="text-sm font-bold mb-2">{isAr?'الإشعارات والصوت':'Notifications & sound'}</div>
                 <div className="flex gap-2 flex-wrap">
-                  {[{mute:false,label:isAr?'تشغيل':'On'},{mute:true,label:isAr?'صامت':'Silent'}].map(o=><button key={String(o.mute)} type="button" onClick={()=>void chatService.updateRoomSettings(activeRoomId,{mute:o.mute,custom_sound:o.mute?'silent':'default',custom_mute_until:null})} className="rounded-xl bg-slate-800 px-3 py-2 text-xs">{o.label}</button>)}
+                  {[{mute:false,label:isAr?'تشغيل':'On'},{mute:true,label:isAr?'صامت':'Silent'}].map(o=><button key={String(o.mute)} type="button" onClick={async()=>{const until=o.mute?new Date(Date.now()+3600000).toISOString():null;await chatService.updateRoomSettings(activeRoomId,{mute:o.mute,custom_sound:o.mute?'silent':'default',custom_mute_until:until});try{localStorage.setItem('smart_time_room_settings_'+activeRoomId,JSON.stringify({mute:o.mute,custom_sound:o.mute?'silent':'default',custom_mute_until:until}));}catch{}}} className="rounded-xl bg-slate-800 px-3 py-2 text-xs">{o.label}</button>)}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-700/50 p-3">
