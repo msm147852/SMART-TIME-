@@ -406,6 +406,19 @@ class ChatService {
     return data.results || [];
   }
 
+  async toggleReaction(roomId: string, messageId: string, reaction: string): Promise<{ active: boolean; reactions: Record<string, number> }> {
+    const data = await this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ reaction }),
+    });
+    return { active: !!data.active, reactions: data.reactions || {} };
+  }
+
+  async getMessageReactions(roomId: string, messageId: string): Promise<Record<string, number>> {
+    const data = await this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/reactions`);
+    return data.reactions || {};
+  }
+
   async getStories(): Promise<Array<{
     id: string;
     userId: string;
