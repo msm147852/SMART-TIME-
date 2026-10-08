@@ -88,6 +88,7 @@ interface SettingsAndBackupModalProps {
   onLanguageChange: (lang: Language) => void;
   onThemeChange: (theme: ThemeMode) => void;
   onDataReset: () => void;
+  onLogout: () => void;
 }
 
 const AVATAR_PRESETS = [
@@ -129,6 +130,7 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   onLanguageChange,
   onThemeChange,
   onDataReset,
+  onLogout,
 }) => {
   const t = translations[language];
   const isAr = language === 'ar';
@@ -2139,6 +2141,18 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full py-2.5 rounded-xl border border-rose-500/30 text-rose-600 dark:text-rose-400 font-black text-xs hover:bg-rose-500/10 transition-all flex items-center justify-center gap-2"
+            id="smart-time-logout-btn"
+          >
+            <span>↪</span>
+            <span>{isAr ? 'تسجيل الخروج' : 'Log out'}</span>
+          </button>
         </div>
 
         {/* Footer Action: حفظ جميع التعديلات وربطها فوراً */}
