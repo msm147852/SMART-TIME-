@@ -125,9 +125,9 @@ function isBlockedBetween(userA: string, userB: string): boolean {
   const row = db.prepare('SELECT 1 FROM blocked_users WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1').get(userA, userB, userB, userA);
   return !!row;
 }
-function isTrialModeDenied(req: express.Request): boolean {
+function isTrialModeDenied(_req: express.Request): boolean {
   const trial = String(process.env.TRIAL_MODE || '').toLowerCase();
-  return ['1','true','yes','on'].includes(trial) && !getAuthUser(req);
+  return ['1','true','yes','on'].includes(trial);
 }
 function purgeExpiredChatMessages(): number {
   const rows = db.prepare('SELECT id FROM conversations WHERE auto_delete_duration > 0').all() as any[];
