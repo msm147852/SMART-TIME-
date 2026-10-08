@@ -38,7 +38,7 @@ const checks=[
   ['archive P2',files.db.includes('archived_rooms') && files.server.includes("chatRouter.put('/rooms/:roomId/archive'") && files.hot.includes('handleArchiveRoom')],
  ['block P2',files.db.includes('blocked_users') && files.server.includes("chatRouter.post('/users/:id/block'") && files.server.includes("chatRouter.post('/users/:id/unblock'") && files.hot.includes('handleBlockActiveUser')],
  ['forward P2',files.db.includes('original_message_id') && files.server.includes('forwarded') && files.service.includes('forwardMessage') && files.hot.includes('selectedForwardRooms')],
- ['reactions P2',files.db.includes('message_reactions') && files.server.includes('message_reactions_updated') && files.hot.includes("['❤️','😂','😮','😢','🙏']")],
+ ['reactions P2',files.db.includes('message_reactions') && files.server.includes('message_reactions_updated') && files.hot.includes('handleToggleReaction') && files.hot.includes('❤️') && files.hot.includes('🙏')],
  ['auto-delete P2',files.db.includes('auto_delete_duration') && files.server.includes("chatRouter.put('/rooms/:roomId/auto-delete'") && files.server.includes('purgeExpiredChatMessages') && files.settings.includes('autoDeleteDuration')],
  ['notification/wallpaper P2',files.db.includes('room_settings') && files.server.includes("chatRouter.put('/rooms/:roomId/settings'") && files.hot.includes('updateRoomSettings')],
  ['oracle6 LiveKit',files.livekit.includes("room.connect") && files.livekit.includes('createTracks') && files.server.includes("voice/token") && files.hot.includes('LiveKitCallModal') && files.service.includes('getLiveKitToken')],
