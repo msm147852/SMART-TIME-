@@ -1,0 +1,14 @@
+# Oracle 6 LiveKit configuration template
+# Copy to /opt/livekit/config.yaml on Oracle 6.
+# NEVER commit real API keys/secrets.
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 7882
+  port_range_end: 7892
+  use_external_ip: true
+
+keys:
+  REPLACE_WITH_LIVEKIT_API_KEY: REPLACE_WITH_LIVEKIT_API_SECRET
