@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound, Phone, ArrowDown, ArrowRight, LogIn, AtSign } from 'lucide-react';
 import { loginWithIdentifier, loginWithPhone, requestPhoneLoginOtp, registerWithEmail, verifyRegistrationPhone, requestTripsPhoneOtp, verifyTripsPhone, requestPasswordReset, resetPassword } from '../services/authService';
 import approvedLoginVisual from '../assets/images/login-screen-approved.png';
+import { renderTurnstile, resetTurnstile } from '../services/turnstileService';
 
 interface Props {
   onAuthenticated: () => void;
@@ -30,22 +31,72 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const [resetSent, setResetSent] = useState(false);
   const [tripPhoneSent, setTripPhoneSent] = useState(false);
   const [registerSmsFailed, setRegisterSmsFailed] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileError, setTurnstileError] = useState('');
   const page2Ref = useRef<HTMLElement | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<string | number | null>(null);
+
+  const resetAuthChallenge = () => {
+    resetTurnstile(turnstileWidgetIdRef.current);
+    setTurnstileToken('');
+  };
+
+  useEffect(() => {
+    let active = true;
+    const mount = async () => {
+      try {
+        if (!turnstileContainerRef.current) return;
+        const widgetId = await renderTurnstile(
+          turnstileContainerRef.current,
+          (token) => {
+            if (!active) return;
+            setTurnstileToken(token);
+            setTurnstileError('');
+          },
+          () => {
+            if (!active) return;
+            setTurnstileToken('');
+            setTurnstileError('تعذر إكمال التحقق الأمني. أعد المحاولة.');
+          },
+        );
+        if (active) {
+          turnstileWidgetIdRef.current = widgetId;
+        } else {
+          resetTurnstile(widgetId);
+        }
+      } catch (error: any) {
+        if (active) setTurnstileError(error?.message || 'تعذر تحميل التحقق الأمني.');
+      }
+    };
+    mount();
+    return () => {
+      active = false;
+      resetAuthChallenge();
+    };
+  }, []);
+
+  const requireTurnstileToken = () => {
+    const token = turnstileToken.trim();
+    if (!token) throw new Error(turnstileError || 'أكمل التحقق الأمني أولًا.');
+    return token;
+  };
 
   const goToLogin = () => page2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const clearError = () => setError('');
-  const switchMode = (next: Mode) => { setMode(next); clearError(); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterPhoneSent(false); };
+  const switchMode = (next: Mode) => { setMode(next); clearError(); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterPhoneSent(false); resetAuthChallenge(); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setBusy(true);
     try {
       if (mode === 'trip-phone') {
+        const challenge = requireTurnstileToken();
         if (!phone.trim()) throw new Error('أدخل رقم هاتفك لتفعيل الرحلات.');
         if (!tripPhoneSent) {
-          const d:any = await requestTripsPhoneOtp(phone.trim()); setTripPhoneSent(true);
+          const d:any = await requestTripsPhoneOtp(phone.trim(), challenge); setTripPhoneSent(true);
           setError(d.devCode ? `رمز التحقق في وضع التطوير: ${d.devCode}` : 'تم إرسال رمز التحقق إلى هاتفك.'); setBusy(false); return;
         }
-        const result:any = await verifyTripsPhone(phone.trim(), code.trim());
+        const result:any = await verifyTripsPhone(phone.trim(), code.trim(), challenge);
         setError(result?.giftEligible === false ? 'تم توثيق الهاتف، لكن هدية الرحلات سبق استخدامها بهذا الرقم.' : 'تم توثيق الهاتف 🎁 وحصلت على 3 أبحاث مجانية.');
         onAuthenticated(); return;
       }
@@ -56,27 +107,31 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         // immediately with no OTP step — full app access right away. Filling it in still runs
         // the normal SMS/WhatsApp verification flow below.
         if (!registerPhoneSent) {
-          const result:any = await registerWithEmail(name.trim(), username.trim(), email.trim(), password, phone.trim());
+          const challenge = requireTurnstileToken();
+          const result:any = await registerWithEmail(name.trim(), username.trim(), email.trim(), password, phone.trim(), challenge);
           if (!result?.requiresPhoneVerification) { onAuthenticated(); return; }
           setRegisterPhoneSent(true);
           // The account + email are already saved server-side at this point regardless of SMS outcome.
           setRegisterSmsFailed(!result?.smsSent && !result?.devCode);
           setError(result?.devCode ? `رمز SMS في وضع التطوير: ${result.devCode}` : result?.smsWarning ? result.smsWarning : 'تم إرسال رمز التحقق إلى هاتفك. أدخل الكود لإكمال التسجيل.'); setBusy(false); return;
         }
-        const result:any = await verifyRegistrationPhone(phone.trim(), code.trim());
+        const challenge = requireTurnstileToken();
+        const result:any = await verifyRegistrationPhone(phone.trim(), code.trim(), challenge);
         setError(result?.giftEligible === false ? 'تم تأكيد الهاتف، لكن الهدية سبق استخدامها بهذا الرقم.' : 'تم تأكيد الهاتف 🎁 وحصلت على 3 أبحاث مجانية هدية ترحيبية.');
         onAuthenticated(); return;
       }
       if (mode === 'phone') {
+        const challenge = requireTurnstileToken();
         if (!phoneSent) {
-          const d:any = await requestPhoneLoginOtp(phone.trim()); setPhoneSent(true);
+          const d:any = await requestPhoneLoginOtp(phone.trim(), challenge); setPhoneSent(true);
           setError(d.devCode ? `رمز SMS في وضع التطوير: ${d.devCode}` : 'تم إرسال رمز SMS إلى هاتفك.'); setBusy(false); return;
         }
-        await loginWithPhone(phone.trim(), code.trim()); onAuthenticated(); return;
+        await loginWithPhone(phone.trim(), code.trim(), challenge); onAuthenticated(); return;
       }
       if (mode === 'forgot') {
+        const challenge = requireTurnstileToken();
         if (!resetSent) {
-          const d:any = await requestPasswordReset(email.trim());
+          const d:any = await requestPasswordReset(email.trim(), challenge);
           if (d.emailSent !== true) throw new Error('لم يتم إرسال رسالة إلى البريد. تأكد من إعداد خدمة البريد على السيرفر ثم حاول مرة أخرى.');
           setResetSent(true); setCode('');
           // Only claim a real email was delivered when a real provider sent it. In dev mode
@@ -85,17 +140,18 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
           setError(d.provider === 'development' ? `وضع التطوير: لا يوجد مزود بريد مُفعّل على السيرفر. رمز إعادة التعيين هو: ${d.devCode}` : 'تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني. افحص الوارد والرسائل غير المرغوب فيها.');
           setBusy(false); return;
         }
-        await resetPassword(email.trim(), code.trim(), password); setMode('login'); setCode(''); setPassword(''); setResetSent(false); setError('تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'); setBusy(false); return;
+        await resetPassword(email.trim(), code.trim(), password, challenge); setMode('login'); setCode(''); setPassword(''); setResetSent(false); setError('تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'); setBusy(false); return;
       }
       const identifier = loginMethod === 'email' ? email.trim() : loginMethod === 'username' ? username.trim() : phone.trim();
       if (!identifier) throw new Error(loginMethod === 'email' ? 'أدخل بريدك الإلكتروني.' : loginMethod === 'username' ? 'أدخل اسم المستخدم.' : 'أدخل رقم هاتفك.');
       if (loginMethod === 'phone') { switchMode('phone'); setPhone(identifier); setBusy(false); return; }
-      await loginWithIdentifier(identifier, password); onAuthenticated();
+      const challenge = requireTurnstileToken();
+      await loginWithIdentifier(identifier, password, challenge); onAuthenticated();
     } catch (err:any) { setError(err.message || 'تعذر تنفيذ العملية.'); }
-    finally { setBusy(false); }
+    finally { setBusy(false); resetAuthChallenge(); }
   };
 
-  const resetToLogin = () => { setMode('login'); setError(''); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterPhoneSent(false); };
+  const resetToLogin = () => { setMode('login'); setError(''); setCode(''); setPhoneSent(false); setResetSent(false); setTripPhoneSent(false); setRegisterPhoneSent(false); resetAuthChallenge(); };
 
   return (
     <div className="h-screen overflow-y-auto snap-y snap-mandatory bg-white text-slate-950" dir="rtl">
@@ -145,6 +201,11 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
               {mode !== 'phone' && mode !== 'trip-phone' && <label className="block"><span className="text-xs font-bold text-slate-700">{mode === 'forgot' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</span><div className="relative mt-1"><LockKeyhole className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required={mode !== 'forgot' || resetSent} minLength={8} type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} className="w-full pr-10 pl-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="8 أحرف على الأقل" /><button type="button" onClick={()=>setShow(!show)} className="absolute left-3 top-3 text-slate-500">{show?<EyeOff className="w-5"/>:<Eye className="w-5"/>}</button></div></label>}
               {mode === 'forgot' && resetSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز إعادة التعيين المرسل بالبريد</span><input required value={code} onChange={e=>setCode(e.target.value)} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.3em]" placeholder="أدخل الرمز" /></label>}
 
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div ref={turnstileContainerRef} className="min-h-[65px] flex items-center justify-center" />
+                <p className="mt-1 text-center text-[10px] font-bold text-slate-500">تحقق أمني مجاني لحماية حسابك من محاولات الدخول الآلية.</p>
+              </div>
+              {turnstileError && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">{turnstileError}</div>}
               {error && <div className={`rounded-xl p-3 text-xs font-bold ${error.includes('تم ') ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'}`}>{error}</div>}
               <button disabled={busy} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black shadow-lg hover:bg-slate-800 transition disabled:opacity-50">{busy?'جارٍ التحقق…':mode==='register'?(registerPhoneSent?'تأكيد الهاتف وإنهاء التسجيل':'إرسال رمز التحقق وإنشاء الحساب'):mode==='trip-phone'?(tripPhoneSent?'تأكيد رقم الهاتف والحصول على الهدية':'إرسال رمز التحقق'):mode==='phone'?(phoneSent?'تأكيد رمز SMS والدخول':'إرسال رمز SMS'):mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'): 'دخول'}</button>
 
