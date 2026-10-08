@@ -32,9 +32,21 @@ export async function sendPasswordResetEmail(email: string, code: string, ttlMin
     const pass = required("SMTP_PASS");
     const secure = String(process.env.SMTP_SECURE || (port === 465 ? "true" : "false")).toLowerCase() === "true";
     const createTransport = nodemailer.default?.createTransport ?? nodemailer.createTransport;
+    console.info("Password reset SMTP attempt", { host, port, secure });
     const transporter = createTransport({ host, port, secure, auth: { user, pass } });
-    const info = await transporter.sendMail({ from, to: email, subject, text });
-    return { provider: "smtp", messageId: typeof info?.messageId === "string" ? info.messageId : undefined };
+    try {
+      const info = await transporter.sendMail({ from, to: email, subject, text });
+      console.info("Password reset SMTP sent", { messageId: typeof info?.messageId === "string" ? info.messageId : undefined });
+      return { provider: "smtp", messageId: typeof info?.messageId === "string" ? info.messageId : undefined };
+    } catch (error: any) {
+      console.error("Password reset SMTP failed", {
+        code: error?.code,
+        responseCode: error?.responseCode,
+        command: error?.command,
+        message: typeof error?.message === "string" ? error.message.replace(/(pass(word)?|auth|authorization|token|secret)[^,;\\n]*/gi, "$1=[REDACTED]") : undefined,
+      });
+      throw error;
+    }
   }
 
   if (String(process.env.ALLOW_DEV_EMAIL_CODE || "").toLowerCase() === "true") {
