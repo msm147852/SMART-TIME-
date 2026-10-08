@@ -69,7 +69,7 @@ export async function startTrialSession(): Promise<AuthSession> {
   return session;
 }
 
-export async function loginWithIdentifier(identifier: string, password: string, turnstileToken?: string, role?: 'admin' | 'user'): Promise<AuthSession | { requiresRoleChoice: true; availableRoles: string[] }> {
+export async function loginWithIdentifier(identifier: string, password: string, turnstileToken?: string, role?: 'admin' | 'user'): Promise<AuthSession | { requiresRoleChoice: true; availableRoles: string[]; roleChoiceTicket: string }> {
   const data = await request('/api/auth/login', { identifier, password, role: role || '', turnstileToken: turnstileToken || '' });
   if (data.requiresRoleChoice) return data;
   const session: AuthSession = { token: data.token, user: data.user };
