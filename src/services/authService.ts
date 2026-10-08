@@ -68,31 +68,31 @@ export async function startTrialSession(): Promise<AuthSession> {
   return session;
 }
 
-export async function loginWithIdentifier(identifier: string, password: string): Promise<AuthSession> {
-  const data = await request('/api/auth/login', { identifier, password });
+export async function loginWithIdentifier(identifier: string, password: string, turnstileToken?: string): Promise<AuthSession> {
+  const data = await request('/api/auth/login', { identifier, password, turnstileToken: turnstileToken || '' });
   const session: AuthSession = { token: data.token, user: data.user };
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
 
-export async function requestPhoneLoginOtp(phone: string) { return request('/api/auth/phone-login/request-otp', { phone }); }
+export async function requestPhoneLoginOtp(phone: string, turnstileToken?: string) { return request('/api/auth/phone-login/request-otp', { phone, turnstileToken: turnstileToken || '' }); }
 
-export async function loginWithPhone(phone: string, code: string): Promise<AuthSession> {
-  const data = await request('/api/auth/phone-login', { phone, code });
+export async function loginWithPhone(phone: string, code: string, turnstileToken?: string): Promise<AuthSession> {
+  const data = await request('/api/auth/phone-login', { phone, code, turnstileToken: turnstileToken || '' });
   const session: AuthSession = { token: data.token, user: data.user };
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
-export async function requestPasswordReset(email: string) {
-  return request('/api/auth/forgot-password', { email });
+export async function requestPasswordReset(email: string, turnstileToken?: string) {
+  return request('/api/auth/forgot-password', { email, turnstileToken: turnstileToken || '' });
 }
 
-export async function resetPassword(email: string, code: string, newPassword: string) {
-  return request('/api/auth/reset-password', { email, code, newPassword });
+export async function resetPassword(email: string, code: string, newPassword: string, turnstileToken?: string) {
+  return request('/api/auth/reset-password', { email, code, newPassword, turnstileToken: turnstileToken || '' });
 }
 
-export async function registerWithEmail(name: string, username: string, email: string, password: string, phone: string): Promise<any> {
-  const data = await request('/api/auth/register', { name, username, email, password, phone, deviceId: getDeviceId() });
+export async function registerWithEmail(name: string, username: string, email: string, password: string, phone: string, turnstileToken?: string): Promise<any> {
+  const data = await request('/api/auth/register', { name, username, email, password, phone, deviceId: getDeviceId(), turnstileToken: turnstileToken || '' });
   if (!data.token) return data;
   const session: AuthSession = { token: data.token, user: data.user };
   saveSession(session); applyUserToProfile(session.user);
@@ -101,9 +101,9 @@ export async function registerWithEmail(name: string, username: string, email: s
   return { ...data, token: session.token, user: session.user };
 }
 
-export async function verifyRegistrationPhone(phone: string, code: string): Promise<any> { const data=await request('/api/auth/register/verify-phone',{phone,code,deviceId:getDeviceId()}); if(data?.user){ const current=getStoredSession(); if(current?.token){ saveSession({token:current.token,user:data.user}); applyUserToProfile(data.user); } } return data; }
-export async function requestTripsPhoneOtp(phone: string): Promise<any> { return request('/api/auth/trips/request-phone-otp',{phone}); }
-export async function verifyTripsPhone(phone: string, code: string): Promise<any> { const data=await request('/api/auth/trips/verify-phone',{phone,code,deviceId:getDeviceId()}); if(data?.user){ const current=getStoredSession(); if(current?.token){ saveSession({token:current.token,user:data.user}); applyUserToProfile(data.user); } } return data; }
+export async function verifyRegistrationPhone(phone: string, code: string, turnstileToken?: string): Promise<any> { const data=await request('/api/auth/register/verify-phone',{phone,code,deviceId:getDeviceId(),turnstileToken: turnstileToken || ''}); if(data?.user){ const current=getStoredSession(); if(current?.token){ saveSession({token:current.token,user:data.user}); applyUserToProfile(data.user); } } return data; }
+export async function requestTripsPhoneOtp(phone: string, turnstileToken?: string): Promise<any> { return request('/api/auth/trips/request-phone-otp',{phone,turnstileToken:turnstileToken || ''}); }
+export async function verifyTripsPhone(phone: string, code: string, turnstileToken?: string): Promise<any> { const data=await request('/api/auth/trips/verify-phone',{phone,code,deviceId:getDeviceId(),turnstileToken:turnstileToken || ''}); if(data?.user){ const current=getStoredSession(); if(current?.token){ saveSession({token:current.token,user:data.user}); applyUserToProfile(data.user); } } return data; }
 
 export async function restoreSession(): Promise<AuthSession | null> {
   const stored = getStoredSession();
