@@ -145,7 +145,7 @@ app.get("/api/ai/groq-health", groqHealthHandler);
 app.get("/api/ai/groq_health", groqHealthHandler);
 
 function base64Url(value: string | Buffer): string {
-  return Buffer.from(value).toString("base64").replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return Buffer.from(value).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function createLiveKitAccessToken(input: { apiKey: string; apiSecret: string; identity: string; room: string }) {
