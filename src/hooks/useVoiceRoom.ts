@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { VOICE_CONFIG } from '../config/voice';
 import { chatService } from '../services/chatService';
 import { getStoredSession } from '../services/authService';
@@ -23,12 +23,12 @@ export function useVoiceRoom(roomId: string) {
   const selfId = useRef(getStoredSession()?.user?.id || '');
   const joined = useRef(false);
 
-  const iceServers: RTCIceServer[] = [
+  const iceServers = useMemo<RTCIceServer[]>(() => [
     ...VOICE_CONFIG.stunServers,
     ...(VOICE_CONFIG.turnUrl
       ? [{ urls: VOICE_CONFIG.turnUrl, username: VOICE_CONFIG.turnUser || undefined, credential: VOICE_CONFIG.turnPass || undefined }]
       : []),
-  ];
+  ], []);
 
   const closePeer = useCallback((userId: string) => {
     peers.current[userId]?.close();
