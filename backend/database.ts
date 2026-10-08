@@ -326,6 +326,8 @@ try { db.exec(`CREATE INDEX IF NOT EXISTS idx_wallet_admin_actions_created ON wa
 
 
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at)`); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS message_reactions (message_id TEXT NOT NULL, user_id TEXT NOT NULL, reaction TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(message_id, user_id, reaction))`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id)'); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN archived_at TEXT'); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN auto_delete_duration INTEGER NOT NULL DEFAULT 0'); } catch {}
