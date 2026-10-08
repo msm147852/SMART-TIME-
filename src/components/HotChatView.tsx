@@ -83,7 +83,7 @@ import { ChatMembersSidebar } from './ChatMembersSidebar';
 import { ChatSettingsModal } from './ChatSettingsModal';
 import { SavedMessagesModal } from './SavedMessagesModal';
 import { AddMemberModal } from './AddMemberModal';
-import { VoiceRoomModal } from './VoiceRoomModal';
+import { LiveKitCallModal } from './LiveKitCallModal';
 import MediaPreviewModal from './chat/MediaPreviewModal';
 import { chatService } from '../services/chatService';
 import { getStoredSession } from '../services/authService';
@@ -2274,65 +2274,14 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* CALL MODAL */}
-      {/* ========================================================================= */}
-      {activeCall && (
-        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div
-            className={`w-full max-w-lg rounded-3xl overflow-hidden border border-sky-500/30 shadow-2xl ${
-              isDark ? 'bg-slate-900' : 'bg-white'
-            }`}
-          >
-            <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-              <div>                <div className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {activeCall === 'video'
-                    ? isAr
-                      ? 'مكالمة فيديو مشفرة'
-                      : 'Video Call'
-                    : isAr
-                    ? 'مكالمة صوتية مشفرة'
-                    : 'Voice Call'}
-                </div>
-                <div className="text-[10px] text-emerald-500 font-bold">
-                  {isAr ? 'اتصال آمن • جاري الاتصال بالطرف الآخر' : 'Secure call • Connecting'}
-                </div>
-              </div>
-              <button
-                onClick={() => setActiveCall(null)}
-                className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {activeCall === 'video' ? (
-              <div className="aspect-video bg-black relative flex items-center justify-center">
-                <Camera className="w-12 h-12 text-slate-500 animate-pulse" />                <div className="absolute bottom-3 start-3 px-2 py-1 rounded-lg bg-black/60 text-white text-[10px]">
-                  {isAr ? 'جاري تهيئة الفيديو...' : 'Initializing video...'}
-                </div>
-              </div>
-            ) : (
-              <div className="py-16 text-center">
-                <div className="w-20 h-20 mx-auto rounded-full bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-500 animate-pulse">                  <Phone className="w-9 h-9" />
-                </div>
-                <div className={`mt-4 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {activeRoom.title || activeRoom.name}
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  {isAr ? 'جاري بدء الاتصال الصوتي…' : 'Starting voice call…'}
-                </div>
-              </div>            )}
-            <div className="p-4 flex justify-center">
-              <button
-                onClick={() => setActiveCall(null)}
-                className="px-6 py-2.5 rounded-2xl bg-rose-500 text-white font-black text-xs hover:bg-rose-600 transition-colors"
-              >
-                {isAr ? 'إنهاء المكالمة' : 'End Call'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LiveKitCallModal
+        isOpen={activeCall !== null}
+        roomId={activeRoomId}
+        roomTitle={activeRoom.title || activeRoom.name}
+        mode={activeCall || 'voice'}
+        language={language}
+        onClose={() => setActiveCall(null)}
+      />
 
       {/* ========================================================================= */}
       {/* MODAL: Create New Room */}
@@ -2499,11 +2448,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         }}
       />
 
-      <VoiceRoomModal
+      <LiveKitCallModal
         isOpen={showVoiceRoomModal}
         roomId={activeRoomId}
         roomTitle={activeRoom.title || activeRoom.name}
-        isHost={isRoomOwner}
+        mode="voice"
         language={language}
         onClose={() => setShowVoiceRoomModal(false)}
       />
