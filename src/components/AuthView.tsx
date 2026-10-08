@@ -91,7 +91,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       if (mode === 'forgot') {
         if (!resetSent) {
           const d:any = await requestPasswordReset(email.trim(), challenge);
-          if (d.emailSent !== true) throw new Error('لم يتم إرسال رسالة إلى البريد. تأكد من إعداد خدمة البريد ثم حاول مرة أخرى.');
+          if (d.emailSent !== true) throw new Error('إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة. إذا لم تصل الرسالة، راجع مجلد الرسائل غير المرغوب فيها أو أعد المحاولة لاحقًا.');
           setResetSent(true); setCode('');
           setError('تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني. افحص الوارد والرسائل غير المرغوب فيها.');
           return;
