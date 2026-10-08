@@ -70,7 +70,7 @@ import ServicesPage from '../app/services/page';
 import SmartAIServicePage from '../app/services/smart-ai/page';
 import { AuthView } from './components/AuthView';
 import { CalendarView } from './components/CalendarView';
-import { getStoredSession, restoreSession, startTrialSession } from './services/authService';
+import { getStoredSession, restoreSession, startTrialSession, logout as logoutAuth } from './services/authService';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
 // Icons
@@ -182,6 +182,19 @@ export default function App() {
       console.error('Trial session error:', error);
       setAuthenticated(false);
     }
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await logoutAuth();
+    setAuthenticated(false);
+    setAuthChecked(true);
+    setViewHistory([]);
+    setCurrentView('dashboard');
+    setIsSettingsOpen(false);
+    setIsNotificationsOpen(false);
+    setIsSearchOpen(false);
+    setIsVoiceOpen(false);
+    setVoiceTranscript('');
   }, []);
 
   useEffect(() => {
@@ -701,6 +714,7 @@ export default function App() {
           onLanguageChange={handleLanguageChange}
           onThemeChange={handleThemeChange}
           onDataReset={handleResetData}
+          onLogout={() => { void handleLogout(); }}
         />
 
         {/* Universal Notifications Modal (مركز الإشعارات الشامل لكل الأقسام) */}
