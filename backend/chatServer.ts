@@ -358,7 +358,7 @@ chatRouter.post('/users/resolve', (req, res) => {
 
     const placeholders = normalizedPhones.map(() => '?').join(', ');
     const sql = "SELECT id, display_name as name, phone, avatar FROM users WHERE id != ? AND normalized_phone IN (" + placeholders + ")";
-    const rows = db.prepare(sql).all(user.id, ...normalizedPhones) as any[];
+    const rows = db.prepare(sql).all(String(user.id), ...normalizedPhones) as any[];
 
     const matches = rows.map((row) => ({
       id: row.id,
