@@ -1912,6 +1912,30 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                   }}
                 />
 
+                {selectedFile && (
+                  <div className={`m-3 p-3 ${isDark ? 'bg-slate-800' : 'bg-gray-100'} rounded-xl flex items-center justify-between border ${chatBorder}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {previewUrl ? (
+                        <img src={previewUrl} alt={selectedFile.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                      ) : (
+                        <FileText className="w-10 h-10 text-sky-500 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate max-w-[240px]">{selectedFile.name}</p>
+                        <p className="text-xs text-slate-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button type="button" onClick={clearSelectedFile} className="w-8 h-8 rounded-full hover:bg-black/10 flex items-center justify-center" aria-label={isAr ? 'إلغاء الملف' : 'Remove file'}>
+                        <X className="w-4 h-4" />
+                      </button>
+                      <button type="button" onClick={sendSelectedFile} className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold">
+                        {isAr ? 'إرسال' : 'Send'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <form
                   onSubmit={(e) => handleSendMessage(e)}
                   className={`p-3 ${chatPanel} border-t ${chatBorder} flex items-center gap-2.5`}
@@ -2264,6 +2288,14 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {preview && (
+        <MediaPreviewModal
+          {...preview}
+          open={!!preview}
+          onClose={() => setPreview(null)}
+        />
       )}
 
       {/* ========================================================================= */}
