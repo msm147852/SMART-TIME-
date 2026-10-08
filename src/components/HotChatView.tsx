@@ -133,7 +133,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80';
 
   // Tabs: خاص | مجموعة | الغرف
-  const [activeTab, setActiveTab] = useState<'private' | 'group' | 'rooms'>('private');
+  const [activeTab, setActiveTab] = useState<'private' | 'group' | 'rooms' | 'archived'>('private');
 
   // Rooms State
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -221,6 +221,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [showVoiceRoomModal, setShowVoiceRoomModal] = useState(false);
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
   const [chatBackground, setChatBackground] = useState<string>('');
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
 
   // Create room state
   const [newRoomTitle, setNewRoomTitle] = useState('');
@@ -320,7 +321,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const loadRooms = async () => {
     setLoadingRooms(true);
     try {
-      const list = await chatService.getRooms();
+      const list = await chatService.getRooms(activeTab === 'archived');
       if (list && list.length > 0) {
         setRooms(list);
         if (!list.some((r) => r.id === activeRoomId)) {
@@ -897,6 +898,37 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     setShowAttachMenu(false);
   };
 
+  const handleArchiveRoom = async () => {
+    try {
+      const archived = activeTab !== 'archived';
+      await chatService.archiveRoom(activeRoomId, archived);
+      await loadRooms();
+      if (archived) setActiveTab('archived');
+    } catch (err: any) { alert(err.message || 'فشل أرشفة المحادثة'); }
+  };
+
+  const handleBlockActiveUser = async () => {
+    const other = roomMembers.find((m) => m.id !== currentUserId);
+    if (!other?.id) return alert(isAr ? 'لا يوجد مستخدم مباشر لحظره.' : 'No direct user to block.');
+    if (!window.confirm(isAr ? 'حظر هذا المستخدم؟' : 'Block this user?')) return;
+    try {
+      await chatService.blockUser(other.id);
+      setShowRoomInfoModal(false);
+      await loadRooms();
+      setActiveRoomId('');
+    } catch (err: any) { alert(err.message || 'فشل حظر المستخدم'); }
+  };
+
+  const handleForwardMessage = async (msg: ChatMessage) => {
+    const candidates = rooms.filter((r) => r.id !== activeRoomId);
+    if (!candidates.length) return;
+    const raw = window.prompt((isAr ? 'اكتب أرقام الغرف مفصولة بفاصلة: ' : 'Enter room numbers separated by commas: ') + candidates.map((r,i)=>String(i+1)+':'+(r.title||r.name)).join(' | '));
+    if (!raw) return;
+    const indexes = raw.split(',').map((x)=>Number(x.trim())-1).filter((x)=>Number.isInteger(x)&&x>=0&&x<candidates.length);
+    for (const idx of Array.from(new Set(indexes))) await chatService.forwardMessage(candidates[idx].id,msg);
+    setForwardingMessage(null);
+  };
+
   // Pin / Unpin
   const handleTogglePin = async (msg: ChatMessage) => {    try {      const res = await chatService.pinMessage(activeRoomId, msg.id, !msg.isPinned);
       setMessagesMap((prev) => ({
@@ -1042,12 +1074,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const filteredRooms = rooms.filter((r) => {
     const matchesSearch = (r.title || r.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
+    if (activeTab === 'archived') return true;
     if (activeTab === 'private') return r.type === 'direct';
     if (activeTab === 'group') return r.type === 'group' || r.type === 'public';
-    if (activeTab === 'rooms') {
-      return r.type === 'voice' || r.type === 'video' || r.isVoice === true || r.isVideo === true;
-    }
-    return r.type === 'direct';
+    if (activeTab === 'rooms') return r.type === 'voice' || r.type === 'video' || r.isVoice === true || r.isVideo === true;
+    return false;
   });
 
   // Filter messages in search mode
@@ -1236,10 +1267,12 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               { id: 'private', label: isAr ? 'خاص' : 'Private' },
               { id: 'group', label: isAr ? 'مجموعة' : 'Group' },
               { id: 'rooms', label: isAr ? 'الغرف' : 'Rooms' },
+              { id: 'archived', label: isAr ? 'مؤرشف' : 'Archived' },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'private' | 'group' | 'rooms')}
+                onClick={() => setActiveTab(tab.id as 'private' | 'group' | 'rooms' | 'archived');
+                  void loadRooms();}
                 className={`flex-1 ${
                   activeTab === tab.id
                     ? 'bg-white dark:bg-slate-700 shadow-sm rounded-full px-4 py-1.5 text-sm font-medium text-slate-900 dark:text-white'
@@ -1508,6 +1541,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             >
               <Video className="w-4 h-4" />
             </button>
+            <button onClick={() => void handleArchiveRoom()} className="p-2 sm:p-2.5 rounded-xl text-amber-500 transition-all hover:scale-105" title={activeTab === 'archived' ? (isAr?'إلغاء الأرشفة':'Unarchive') : (isAr?'أرشفة':'Archive')}><Archive className="w-4 h-4" /></button>
+            {activeRoom.type === 'direct' && <button onClick={() => void handleBlockActiveUser()} className="p-2 sm:p-2.5 rounded-xl text-rose-500 transition-all hover:scale-105" title={isAr?'حظر المستخدم':'Block user'}><Ban className="w-4 h-4" /></button>}
             <button
               onClick={() => setShowRoomInfoModal(true)}
               className={`p-2 sm:p-2.5 rounded-xl ${chatIconButton} text-slate-600 dark:text-slate-300 transition-all hover:scale-105`}
@@ -1716,15 +1751,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                           >
                             <Pin className={`w-3.5 h-3.5 ${msg.isPinned ? 'fill-sky-400 text-sky-400' : ''}`} />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleReaction(msg)}
-                            className="p-1 hover:text-rose-400 transition-colors"
-                            title={isAr ? 'تفاعل 👍' : 'React 👍'}
-                          >
-                            <span className="text-xs">👍</span>
-                          </button>
-                          <button
+                          <div className="flex items-center gap-0.5">
+                            {['❤️','😂','😮','😢','🙏'].map((emoji) => <button key={emoji} type="button" onClick={() => void handleToggleReaction(msg, emoji)} className="p-1 text-xs hover:scale-125 transition-transform" title={isAr ? 'تفاعل '+emoji : 'React '+emoji}>{emoji}</button>)}
+                          </div>
+ 
+                          <button type="button" onClick={() => void handleForwardMessage(msg)} className="p-1 hover:text-sky-400 transition-colors" title={isAr?'توجيه':'Forward'}><Share2 className="w-3.5 h-3.5" /></button>                         <button
                             type="button"
                             onClick={() => setReplyingTo(msg)}
                             className="p-1 hover:text-sky-400 transition-colors"
