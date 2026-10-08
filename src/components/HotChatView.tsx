@@ -485,6 +485,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       });
     });
 
+    const unsubReactions = chatService.on('message_reactions_updated', ({ roomId, messageId, reactions }) => {
+      setMessagesMap((prev) => ({
+        ...prev,
+        [roomId]: (prev[roomId] || []).map((m) => m.id === messageId ? ({ ...m, extra: { ...(m as any).extra, reactions } } as any) : m),
+      }));
+    });
+
     // Messages read
     const unsubRead = chatService.on('messages_read', ({ roomId, userId }) => {
       setMessagesMap((prev) => {
@@ -552,6 +559,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       );
     });
 
+    unsubReactions();
     return () => {
       unsubWs();
       unsubMsg();
@@ -918,6 +926,21 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
       }));
     } catch (err: any) {
       alert(err.message || 'فشل حفظ الرسالة');
+    }
+  };
+
+  // Reactions
+  const handleToggleReaction = async (msg: ChatMessage, reaction = '👍') => {
+    try {
+      const res = await chatService.toggleReaction(activeRoomId, msg.id, reaction);
+      setMessagesMap((prev) => ({
+        ...prev,
+        [activeRoomId]: (prev[activeRoomId] || []).map((m) =>
+          m.id === msg.id ? { ...m, extra: { ...(m as any).extra, reactions: res.reactions } } as any : m
+        ),
+      }));
+    } catch (err: any) {
+      alert(err.message || 'فشل تحديث التفاعل');
     }
   };
 
@@ -1692,6 +1715,14 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                             title={msg.isPinned ? (isAr ? 'إلغاء التثبيت' : 'Unpin') : (isAr ? 'تثبيت الرسالة' : 'Pin message')}
                           >
                             <Pin className={`w-3.5 h-3.5 ${msg.isPinned ? 'fill-sky-400 text-sky-400' : ''}`} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReaction(msg)}
+                            className="p-1 hover:text-rose-400 transition-colors"
+                            title={isAr ? 'تفاعل 👍' : 'React 👍'}
+                          >
+                            <span className="text-xs">👍</span>
                           </button>
                           <button
                             type="button"
