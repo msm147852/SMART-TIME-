@@ -400,8 +400,8 @@ function verifyRoleChoiceTicket(ticket:string) {
     return String(data.userId);
   } catch { return null; }
 }
-function createSession(userId: string) { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at) VALUES (?,?,?,?)').run(token,userId,expires,now.toISOString()); return token; }
-function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,u.role,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
+function createSession(userId: string, sessionRole?: 'owner'|'admin'|'user'|'guest') { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); const row=db.prepare('SELECT * FROM users WHERE id=?').get(userId) as any; const role=sessionRole || effectiveRole(row); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at,session_role) VALUES (?,?,?,?,?)').run(token,userId,expires,now.toISOString(),role); return token; }
+function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,u.role,s.session_role,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
 function effectiveRole(row:any): 'owner'|'admin'|'user'|'guest' {
   const email = String(row.email || '').trim().toLowerCase();
   if (email && email === PROGRAM_OWNER_EMAIL) return 'owner';
@@ -411,7 +411,7 @@ function effectiveRole(row:any): 'owner'|'admin'|'user'|'guest' {
 function publicUser(row:any){return {id:row.id,email:row.email,username:row.username||undefined,name:row.name||row.display_name||'',phone:row.phone||undefined,phoneVerified:!!row.phoneVerified,activationStatus:row.activation_status||row.activationStatus||'pending',role:effectiveRole(row)};}
 function requestedLoginRole(value:any): 'owner'|'admin'|'user'|undefined {
   const role=String(value||'').trim().toLowerCase();
-  return role === 'admin' ? 'admin' : role === 'user' ? 'user' : undefined;
+  return role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : role === 'user' ? 'user' : undefined;
 }
 function normalizePhone(phone:string){return String(phone||'').replace(/[\s()-]/g,'');}
 function normalizeUsername(username:string){return String(username||'').trim().toLowerCase();}
@@ -651,7 +651,7 @@ app.post('/api/auth/login',async(req,res)=>{
     if(selectedRole === 'admin' && role !== 'owner' && role !== 'admin') return res.status(403).json({error:'هذا الحساب لا يملك صلاحية الدخول كإداري.'});
     const sessionRole=selectedRole === 'owner' ? 'owner' : selectedRole === 'admin' ? role : 'user';
     const user={...row,name:row.display_name,phoneVerified:row.phone_verified,role:sessionRole};
-    return res.json({token:createSession(row.id),user:publicUser(user)});
+    return res.json({token:createSession(row.id,sessionRole),user:{...publicUser(user),role:sessionRole}});
   } catch(e:any) { return res.status(500).json({error:e.message||'تعذر تسجيل الدخول'}); }
 });
 app.post('/api/auth/select-role',(req,res)=>{
@@ -663,7 +663,7 @@ app.post('/api/auth/select-role',(req,res)=>{
     if(!row || effectiveRole(row)!=='owner') return res.status(403).json({error:'هذا الحساب لا يملك صلاحية اختيار الوضع الإداري.'});
     const sessionRole=selectedRole === 'owner' ? 'owner' : 'user';
     const user={...row,name:row.display_name,phoneVerified:row.phone_verified,role:sessionRole};
-    return res.json({token:createSession(row.id),user:publicUser(user)});
+    return res.json({token:createSession(row.id,sessionRole),user:{...publicUser(user),role:sessionRole}});
   } catch(e:any) { return res.status(500).json({error:e.message||'تعذر اختيار نوع الدخول'}); }
 });
 const ADMIN_PERMISSION_SET = [
@@ -675,14 +675,14 @@ const ADMIN_PERMISSION_SET = [
 function requireAdmin(req: express.Request, res: express.Response) {
   const user=authUser(req);
   if(!user) { res.status(401).json({error:'يجب تسجيل الدخول.'}); return null; }
-  const role=effectiveRole(user);
+  const role=String(user.session_role||effectiveRole(user));
   if(role!=='owner' && role!=='admin') { res.status(403).json({error:'صلاحيات الإدارة مطلوبة.'}); return null; }
   return {...user, role};
 }
 function requireOwner(req: express.Request, res: express.Response) {
   const user=authUser(req);
   if(!user) { res.status(401).json({error:'يجب تسجيل الدخول.'}); return null; }
-  if(effectiveRole(user)!=='owner') { res.status(403).json({error:'هذا الإجراء متاح للمالك فقط.'}); return null; }
+  if(String(user.session_role||'')!=='owner' || effectiveRole(user)!=='owner') { res.status(403).json({error:'هذا الإجراء متاح للمالك فقط.'}); return null; }
   return {...user, role:'owner' as const};
 }
 function protectOwnerTarget(actor:any,target:any) {
@@ -760,7 +760,7 @@ app.get('/api/admin/system/status',(req,res)=>{
   const user=requireAdmin(req,res); if(!user) return;
   res.json({ok:true,role:user.role,permissions:[...ADMIN_PERMISSION_SET],services:getServiceStatuses(),timestamp:new Date().toISOString()});
 });
-app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user)});});
+app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:{...publicUser(user),role:String(user.session_role||effectiveRole(user))}});});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
 app.post('/api/auth/phone-login/request-otp',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "phone-login-request")) return res.status(429).json({error:'تم تجاوز عدد محاولات طلب رمز الدخول. حاول لاحقًا.'});
