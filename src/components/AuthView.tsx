@@ -117,7 +117,6 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     setError(''); setBusy(true);
     try {
       if (!roleChoiceTicket) throw new Error('انتهت صلاحية اختيار نوع الدخول. سجّل الدخول مرة أخرى.');
-      const challenge = requireTurnstileToken();
       await selectLoginRole(roleChoiceTicket, role);
       onAuthenticated();
     } catch (err:any) { setError(err.message || 'تعذر اختيار نوع الدخول.'); resetAuthChallenge(); }
