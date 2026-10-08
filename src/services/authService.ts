@@ -10,6 +10,7 @@ export interface AuthUser {
   name: string;
   phone?: string;
   phoneVerified?: boolean;
+  role?: 'owner' | 'admin' | 'user' | 'guest';
 }
 
 export interface AuthSession {
@@ -68,8 +69,9 @@ export async function startTrialSession(): Promise<AuthSession> {
   return session;
 }
 
-export async function loginWithIdentifier(identifier: string, password: string, turnstileToken?: string): Promise<AuthSession> {
-  const data = await request('/api/auth/login', { identifier, password, turnstileToken: turnstileToken || '' });
+export async function loginWithIdentifier(identifier: string, password: string, turnstileToken?: string, role?: 'admin' | 'user'): Promise<AuthSession | { requiresRoleChoice: true; availableRoles: string[] }> {
+  const data = await request('/api/auth/login', { identifier, password, role: role || '', turnstileToken: turnstileToken || '' });
+  if (data.requiresRoleChoice) return data;
   const session: AuthSession = { token: data.token, user: data.user };
   saveSession(session); applyUserToProfile(session.user); return session;
 }
