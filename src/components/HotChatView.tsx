@@ -84,6 +84,7 @@ import { ChatSettingsModal } from './ChatSettingsModal';
 import { SavedMessagesModal } from './SavedMessagesModal';
 import { AddMemberModal } from './AddMemberModal';
 import { VoiceRoomModal } from './VoiceRoomModal';
+import MediaPreviewModal from './chat/MediaPreviewModal';
 import { chatService } from '../services/chatService';
 import { getStoredSession } from '../services/authService';
 
@@ -283,6 +284,25 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const [liveLocationWatchId, setLiveLocationWatchId] = useState<number | null>(null);
   const [liveLocationMsgId, setLiveLocationMsgId] = useState<string | null>(null);
+
+  const [preview, setPreview] = useState<{
+    type: 'image' | 'video' | 'pdf' | 'file';
+    url: string;
+    fileName: string;
+  } | null>(null);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedFile || !selectedFile.type.startsWith('image/')) {
+      setPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile]);
 
   // Window state
   const [isFloating, setIsFloating] = useState(false);
@@ -716,20 +736,49 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     setRecordingSeconds(0);
   };
 
+  const handleMediaClick = (msg: ChatMessage) => {
+    const url = msg.mediaUrl || (msg as any).url;
+    if (!url) return;
+    const name = (msg as any).fileName || (msg as any).name || (msg.text || msg.body || 'file')
+      .replace(/^🖼️\s*/, '')
+      .replace(/^🎬\s*/, '')
+      .replace(/^📄\s*/, '');
+    if (msg.type === 'image' || (msg as any).mediaType === 'image' || /\.(jpg|jpeg|png|gif|webp)(?:$|\?)/i.test(url)) {
+      setPreview({ type: 'image', url, fileName: name });
+    } else if (msg.type === 'video' || /\.(mp4|webm|mov)(?:$|\?)/i.test(url)) {
+      setPreview({ type: 'video', url, fileName: name });
+    } else if (msg.type === 'file' && (url.toLowerCase().includes('.pdf') || name.toLowerCase().endsWith('.pdf'))) {
+      setPreview({ type: 'pdf', url, fileName: name });
+    } else {
+      setPreview({ type: 'file', url, fileName: name });
+    }
+  };
+
   // File Upload Helper
 
-  const handleFileAttachment = async (file: File, kind: 'image' | 'video' | 'file') => {
+  const handleFileAttachment = (file: File) => {
     setShowAttachMenu(false);
     if (file.size > 10 * 1024 * 1024) {
       alert(isAr ? 'الحد الأقصى للملف 10 ميجابايت.' : 'Maximum file size is 10 MB.');
       return;
     }
+    setSelectedFile(file);
+  };
+
+  const clearSelectedFile = () => setSelectedFile(null);
+
+  const sendSelectedFile = async () => {
+    if (!selectedFile) return;
+    const file = selectedFile;
+    const kind: 'image' | 'video' | 'file' =
+      file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file';
     try {
       const uploaded = await chatService.uploadChatFile(file, activeRoomId);
       const label = kind === 'image' ? `🖼️ ${file.name}` : kind === 'video' ? `🎬 ${file.name}` : `📄 ${file.name}`;
+      setSelectedFile(null);
       await handleSendMessage(undefined, label, kind, undefined, uploaded.url);
     } catch {
-      alert(isAr ? 'تعذر قراءة الملف.' : 'Unable to read the file.');
+      alert(isAr ? 'تعذر رفع الملف.' : 'Unable to upload the file.');
     }
   };
 
@@ -1663,33 +1712,47 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                             </div>
                           </div>
                         ) : msg.type === 'image' && msg.mediaUrl ? (
-                          <div className="space-y-2">
+                          <div
+                            onClick={() => handleMediaClick(msg)}
+                            className="cursor-pointer hover:opacity-90 transition-opacity space-y-2"
+                          >
                             <img
                               src={msg.mediaUrl}
                               alt={msg.text}
                               className="max-w-full max-h-72 rounded-xl object-contain border border-current/10"
+                              loading="lazy"
                             />
                             <div className="text-[11px] font-semibold">{msg.text || msg.body}</div>
                           </div>
                         ) : msg.type === 'video' && msg.mediaUrl ? (
-                          <div className="space-y-2">
-                            <video
-                              src={msg.mediaUrl}
-                              controls
-                              playsInline
-                              className="max-w-full max-h-72 rounded-xl border border-current/10"
-                            />
+                          <div
+                            onClick={() => handleMediaClick(msg)}
+                            className="cursor-pointer hover:opacity-90 transition-opacity space-y-2"
+                          >
+                            <div className="relative">
+                              <video
+                                src={msg.mediaUrl}
+                                playsInline
+                                muted
+                                preload="metadata"
+                                className="max-w-full max-h-72 rounded-xl border border-current/10"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span className="w-12 h-12 rounded-full bg-black/60 text-white flex items-center justify-center">
+                                  <Play className="w-5 h-5 ms-0.5" />
+                                </span>
+                              </div>
+                            </div>
                             <div className="text-[11px] font-semibold">{msg.text || msg.body}</div>
                           </div>
                         ) : msg.type === 'file' && msg.mediaUrl ? (
-                          <a
-                            href={msg.mediaUrl}
-                            download={(msg.text || 'file').replace(/^📄\s*/, '')}
-                            className="flex items-center gap-3 p-2 rounded-xl bg-black/10 hover:bg-black/20"
+                          <div
+                            onClick={() => handleMediaClick(msg)}
+                            className="cursor-pointer hover:opacity-90 transition-opacity flex items-center gap-3 p-2 rounded-xl bg-black/10 hover:bg-black/20"
                           >
                             <FileText className="w-8 h-8 text-sky-400 shrink-0" />
                             <span className="text-xs font-bold break-all">{msg.text || msg.body}</span>
-                          </a>
+                          </div>
                         ) : (
                           <div className={msg.isDeleted ? 'italic opacity-60' : ''}>
                             {msg.text || msg.body}
@@ -1833,10 +1896,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f)
-                      handleFileAttachment(
-                        f,
-                        f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : 'file'
-                      );
+                      handleFileAttachment(f);
                     e.currentTarget.value = '';
                   }}
                 />
@@ -1847,7 +1907,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleFileAttachment(f, 'file');
+                    if (f) handleFileAttachment(f);
                     e.currentTarget.value = '';
                   }}
                 />
