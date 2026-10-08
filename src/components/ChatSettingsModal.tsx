@@ -44,6 +44,7 @@ interface ChatSettingsModalProps {
   onExportChat?: () => void;
   onLeaveRoom?: () => void;
   onDeleteRoom?: () => void;
+  onSavePersonalSettings?: (settings: any) => Promise<void> | void;
 }
 
 export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
@@ -58,6 +59,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
   onExportChat,
   onLeaveRoom,
   onDeleteRoom,
+  onSavePersonalSettings,
 }) => {
   const isAr = language === 'ar';
 
@@ -91,6 +93,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
 
   const [soundNotifications, setSoundNotifications] = useState(() => localStorage.getItem('smart_time_chat_sound') !== 'false');
   const [lastSeen, setLastSeen] = useState(() => localStorage.getItem('smart_time_chat_last_seen') !== 'false');
+  const [autoDeleteDuration, setAutoDeleteDuration] = useState<number>((room as any).autoDeleteDuration || 0);
 
   // Background
   const [background, setBackground] = useState<string>(room.background || '');
@@ -223,6 +226,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
     localStorage.setItem('smart_time_chat_sound', String(soundNotifications));
     localStorage.setItem('smart_time_chat_last_seen', String(lastSeen));
     localStorage.setItem('smart_time_chat_prefs_' + room.id, JSON.stringify({prefs, soundNotifications, lastSeen, background,backgroundUrl,memberPermissions,adminPermissions,moderatorPermissions}));
+    void onSavePersonalSettings?.({ mute: !soundNotifications, custom_sound: soundNotifications ? null : 'silent', custom_mute_until: null, wallpaper_url: backgroundUrl || null, wallpaper_type: backgroundUrl ? 'image' : (background ? 'color' : 'default') });
     onSave({
       title,
       name: title,
@@ -555,6 +559,15 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border space-y-2 ${cardBg}`}>
+                  <div className="flex items-center gap-2 font-bold text-xs"><Clock className="w-4 h-4 text-sky-500" /><span>{isAr ? 'الحذف التلقائي' : 'Auto-delete'}</span></div>
+                  <p className={`text-[10px] ${mutedText}`}>{isAr ? 'حذف الرسائل تلقائياً بعد المدة المحددة.' : 'Automatically delete old messages.'}</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[{v:0,l:isAr?'إيقاف':'Off'},{v:3600,l:isAr?'1 ساعة':'1h'},{v:86400,l:isAr?'24 ساعة':'1d'},{v:604800,l:isAr?'7 أيام':'7d'}].map(o=><button key={o.v} type="button" onClick={()=>setAutoDeleteDuration(o.v)} className={`py-1.5 rounded-xl text-xs font-bold ${autoDeleteDuration===o.v?'bg-sky-600 text-white':isDark?'bg-slate-800 text-slate-300':'bg-slate-200 text-slate-700'}`}>{o.l}</button>)}
+                  </div>
+                  {autoDeleteDuration>0 && <div className="text-[10px] text-amber-400">{isAr ? `الرسائل ستحذف بعد ${autoDeleteDuration===3600?'ساعة':autoDeleteDuration===86400?'24 ساعة':'7 أيام'}` : 'Messages will be deleted automatically.'}</div>}
                 </div>
 
                 {/* Slow Mode */}
