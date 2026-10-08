@@ -2528,6 +2528,10 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         language={language}
         isDark={isDark}
         onSave={handleSaveRoomSettings}
+        onSavePersonalSettings={async (settings) => {
+          await chatService.updateRoomSettings(activeRoomId, settings);
+          try { localStorage.setItem('smart_time_room_settings_' + activeRoomId, JSON.stringify(settings)); } catch {}
+        }}
         onClearHistory={handleClearRoomHistory}
         onExportChat={() => {
           const msgs = messagesMap[activeRoomId] || [];
