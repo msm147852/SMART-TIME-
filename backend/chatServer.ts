@@ -1807,12 +1807,47 @@ chatRouter.get('/rooms/:roomId/settings',(req,res)=>{
 // Existing message-send endpoint is reused for forwarding.
 
 chatRouter.post('/messages/:messageId/react',(req,res)=>{
-  req.params.roomId=String((db.prepare('SELECT conversation_id FROM messages WHERE id=?').get(req.params.messageId) as any)?.conversation_id||'');
-  const forward=req.params.roomId;
-  if(!forward)return res.status(404).json({error:'الرسالة غير موجودة'});
-  const accessUser=getAuthUser(req); if(!accessUser)return res.status(401).json({error:'يجب تسجيل الدخول'});
-  req.url='/rooms/'+forward+'/messages/'+req.params.messageId+'/reactions';
-  return chatRouter.handle(req,res,()=>{});
+  try{
+    const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const {messageId}=req.params; const msg=db.prepare('SELECT conversation_id FROM messages WHERE id=?').get(messageId) as any;
+    if(!msg)return res.status(404).json({error:'الرسالة غير موجودة'});
+    const roomId=String(msg.conversation_id); const access=verifyConversationAccess(user.id,roomId);
+    if(!access.allowed&&!access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const reaction=String(req.body?.emoji||'').trim(); const allowed=new Set(['❤️','😂','😮','😢','🙏']);
+    if(!allowed.has(reaction))return res.status(400).json({error:'تفاعل غير صالح'});
+    const exists=db.prepare('SELECT 1 FROM message_reactions WHERE message_id=? AND user_id=? AND reaction=?').get(messageId,user.id,reaction);
+    if(exists)db.prepare('DELETE FROM message_reactions WHERE message_id=? AND user_id=? AND reaction=?').run(messageId,user.id,reaction);
+    else db.prepare('INSERT INTO message_reactions(message_id,user_id,reaction,created_at) VALUES(?,?,?,?)').run(messageId,user.id,reaction,new Date().toISOString());
+    const rows=db.prepare('SELECT reaction,COUNT(*) count FROM message_reactions WHERE message_id=? GROUP BY reaction').all(messageId) as any[];
+    const reactions=rows.reduce((a:any,r:any)=>(a[r.reaction]=Number(r.count),a),{});
+    broadcastToRoom(roomId,{type:exists?'reaction:removed':'reaction:new',payload:{messageId,userId:user.id,emoji:reaction,reactions}});
+    broadcastToRoom(roomId,{type:'message_reactions_updated',payload:{roomId,messageId,reactions}});
+    res.json({ok:true,active:!exists,reactions});
+  }catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.delete('/messages/:messageId/react',(req,res)=>{
+  try{
+    const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const {messageId}=req.params;const msg=db.prepare('SELECT conversation_id FROM messages WHERE id=?').get(messageId) as any;if(!msg)return res.status(404).json({error:'الرسالة غير موجودة'});
+    const roomId=String(msg.conversation_id);const access=verifyConversationAccess(user.id,roomId);if(!access.allowed&&!access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const reaction=String(req.query.emoji||'').trim();if(!reaction)return res.status(400).json({error:'emoji مطلوب'});
+    db.prepare('DELETE FROM message_reactions WHERE message_id=? AND user_id=? AND reaction=?').run(messageId,user.id,reaction);
+    const rows=db.prepare('SELECT reaction,COUNT(*) count FROM message_reactions WHERE message_id=? GROUP BY reaction').all(messageId) as any[];
+    const reactions=rows.reduce((a:any,r:any)=>(a[r.reaction]=Number(r.count),a),{});
+    broadcastToRoom(roomId,{type:'reaction:removed',payload:{messageId,userId:user.id,emoji:reaction,reactions}});
+    broadcastToRoom(roomId,{type:'message_reactions_updated',payload:{roomId,messageId,reactions}});
+    res.json({ok:true,reactions});
+  }catch(e:any){res.status(500).json({error:e.message})}
+});
+chatRouter.get('/messages/:messageId/reactions',(req,res)=>{
+  try{
+    const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const {messageId}=req.params;const msg=db.prepare('SELECT conversation_id FROM messages WHERE id=?').get(messageId) as any;if(!msg)return res.status(404).json({error:'الرسالة غير موجودة'});
+    const roomId=String(msg.conversation_id);const access=verifyConversationAccess(user.id,roomId);if(!access.allowed&&!access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const rows=db.prepare('SELECT mr.reaction,mr.user_id,COALESCE(u.display_name,u.email,mr.user_id) name FROM message_reactions mr LEFT JOIN users u ON u.id=mr.user_id WHERE mr.message_id=?').all(messageId) as any[];
+    const reactions=rows.reduce((a:any,r:any)=>(a[r.reaction]=(a[r.reaction]||0)+1,a),{});
+    res.json({reactions,users:rows.map((r:any)=>({userId:r.user_id,name:r.name,reaction:r.reaction}))});
+  }catch(e:any){res.status(500).json({error:e.message})}
 });
 chatRouter.post('/stories',(req,res)=>{
  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const id='story_'+crypto.randomUUID();const now=new Date().toISOString();db.prepare('INSERT INTO stories(id,user_id,body,media_url,expires_at,created_at) VALUES(?,?,?,?,?,?)').run(id,user.id,String(req.body?.body||''),req.body?.mediaUrl||null,req.body?.expiresAt||new Date(Date.now()+86400000).toISOString(),now);res.json({ok:true,id})}catch(e:any){res.status(500).json({error:e.message})}
