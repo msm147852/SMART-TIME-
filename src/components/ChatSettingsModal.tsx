@@ -226,7 +226,7 @@ export const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
     localStorage.setItem('smart_time_chat_sound', String(soundNotifications));
     localStorage.setItem('smart_time_chat_last_seen', String(lastSeen));
     localStorage.setItem('smart_time_chat_prefs_' + room.id, JSON.stringify({prefs, soundNotifications, lastSeen, background,backgroundUrl,memberPermissions,adminPermissions,moderatorPermissions}));
-    void onSavePersonalSettings?.({ mute: !soundNotifications, custom_sound: soundNotifications ? null : 'silent', custom_mute_until: null, wallpaper_url: backgroundUrl || null, wallpaper_type: backgroundUrl ? 'image' : (background ? 'color' : 'default') });
+    void onSavePersonalSettings?.({ mute: !soundNotifications, custom_sound: soundNotifications ? null : 'silent', custom_mute_until: null, wallpaper_url: backgroundUrl || null, wallpaper_type: backgroundUrl ? 'image' : (background ? 'color' : 'default'), autoDeleteDuration });
     onSave({
       title,
       name: title,
