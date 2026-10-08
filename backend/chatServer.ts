@@ -471,6 +471,15 @@ chatRouter.get('/rooms', (req, res) => {
       let avatar = r.avatar;
       let isOnline = false;
 
+      const roomMembers = db.prepare(`
+        SELECT cm.user_id as id, u.display_name as name, u.avatar, cm.role, cm.joined_at as joinedAt, cm.muted, cm.banned
+        FROM conversation_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.conversation_id = ?
+        ORDER BY CASE cm.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'moderator' THEN 3 ELSE 4 END, cm.joined_at ASC
+        LIMIT 4
+      `).all(r.id) as any[];
+
       if (r.type === 'direct' && userId) {
         const otherMember = db.prepare(`
           SELECT u.id, u.display_name as name, u.avatar
@@ -506,6 +515,16 @@ chatRouter.get('/rooms', (req, res) => {
         lastMessageTime: r.last_message_time || '',
         unreadCount: Number(r.unread_count || 0),
         membersCount: Number(r.members_count || 0),
+        members: roomMembers.map((m) => ({
+          id: m.id,
+          name: m.name || 'مستخدم',
+          avatar: m.avatar || '',
+          role: m.role,
+          joinedAt: m.joinedAt,
+          muted: !!m.muted,
+          banned: !!m.banned,
+          isOnline: isUserOnline(m.id),
+        })),
         isOnline,
         settings,
         permissions,

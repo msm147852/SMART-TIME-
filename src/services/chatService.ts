@@ -224,6 +224,19 @@ class ChatService {
     });
   }
 
+  async joinRoomApi(roomId: string): Promise<void> {
+    await this.request(`/api/chat/rooms/${roomId}/join`, {
+      method: 'POST',
+    });
+  }
+
+  async inviteMember(roomId: string, userId: string): Promise<void> {
+    await this.request(`/api/chat/rooms/${roomId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
   // 7. Clear room messages
   async clearRoomMessages(roomId: string): Promise<void> {
     await this.request(`/api/chat/rooms/${roomId}/clear`, {
