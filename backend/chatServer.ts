@@ -686,7 +686,7 @@ chatRouter.post('/rooms', (req, res) => {
         id, title, description, type, room_type, topic, is_voice, is_video, is_live,
         avatar, background, background_url, creator_id, pinned, settings_json, permissions_json, max_participants, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
     `).run(
       roomId, title || 'محادثة جديدة', description, normalizedType, normalizedRoomType, topic,
       voiceFlag ? 1 : 0, videoFlag ? 1 : 0, liveFlag ? 1 : 0,
@@ -806,6 +806,15 @@ chatRouter.get('/rooms/:roomId', (req, res) => {
         adminPermissions,
         moderatorPermissions,
         currentUserRole: access.role || 'member',
+        roomType: conv.room_type || conv.type,
+        topic: conv.topic || '',
+        isVoice: !!conv.is_voice,
+        isVideo: !!conv.is_video,
+        isLive: !!conv.is_live || !!conv.voiceRoomActive,
+        isArchived: !!db.prepare('SELECT 1 FROM archived_rooms WHERE user_id=? AND room_id=?').get(userId, roomId),
+        autoDeleteDuration: Number(conv.auto_delete_duration || 0),
+        maxParticipants: Number(conv.max_participants || 50),
+        voiceParticipants: JSON.parse(conv.voiceParticipants || '[]'),
         createdAt: conv.created_at,
         updatedAt: conv.updated_at,
       },
@@ -1755,7 +1764,9 @@ chatRouter.put('/rooms/:roomId/auto-delete',(req,res)=>{
     const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
     const duration=Number(req.body?.duration||0); if(![0,3600,86400,604800].includes(duration))return res.status(400).json({error:'مدة الحذف غير صالحة'});
     const access=verifyConversationAccess(user.id,req.params.roomId);
-    if(!access.allowed || (access.role!=='owner' && access.role!=='admin')) return res.status(403).json({error:'للمالك/المشرف فقط'});
+    if(!access.allowed) return res.status(403).json({error:'ليس لديك صلاحية'});
+    const roomRow=db.prepare('SELECT type FROM conversations WHERE id=?').get(req.params.roomId) as any;
+    if(roomRow?.type!=='direct' && access.role!=='owner' && access.role!=='admin') return res.status(403).json({error:'للمالك/المشرف فقط'});
     db.prepare('UPDATE conversations SET auto_delete_duration=? WHERE id=?').run(duration,req.params.roomId);
     broadcastToRoom(req.params.roomId,{type:'auto_delete_updated',payload:{roomId:req.params.roomId,duration}});
     res.json({ok:true,duration});
@@ -1769,7 +1780,7 @@ chatRouter.put('/rooms/:roomId/settings',(req,res)=>{
     const b=req.body||{}; const current=db.prepare('SELECT * FROM room_settings WHERE user_id=? AND room_id=?').get(user.id,req.params.roomId) as any;
     const mute=b.mute===undefined?Number(current?.mute||0):b.mute?1:0;
     const customSound=b.custom_sound===undefined?(current?.custom_sound||null):String(b.custom_sound||'')||null;
-    const muteUntil=b.custom_mute_until===undefined?(current?.custom_mute_until||null):b.custom_mute_until||null;
+    const muteUntil=b.mute_until===undefined?(b.custom_mute_until===undefined?(current?.custom_mute_until||null):b.custom_mute_until||null):b.mute_until||null;
     const wallpaperUrl=b.wallpaper_url===undefined?(current?.wallpaper_url||null):String(b.wallpaper_url||'')||null;
     const wallpaperType=b.wallpaper_type===undefined?(current?.wallpaper_type||'default'):String(b.wallpaper_type||'default');
     if(!['default','color','image'].includes(wallpaperType))return res.status(400).json({error:'نوع الخلفية غير صالح'});
