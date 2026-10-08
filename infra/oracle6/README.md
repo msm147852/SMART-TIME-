@@ -6,11 +6,11 @@ This directory contains the production-safe deployment template. Real secrets ar
 LIVEKIT_API_KEY, LIVEKIT_API_SECRET, ORACLE6_PUBLIC_IP, ORACLE6_PRIVATE_IP, COTURN_USER, COTURN_PASS.
 
 ## Deploy
-Run `scripts/oracle6-install.sh` on Oracle 6 after setting the variables in the shell. Open TCP 7880/7881, UDP 3478, TCP/UDP 5349, and UDP 7882-7892 in the Oracle security list and OS firewall.
+Run `scripts/oracle6-install.sh` on Oracle 6 after setting the variables in the shell. For production, expose LiveKit behind a real DNS name with trusted TLS; LiveKit documents 7880 as the API/WebSocket port and requires SSL termination for a secure deployment. Open TCP 7881 and the configured UDP media range (here 7882-7892), plus TURN 3478/UDP and 5349/TCP if used. citeturn0search0turn0search1
 
 ## Backend (Oracle 1)
 Set:
-LIVEKIT_URL=wss://<oracle6-host-or-ip>:7880
+LIVEKIT_URL=wss://livekit.<your-domain>
 LIVEKIT_API_KEY=<same key>
 LIVEKIT_API_SECRET=<same secret>
 COTURN_URL=turn:<oracle6-host-or-ip>:3478
