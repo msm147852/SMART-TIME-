@@ -2318,16 +2318,30 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               </div>
               <div className="rounded-2xl border border-slate-700/50 p-3">
                 <div className="text-sm font-bold mb-2">{isAr?'الإشعارات والصوت':'Notifications & sound'}</div>
-                <div className="flex gap-2 flex-wrap">
-                  {[{mute:false,label:isAr?'تشغيل':'On'},{mute:true,label:isAr?'صامت':'Silent'}].map(o=><button key={String(o.mute)} type="button" onClick={async()=>{const until=o.mute?new Date(Date.now()+3600000).toISOString():null;await chatService.updateRoomSettings(activeRoomId,{mute:o.mute,custom_sound:o.mute?'silent':'default',custom_mute_until:until});try{localStorage.setItem('smart_time_room_settings_'+activeRoomId,JSON.stringify({mute:o.mute,custom_sound:o.mute?'silent':'default',custom_mute_until:until}));}catch{}}} className="rounded-xl bg-slate-800 px-3 py-2 text-xs">{o.label}</button>)}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[0,3600,28800,604800,-1].map(duration=>{
+                    const label=duration===0?(isAr?'تشغيل':'On'):duration===3600?(isAr?'كتم 1 ساعة':'Mute 1h'):duration===28800?(isAr?'كتم 8 ساعات':'Mute 8h'):duration===604800?(isAr?'كتم أسبوع':'Mute 1 week'):(isAr?'كتم دائم':'Always');
+                    return <button key={duration} type="button" onClick={async()=>{const until=duration<0?null:(duration===0?null:new Date(Date.now()+duration*1000).toISOString());const payload={mute:duration!==0,custom_sound:duration!==0?'silent':'default',custom_mute_until:until};await chatService.updateRoomSettings(activeRoomId,payload);try{localStorage.setItem('smart_time_room_settings_'+activeRoomId,JSON.stringify(payload));}catch{}}} className="rounded-xl bg-slate-800 px-2 py-2 text-xs">{label}</button>;
+                  })}
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {['default','silent','chime'].map(sound=><button key={sound} type="button" onClick={async()=>{const payload={custom_sound:sound};await chatService.updateRoomSettings(activeRoomId,payload);try{const prev=JSON.parse(localStorage.getItem('smart_time_room_settings_'+activeRoomId)||'{}');localStorage.setItem('smart_time_room_settings_'+activeRoomId,JSON.stringify({...prev,...payload}));}catch{}}} className="rounded-xl bg-slate-800 px-3 py-2 text-xs">{sound==='default'?(isAr?'افتراضي':'Default'):sound==='silent'?(isAr?'صامت':'Silent'):(isAr?'نغمة':'Chime')}</button>)}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-700/50 p-3">
                 <div className="text-sm font-bold mb-2">{isAr?'الخلفية':'Wallpaper'}</div>
                 <div className="grid grid-cols-4 gap-2">
-                  {['#efeae2','#dbeafe','#dcfce7','#fce7f3'].map(color=><button key={color} type="button" onClick={()=>{setChatBackground(color);void chatService.updateRoomSettings(activeRoomId,{wallpaper_url:color,wallpaper_type:'color'});try{localStorage.setItem('smart_time_room_wallpaper_'+activeRoomId,color);}catch{}}} style={{background:color}} className="h-10 rounded-xl border border-white/20"/>)}
+                  {['#efeae2','#dbeafe','#dcfce7','#fce7f3','#fef3c7','#ede9fe','#e0f2fe','#f1f5f9'].map(color=><button key={color} type="button" onClick={()=>{setChatBackground(color);void chatService.updateRoomSettings(activeRoomId,{wallpaper_url:color,wallpaper_type:'color'});try{localStorage.setItem('smart_time_room_wallpaper_'+activeRoomId,color);}catch{}}} style={{background:color}} className="h-10 rounded-xl border border-white/20"/>)}
                 </div>
                 <button type="button" onClick={()=>{setChatBackground('');void chatService.updateRoomSettings(activeRoomId,{wallpaper_url:null,wallpaper_type:'default'});try{localStorage.removeItem('smart_time_room_wallpaper_'+activeRoomId);}catch{}}} className="mt-2 w-full rounded-xl bg-slate-800 py-2 text-xs">{isAr?'الوضع الافتراضي':'Default'}</button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {[
+                    'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600',
+                    'https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=600',
+                    'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=600',
+                    'https://images.unsplash.com/photo-1500534623283-312aade485b7?w=600',
+                  ].map(url=><button key={url} type="button" onClick={()=>{setChatBackground(url);void chatService.updateRoomSettings(activeRoomId,{wallpaper_url:url,wallpaper_type:'image'});try{localStorage.setItem('smart_time_room_wallpaper_'+activeRoomId,url);}catch{}}} style={{backgroundImage:'url('+url+')'}} className="h-16 rounded-xl bg-cover bg-center border border-white/10"/>)}
+                </div>
               </div>
               {activeRoom.type==='direct' && <button type="button" onClick={()=>void handleBlockActiveUser()} className="w-full rounded-2xl bg-rose-600/15 border border-rose-500/30 p-3 text-start text-rose-300">{isAr?'حظر المستخدم':'Block user'}</button>}
             </div>
