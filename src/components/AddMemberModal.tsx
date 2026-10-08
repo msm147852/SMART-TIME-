@@ -98,11 +98,39 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
       if (!selectedContacts.length) { setContactsMessage(isAr ? 'لم يتم اختيار جهة اتصال بها رقم هاتف.' : 'No contact with a phone number was selected.'); return; }
       const phones = selectedContacts.flatMap((c: any) => c.phones);
       const matches = await chatService.lookupContacts(phones);
-      if (matches.length) {
-        setUsers((prev) => { const map = new Map(prev.map((u) => [u.id, u])); matches.forEach((u) => map.set(u.id, u)); return Array.from(map.values()); });
-        setSelectedUserId(matches[0].id); return;
+
+      // The contact lookup is only a convenience. The source of truth for
+      // registration is the authenticated backend users list, never local
+      // storage or the device contacts database.
+      const normalizePhone = (phone: string) => {
+        const digits = String(phone || '').replace(/\\D/g, '');
+        return digits.length > 10 ? digits.slice(-10) : digits;
+      };
+
+      let registeredMatches = matches;
+      if (!registeredMatches.length) {
+        const registeredUsers = await chatService.getUsers();
+        const wantedPhones = new Set(phones.map(normalizePhone).filter(Boolean));
+        registeredMatches = registeredUsers.filter(
+          (user) => Boolean(user.phone) && wantedPhones.has(normalizePhone(user.phone || '')),
+        );
       }
-      const firstContact = selectedContacts[0]; await shareInvite(firstContact.name, firstContact.phones[0]);
+
+      if (registeredMatches.length) {
+        setUsers((prev) => {
+          const map = new Map(prev.map((u) => [u.id, u]));
+          registeredMatches.forEach((u) => map.set(u.id, u));
+          return Array.from(map.values());
+        });
+        setSelectedUserId(registeredMatches[0].id);
+        setContactsMessage(isAr ? 'تم العثور على الحساب المسجل في SMART TIME.' : 'Registered SMART TIME account found.');
+        return;
+      }
+
+      // Only show Invite after the backend has confirmed that no registered
+      // SMART TIME account matches the selected phone number.
+      const firstContact = selectedContacts[0];
+      await shareInvite(firstContact.name, firstContact.phones[0]);
     } catch (err: any) { if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.')); }
     finally { setContactsLoading(false); }
   };
