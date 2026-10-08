@@ -324,7 +324,24 @@ try {
 } catch {}
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_wallet_admin_actions_created ON wallet_admin_actions(created_at)`); } catch {}
 
+
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at)`); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN archived_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN auto_delete_duration INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(is_archived, updated_at)'); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS archived_rooms (user_id TEXT NOT NULL, room_id TEXT NOT NULL, archived_at TEXT NOT NULL, PRIMARY KEY(user_id, room_id))`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_archived_rooms_user ON archived_rooms(user_id, archived_at)'); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS blocked_users (blocker_id TEXT NOT NULL, blocked_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(blocker_id, blocked_id))`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users(blocked_id)'); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS room_settings (user_id TEXT NOT NULL, room_id TEXT NOT NULL, mute INTEGER NOT NULL DEFAULT 0, custom_sound TEXT, custom_mute_until TEXT, wallpaper_url TEXT, wallpaper_type TEXT NOT NULL DEFAULT 'default', PRIMARY KEY(user_id, room_id))`); } catch {}
+try { db.exec('ALTER TABLE room_settings ADD COLUMN wallpaper_url TEXT'); } catch {}
+try { db.exec("ALTER TABLE room_settings ADD COLUMN wallpaper_type TEXT NOT NULL DEFAULT 'default'"); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN original_message_id TEXT'); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN original_sender TEXT'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_autodelete ON messages(conversation_id, created_at, is_deleted)'); } catch {}
+
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id)`); } catch {}
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_conv_members_user ON conversation_members(user_id)`); } catch {}
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_saved_messages_user ON saved_messages(user_id)`); } catch {}
