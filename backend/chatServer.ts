@@ -1009,6 +1009,9 @@ chatRouter.get('/rooms/:roomId/messages', (req, res) => {
         isEdited: !!r.is_edited,
         isDeleted: !!r.is_deleted,
         isSaved: !!r.is_saved,
+        forwarded: !!r.forwarded,
+        originalMessageId: r.original_message_id || undefined,
+        originalSender: r.original_sender || undefined,
         isOutgoing: userId ? r.sender_id === userId : false,
         timestamp: r.created_at,
         createdAt: r.created_at,
@@ -1030,7 +1033,7 @@ chatRouter.post('/rooms/:roomId/messages', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول لإرسال رسالة' });
 
     const { roomId } = req.params;
-    const { text, body, type = 'text', mediaUrl, data, extra } = req.body;
+    const { text, body, type = 'text', mediaUrl, data, extra, forwarded = false, originalMessageId = null, originalSender = null } = req.body;
     let resolvedMediaUrl = mediaUrl ? String(mediaUrl) : '';
     if (type === 'image' && data && typeof data === 'string') {
       resolvedMediaUrl = await uploadChatImage(data, roomId);
@@ -1069,8 +1072,8 @@ chatRouter.post('/rooms/:roomId/messages', async (req, res) => {
     const extraJson = extra ? JSON.stringify(extra) : null;
 
     db.prepare(`
-      INSERT INTO messages (id, conversation_id, sender_id, sender_name, sender_avatar, body, media_url, type, status, is_pinned, is_edited, is_deleted, extra_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent', 0, 0, 0, ?, ?, ?)
+      INSERT INTO messages (id, conversation_id, sender_id, sender_name, sender_avatar, body, media_url, type, status, is_pinned, is_edited, is_deleted, forwarded, original_message_id, original_sender, extra_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent', 0, 0, 0, ?, ?, ?, ?, ?, ?)
     `).run(
       messageId,
       roomId,
@@ -1080,6 +1083,9 @@ chatRouter.post('/rooms/:roomId/messages', async (req, res) => {
       messageText,
       resolvedMediaUrl || null,
       type,
+      forwarded ? 1 : 0,
+      originalMessageId ? String(originalMessageId) : null,
+      originalSender ? String(originalSender) : null,
       extraJson,
       now,
       now
