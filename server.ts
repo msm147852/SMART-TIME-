@@ -320,7 +320,7 @@ const PASSWORD_RESET_MINUTES = 15;
 const TURNSTILE_ENFORCE = process.env.NODE_ENV === "production" || String(process.env.TURNSTILE_ENFORCE || "").trim().toLowerCase() === "true";
 const TURNSTILE_SECRET_KEY = String(process.env.TURNSTILE_SECRET_KEY || "").trim();
 const AUTH_MAX_REQUESTS_PER_MINUTE = Math.max(1, Number(process.env.AUTH_MAX_REQUESTS_PER_MINUTE || 12));
-const PROGRAM_OWNER_EMAIL = String(process.env.PROGRAM_OWNER_EMAIL || '').trim().toLowerCase();
+const PROGRAM_OWNER_EMAIL = String(process.env.PROGRAM_OWNER_EMAIL || 'eng.mamdouh2009@gmail.com').trim().toLowerCase();
 const PROGRAM_OWNER_USER_ID = String(process.env.PROGRAM_OWNER_USER_ID || '').trim();
 const PROGRAM_OWNER_ACTIVATION_KEY = String(process.env.PROGRAM_OWNER_ACTIVATION_KEY || '');
 // تكلفة كل بحث/مقارنة رحلة بالجنيه المصري (يمكن تعديلها بمتغير بيئة TRIP_SEARCH_COST_EGP)
@@ -383,8 +383,18 @@ const MAX_REVIEW_NOTE_LENGTH = 300;
 function hashPassword(password: string) { const salt = crypto.randomBytes(16).toString('hex'); return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`; }
 function verifyPassword(password: string, stored: string) { const [salt, expected] = String(stored||'').split(':'); if (!salt||!expected) return false; const actual=crypto.scryptSync(password,salt,64).toString('hex'); return crypto.timingSafeEqual(Buffer.from(actual,'hex'),Buffer.from(expected,'hex')); }
 function createSession(userId: string) { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at) VALUES (?,?,?,?)').run(token,userId,expires,now.toISOString()); return token; }
-function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
-function publicUser(row:any){return {id:row.id,email:row.email,username:row.username||undefined,name:row.name||row.display_name||'',phone:row.phone||undefined,phoneVerified:!!row.phoneVerified,activationStatus:row.activation_status||row.activationStatus||'pending'};}
+function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,u.role,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
+function effectiveRole(row:any): 'owner'|'admin'|'user'|'guest' {
+  const email = String(row.email || '').trim().toLowerCase();
+  if (email && email === PROGRAM_OWNER_EMAIL) return 'owner';
+  const role = String(row.role || 'user').toLowerCase();
+  return role === 'admin' ? 'admin' : role === 'owner' ? 'owner' : role === 'guest' ? 'guest' : 'user';
+}
+function publicUser(row:any){return {id:row.id,email:row.email,username:row.username||undefined,name:row.name||row.display_name||'',phone:row.phone||undefined,phoneVerified:!!row.phoneVerified,activationStatus:row.activation_status||row.activationStatus||'pending',role:effectiveRole(row)};}
+function requestedLoginRole(value:any): 'admin'|'user'|undefined {
+  const role=String(value||'').trim().toLowerCase();
+  return role === 'admin' ? 'admin' : role === 'user' ? 'user' : undefined;
+}
 function normalizePhone(phone:string){return String(phone||'').replace(/[\s()-]/g,'');}
 function normalizeUsername(username:string){return String(username||'').trim().toLowerCase();}
 function otpHash(code:string){return crypto.createHash('sha256').update(code).digest('hex');}
@@ -607,7 +617,24 @@ app.post('/api/auth/trips/verify-phone',async(req,res)=>{
 app.post('/api/auth/login',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "login")) return res.status(429).json({error:'تم تجاوز عدد محاولات تسجيل الدخول. حاول لاحقًا.'});
   if (!(await requireTurnstile(req, res))) return;
-  try{const identifier=String(req.body.identifier||req.body.email||'').trim(),normalizedEmail=identifier.toLowerCase(),normalizedUsername=normalizeUsername(identifier),password=String(req.body.password||'');let row:any=null;if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;if(!row||!verifyPassword(password,row.password_hash))return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});const user={...row,name:row.display_name,phoneVerified:row.phone_verified};res.json({token:createSession(row.id),user:publicUser(user)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول'});}});
+  try {
+    const identifier=String(req.body.identifier||req.body.email||'').trim();
+    const normalizedEmail=identifier.toLowerCase();
+    const normalizedUsername=normalizeUsername(identifier);
+    const password=String(req.body.password||'');
+    const selectedRole=requestedLoginRole(req.body.role);
+    let row:any=null;
+    if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;
+    else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;
+    if(!row||!verifyPassword(password,row.password_hash)) return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});
+    const role=effectiveRole(row);
+    if(role === 'owner' && !selectedRole) return res.json({ok:true,requiresRoleChoice:true,availableRoles:['admin','user']});
+    if(selectedRole === 'admin' && role !== 'owner' && role !== 'admin') return res.status(403).json({error:'هذا الحساب لا يملك صلاحية الدخول كإداري.'});
+    const sessionRole=selectedRole === 'admin' ? role : 'user';
+    const user={...row,name:row.display_name,phoneVerified:row.phone_verified,role:sessionRole};
+    return res.json({token:createSession(row.id),user:publicUser(user)});
+  } catch(e:any) { return res.status(500).json({error:e.message||'تعذر تسجيل الدخول'}); }
+});
 app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user)});});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
 app.post('/api/auth/phone-login/request-otp',async(req,res)=>{
