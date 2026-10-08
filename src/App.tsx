@@ -68,8 +68,9 @@ import { NotificationsModal } from './components/NotificationsModal';
 import { LiveNewsPanel } from './components/LiveNewsPanel';
 import ServicesPage from '../app/services/page';
 import SmartAIServicePage from '../app/services/smart-ai/page';
+import { AuthView } from './components/AuthView';
 import { CalendarView } from './components/CalendarView';
-import { startTrialSession } from './services/authService';
+import { getStoredSession, restoreSession, startTrialSession } from './services/authService';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
 // Icons
@@ -83,14 +84,9 @@ import {
 
 export default function App() {
   const servicePath = typeof window !== 'undefined' ? window.location.pathname : '/';
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/') {
-      window.location.replace('/services');
-    }
-  }, []);
-
   // Global App State
   const [authChecked, setAuthChecked] = useState(false);
+  const [authenticated, setAuthenticated] = useState(() => Boolean(getStoredSession()?.token));
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [viewHistory, setViewHistory] = useState<AppView[]>([]);
   const [language, setLanguage] = useState<Language>('ar');
@@ -155,16 +151,37 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => NotificationsRepository.getNotifications());
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(() => NotesRepository.getDailyTasks());
   useEffect(() => {
-    // المرحلة التجريبية: تشغيل التطبيق مباشرة بدون شاشة دخول أو أي توثيق.
-    startTrialSession()
+    let active = true;
+    restoreSession()
       .then((session) => {
+        if (!active) return;
+        setAuthenticated(Boolean(session));
         if (session) setUserProfile(UserRepository.getProfile());
       })
-      .catch((error) => {
-        console.error('Trial session error:', error);
-        // حتى لو فشل الاتصال بالـ API، لا نعرض شاشة دخول؛ التطبيق يظل قابلاً للاستعراض.
+      .catch(() => {
+        if (active) setAuthenticated(false);
       })
-      .finally(() => setAuthChecked(true));
+      .finally(() => {
+        if (active) setAuthChecked(true);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const handleAuthenticated = useCallback(async () => {
+    const session = await restoreSession();
+    setAuthenticated(Boolean(session));
+    if (session) setUserProfile(UserRepository.getProfile());
+  }, []);
+
+  const handleGuest = useCallback(async () => {
+    try {
+      const session = await startTrialSession();
+      setAuthenticated(Boolean(session));
+      if (session) setUserProfile(UserRepository.getProfile());
+    } catch (error) {
+      console.error('Trial session error:', error);
+      setAuthenticated(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -366,7 +383,15 @@ export default function App() {
 
   if (servicePath === '/services/smart-ai') return <SmartAIServicePage />;
   if (servicePath === '/services') return <ServicesPage />;
-  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ تشغيل النسخة التجريبية…</div>;
+  if (!authChecked) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">جارٍ التحقق من جلسة الحساب…</div>;
+  if (!authenticated) {
+    return (
+      <AuthView
+        onAuthenticated={() => { void handleAuthenticated(); }}
+        onGuest={() => { void handleGuest(); }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center sm:p-3 selection:bg-accent-500 selection:text-white">
