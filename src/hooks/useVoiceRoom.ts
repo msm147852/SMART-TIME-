@@ -22,7 +22,7 @@ export function useVoiceRoom(roomId: string) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const iceServersRef = useRef<RTCIceServer[]>(VOICE_CONFIG.stunServers);
   const remoteAudio = useRef<Record<string, HTMLAudioElement>>({});
-  const remoteStreams = useRef<Record<string, MediaStream>>({});
+
   const selfId = useRef(getStoredSession()?.user?.id || '');
   const joined = useRef(false);
 
