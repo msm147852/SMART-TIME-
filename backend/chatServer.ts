@@ -583,6 +583,8 @@ chatRouter.get('/rooms', (req, res) => {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
         isArchived: !!db.prepare('SELECT 1 FROM archived_rooms WHERE user_id = ? AND room_id = ?').get(userId, r.id),
+        autoDeleteDuration: Number(r.auto_delete_duration || 0),
+        maxParticipants: Number(r.max_participants || 50),
       };
     });
 
@@ -614,6 +616,7 @@ chatRouter.post('/rooms', (req, res) => {
       backgroundUrl = '',
       settings,
       permissions,
+      maxParticipants = 50,
     } = req.body;
 
     const allowedTypes = new Set(['direct', 'group', 'public', 'voice', 'video']);
@@ -625,6 +628,7 @@ chatRouter.post('/rooms', (req, res) => {
     const voiceFlag = Boolean(isVoice || normalizedType === 'voice' || normalizedRoomType === 'voice');
     const videoFlag = Boolean(isVideo || normalizedType === 'video' || normalizedRoomType === 'video');
     const liveFlag = Boolean(isLive || voiceFlag || videoFlag);
+    const roomCapacity = Math.max(1, Math.min(Number(maxParticipants) || 50, 50));
 
     const roomId = `room_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
@@ -680,13 +684,13 @@ chatRouter.post('/rooms', (req, res) => {
     db.prepare(`
       INSERT INTO conversations (
         id, title, description, type, room_type, topic, is_voice, is_video, is_live,
-        avatar, background, background_url, creator_id, pinned, settings_json, permissions_json, created_at, updated_at
+        avatar, background, background_url, creator_id, pinned, settings_json, permissions_json, max_participants, created_at, updated_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
     `).run(
       roomId, title || 'محادثة جديدة', description, normalizedType, normalizedRoomType, topic,
       voiceFlag ? 1 : 0, videoFlag ? 1 : 0, liveFlag ? 1 : 0,
-      defaultAvatar, background, backgroundUrl, user.id, defaultSettings, defaultPerms, now, now
+      defaultAvatar, background, backgroundUrl, user.id, defaultSettings, defaultPerms, roomCapacity, now, now
     );
 
     // Add creator as owner
@@ -1576,9 +1580,11 @@ chatRouter.post('/rooms/:roomId/voice/join',(req,res)=>{
   const role=(access.role==='owner'||access.role==='admin') ? 'host' : requestedRole;
   const conv=db.prepare('SELECT voiceRoomActive, voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
   const participants=JSON.parse(conv?.voiceParticipants||'[]');
+  const maxParticipants=Number((db.prepare('SELECT max_participants FROM conversations WHERE id=?').get(roomId) as any)?.max_participants||50);
   const existing=participants.find((p:any)=>p.userId===user.id);
+  if(!existing && participants.length >= maxParticipants) return res.status(409).json({error:'الغرفة ممتلئة'});
   const participant=existing||{userId:user.id,name:user.name||'مستخدم',role,muted:role!=='host',handRaised:false,joinedAt:new Date().toISOString()};
-  if(!existing)participants.push(participant);
+  if(!existing){ participants.push(participant); db.prepare('INSERT OR IGNORE INTO voice_participants(room_id,user_id,is_muted,is_speaking,is_camera_on,joined_at) VALUES(?,?,?,?,?,?)').run(roomId,user.id,participant.muted?1:0,0,0,participant.joinedAt); }
   db.prepare('UPDATE conversations SET voiceRoomActive=1, voiceParticipants=? WHERE id=?').run(JSON.stringify(participants),roomId);
   broadcastToRoom(roomId,{type:'voice_room_updated',payload:{roomId,participants}});
   res.json({ok:true,participant,participants});
@@ -1589,6 +1595,7 @@ chatRouter.post('/rooms/:roomId/voice/leave',(req,res)=>{
   const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
   const {roomId}=req.params; if(!chatRoleAllowed(user.id,roomId))return res.status(403).json({error:'ليس لديك صلاحية الوصول لهذه الغرفة'}); const conv=db.prepare('SELECT voiceParticipants FROM conversations WHERE id=?').get(roomId) as any;
   const participants=JSON.parse(conv?.voiceParticipants||'[]').filter((p:any)=>p.userId!==user.id);
+  db.prepare('DELETE FROM voice_participants WHERE room_id=? AND user_id=?').run(roomId,user.id);
   db.prepare('UPDATE conversations SET voiceRoomActive=?, voiceParticipants=? WHERE id=?').run(participants.length?1:0,JSON.stringify(participants),roomId);
   broadcastToRoom(roomId,{type:'voice_participant_left',payload:{roomId,userId:user.id,participants}});
   res.json({ok:true,participants});
@@ -1601,6 +1608,7 @@ chatRouter.post('/rooms/:roomId/voice/mute',(req,res)=>{
   const participants=JSON.parse(conv?.voiceParticipants||'[]'); const p=participants.find((x:any)=>x.userId===user.id);
   if(!p)return res.status(404).json({error:'أنت لست داخل الغرفة الصوتية'});
   p.muted=!!req.body?.muted; db.prepare('UPDATE conversations SET voiceParticipants=? WHERE id=?').run(JSON.stringify(participants),roomId);
+  db.prepare('UPDATE voice_participants SET is_muted=? WHERE room_id=? AND user_id=?').run(p.muted?1:0,roomId,user.id);
   broadcastToRoom(roomId,{type:'voice_room_updated',payload:{roomId,participants}});
   res.json({ok:true,muted:p.muted});
  }catch(e:any){res.status(500).json({error:e.message})}
@@ -1688,6 +1696,11 @@ chatRouter.get('/rooms/:roomId/voice/token',(req,res)=>{
   try{
     const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
     const access=verifyConversationAccess(user.id,req.params.roomId); if(!access.allowed && !access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const mode=(process.env.VOICE_MODE||'p2p').trim().toLowerCase();
+    if(mode!=='livekit') return res.json({mode:'p2p',token:'p2p-'+req.params.roomId+'-'+user.id,iceServers:[
+      ...(process.env.COTURN_URL?[{urls:process.env.COTURN_URL,username:process.env.COTURN_USER||undefined,credential:process.env.COTURN_PASS||undefined}]:[]),
+      {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}
+    ]});
     const key=process.env.LIVEKIT_API_KEY?.trim(), secret=process.env.LIVEKIT_API_SECRET?.trim(), url=process.env.LIVEKIT_URL?.trim();
     if(!key||!secret||!url)return res.status(503).json({error:'LiveKit غير مُهيأ على الخادم'});
     const b64=(s:string)=>Buffer.from(s).toString('base64url');
@@ -1696,7 +1709,7 @@ chatRouter.get('/rooms/:roomId/voice/token',(req,res)=>{
     const payload=b64(JSON.stringify({iss:key,sub:user.id,nbf:now,exp,video:{roomJoin:true,room:req.params.roomId,canPublish:true,canSubscribe:true,canPublishData:true}}));
     const unsigned=header+'.'+payload;
     const sig=crypto.createHmac('sha256',secret).update(unsigned).digest('base64url');
-    res.json({token:unsigned+'.'+sig,url});
+    res.json({mode:'livekit',token:unsigned+'.'+sig,url});
   }catch(e:any){res.status(500).json({error:e.message});}
 });
 
@@ -1730,6 +1743,9 @@ chatRouter.post('/users/:id/unblock',(req,res)=>{
   catch(e:any){res.status(500).json({error:e.message});}
 });
 chatRouter.get('/users/blocked',(req,res)=>{
+  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const rows=db.prepare('SELECT u.id,u.display_name as name,u.email,u.avatar,u.phone,b.created_at as createdAt FROM blocked_users b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=? ORDER BY b.created_at DESC').all(user.id);res.json({users:rows});}
+  catch(e:any){res.status(500).json({error:e.message});}
+});chatRouter.get('/blocked',(req,res)=>{
   try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const rows=db.prepare('SELECT u.id,u.display_name as name,u.email,u.avatar,u.phone,b.created_at as createdAt FROM blocked_users b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=? ORDER BY b.created_at DESC').all(user.id);res.json({users:rows});}
   catch(e:any){res.status(500).json({error:e.message});}
 });
@@ -1767,6 +1783,15 @@ chatRouter.get('/rooms/:roomId/settings',(req,res)=>{
 });
 
 // Existing message-send endpoint is reused for forwarding.
+
+chatRouter.post('/messages/:messageId/react',(req,res)=>{
+  req.params.roomId=String((db.prepare('SELECT conversation_id FROM messages WHERE id=?').get(req.params.messageId) as any)?.conversation_id||'');
+  const forward=req.params.roomId;
+  if(!forward)return res.status(404).json({error:'الرسالة غير موجودة'});
+  const accessUser=getAuthUser(req); if(!accessUser)return res.status(401).json({error:'يجب تسجيل الدخول'});
+  req.url='/rooms/'+forward+'/messages/'+req.params.messageId+'/reactions';
+  return chatRouter.handle(req,res,()=>{});
+});
 chatRouter.post('/stories',(req,res)=>{
  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const id='story_'+crypto.randomUUID();const now=new Date().toISOString();db.prepare('INSERT INTO stories(id,user_id,body,media_url,expires_at,created_at) VALUES(?,?,?,?,?,?)').run(id,user.id,String(req.body?.body||''),req.body?.mediaUrl||null,req.body?.expiresAt||new Date(Date.now()+86400000).toISOString(),now);res.json({ok:true,id})}catch(e:any){res.status(500).json({error:e.message})}
 });
