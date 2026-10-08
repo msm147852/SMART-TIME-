@@ -144,6 +144,60 @@ const groqHealthHandler = async (_req: express.Request, res: express.Response) =
 app.get("/api/ai/groq-health", groqHealthHandler);
 app.get("/api/ai/groq_health", groqHealthHandler);
 
+function base64Url(value: string | Buffer): string {
+  return Buffer.from(value).toString("base64").replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+}
+
+function createLiveKitAccessToken(input: { apiKey: string; apiSecret: string; identity: string; room: string }) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = base64Url(JSON.stringify({
+    iss: input.apiKey,
+    sub: input.identity,
+    iat: now,
+    nbf: now,
+    exp: now + 10 * 60,
+    video: {
+      roomJoin: true,
+      room: input.room,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    },
+  }));
+  const signingInput = `${header}.${payload}`;
+  const signature = crypto.createHmac("sha256", input.apiSecret).update(signingInput).digest();
+  return `${signingInput}.${base64Url(signature)}`;
+}
+
+app.post("/api/voice/livekit-token", (req, res) => {
+  const user = authUser(req);
+  if (!user) return res.status(401).json({ error: "Authentication is required for voice." });
+
+  const apiKey = String(process.env.LIVEKIT_API_KEY || "").trim();
+  const apiSecret = String(process.env.LIVEKIT_API_SECRET || "").trim();
+  const serverUrl = String(process.env.LIVEKIT_URL || "").trim();
+  if (!apiKey || !apiSecret || !serverUrl) {
+    return res.status(503).json({ error: "LiveKit voice transport is not configured." });
+  }
+
+  const roomName = `smart-time-voice-${String(user.id).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80)}`;
+  const token = createLiveKitAccessToken({
+    apiKey,
+    apiSecret,
+    identity: String(user.id),
+    room: roomName,
+  });
+
+  return res.json({
+    serverUrl,
+    roomName,
+    token,
+    expiresInSeconds: 600,
+  });
+});
+
+
 app.post("/api/ai/stt", async (req, res) => {
   const user = authUser(req);
   if (!user) return res.status(401).json({ error: "Authentication is required for voice transcription." });
