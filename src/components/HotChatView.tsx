@@ -396,6 +396,10 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             if (detail.moderatorPermissions) setModeratorPermissions(detail.moderatorPermissions);
             setRoomDescription(detail.description || '');
             setChatBackground(detail.background || '');
+            chatService.getRoomSettings(activeRoomId).then((settings) => {
+              if (settings?.wallpaper_url) setChatBackground(settings.wallpaper_url);
+              try { localStorage.setItem('smart_time_room_settings_' + activeRoomId, JSON.stringify(settings)); } catch {}
+            }).catch(() => {});
           }
         })
         .catch(() => {});
@@ -1938,6 +1942,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                           </div>
                         )}
 
+                        {Object.entries((((msg as any).extra?.reactions) || {}) as Record<string, number>).map(([emoji, count]) => (
+                          <button key={emoji} type="button" onClick={async () => { try { const d = await chatService.getReactionDetails(activeRoomId, msg.id); const names = (d.users || []).filter((u:any) => u.reaction === emoji).map((u:any) => u.name).join('، '); alert(names || (isAr ? 'لا يوجد متفاعلون' : 'No reactors')); } catch {} }} className="px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-[10px]">
+                            {emoji} {count}
+                          </button>
+                        ))}
                         <div
                           className={`text-[9px] flex items-center justify-end gap-1 font-mono-num ${
                             msg.isOutgoing ? 'text-sky-100' : 'text-slate-400'
