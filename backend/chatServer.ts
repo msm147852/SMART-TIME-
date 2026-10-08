@@ -118,6 +118,32 @@ export function verifyConversationAccess(userId: string, roomId: string): { allo
   }
 }
 
+
+// P2 privacy helpers.
+function isBlockedBetween(userA: string, userB: string): boolean {
+  if (!userA || !userB || userA === userB) return false;
+  const row = db.prepare('SELECT 1 FROM blocked_users WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1').get(userA, userB, userB, userA);
+  return !!row;
+}
+function isTrialModeDenied(req: express.Request): boolean {
+  const trial = String(process.env.TRIAL_MODE || '').toLowerCase();
+  return ['1','true','yes','on'].includes(trial) && !getAuthUser(req);
+}
+function purgeExpiredChatMessages(): number {
+  const rows = db.prepare('SELECT id FROM conversations WHERE auto_delete_duration > 0').all() as any[];
+  let deleted = 0;
+  const now = Date.now();
+  for (const room of rows) {
+    const conv = db.prepare('SELECT auto_delete_duration FROM conversations WHERE id = ?').get(room.id) as any;
+    const cutoff = new Date(now - Number(conv?.auto_delete_duration || 0) * 1000).toISOString();
+    const result = db.prepare("UPDATE messages SET is_deleted=1, body='تم حذف هذه الرسالة تلقائياً', media_url=NULL, updated_at=? WHERE conversation_id=? AND is_deleted=0 AND created_at < ?").run(new Date().toISOString(), room.id, cutoff);
+    deleted += Number(result.changes || 0);
+    if (Number(result.changes || 0) > 0) broadcastToRoom(room.id, { type: 'messages_auto_deleted', payload: { roomId: room.id } });
+  }
+  return deleted;
+}
+setInterval(() => { try { purgeExpiredChatMessages(); } catch (err) { console.warn('chat auto-delete failed', err); } }, 60 * 60 * 1000);
+
 // Setup WebSocket server
 export function setupChatWebSocket(httpServer: http.Server) {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws/chat' });
@@ -480,6 +506,7 @@ chatRouter.get('/rooms', (req, res) => {
 
     const rows = (userId ? db.prepare(query).all(userId, userId, userId, userId, userId) : db.prepare(query).all()) as any[];
 
+    const archivedOnly = String(req.query.archived || 'false').toLowerCase() === 'true';
     const rooms = rows.map((r) => {
       let settings = null;
       let permissions = null;
@@ -555,10 +582,12 @@ chatRouter.get('/rooms', (req, res) => {
         adminPermissions,        moderatorPermissions,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
+        isArchived: !!db.prepare('SELECT 1 FROM archived_rooms WHERE user_id = ? AND room_id = ?').get(userId, r.id),
       };
     });
 
-    res.json({ rooms });
+    const visibleRooms = rooms.filter((room: any) => archivedOnly ? !!room.isArchived : !room.isArchived);
+    res.json({ rooms: visibleRooms });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -599,6 +628,10 @@ chatRouter.post('/rooms', (req, res) => {
 
     const roomId = `room_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
+
+    if (normalizedType === 'direct' && memberIds.length === 1 && isBlockedBetween(user.id, String(memberIds[0]))) {
+      return res.status(403).json({ error: 'لا يمكن إنشاء محادثة مع مستخدم محظور' });
+    }
 
     // Check if direct chat between these two users already exists
     if (type === 'direct' && memberIds.length === 1) {
@@ -1012,6 +1045,10 @@ chatRouter.post('/rooms/:roomId/messages', async (req, res) => {
     if (!access.allowed && !access.isPublic) {
       return res.status(403).json({ error: 'ليس لديك صلاحية الإرسال في هذه الغرفة' });
     }
+    const blockedSender = db.prepare('SELECT 1 FROM blocked_users bu JOIN conversation_members cm ON cm.user_id = bu.blocked_id WHERE bu.blocker_id = ? AND cm.conversation_id = ? LIMIT 1').get(user.id, roomId);
+    if (blockedSender) return res.status(403).json({ error: 'لا يمكنك إرسال رسالة إلى مستخدم قمت بحظره' });
+    const blockedPeer = db.prepare('SELECT 1 FROM blocked_users bu JOIN conversation_members cm ON cm.user_id = bu.blocker_id WHERE bu.blocked_id = ? AND cm.conversation_id = ? LIMIT 1').get(user.id, roomId);
+    if (blockedPeer) return res.status(403).json({ error: 'لا يمكنك إرسال رسالة إلى مستخدم قام بحظرك' });
     if (access.allowed && !chatPermissionAllowed(user.id, roomId, 'sendMessages')) {
       return res.status(403).json({ error: 'إرسال الرسائل غير مسموح به في هذه الغرفة' });
     }
@@ -1345,6 +1382,9 @@ chatRouter.post('/rooms/:roomId/members', (req, res) => {
       return res.status(403).json({ error: 'لا يمكنك منح هذا الدور' });
     }
 
+    if (String(targetUserId) === String(user.id)) return res.status(400).json({ error: 'لا يمكنك إضافة نفسك بهذه الطريقة' });
+    if (isBlockedBetween(user.id, String(targetUserId))) return res.status(403).json({ error: 'لا يمكن إضافة مستخدم محظور' });
+
     const existing = db.prepare('SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(roomId, targetUserId) as any;
     if (existing) {
       return res.status(409).json({ error: 'هذا المستخدم عضو بالفعل في الغرفة' });
@@ -1638,6 +1678,89 @@ chatRouter.get('/rooms/:roomId/messages/:messageId/reactions', (req, res) => {
   } catch (err:any) { res.status(500).json({ error: err.message }); }
 });
 
+chatRouter.get('/rooms/:roomId/voice/token',(req,res)=>{
+  try{
+    const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const access=verifyConversationAccess(user.id,req.params.roomId); if(!access.allowed && !access.isPublic)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const key=process.env.LIVEKIT_API_KEY?.trim(), secret=process.env.LIVEKIT_API_SECRET?.trim(), url=process.env.LIVEKIT_URL?.trim();
+    if(!key||!secret||!url)return res.status(503).json({error:'LiveKit غير مُهيأ على الخادم'});
+    const b64=(s:string)=>Buffer.from(s).toString('base64url');
+    const now=Math.floor(Date.now()/1000), exp=now+3600;
+    const header=b64(JSON.stringify({alg:'HS256',typ:'JWT'}));
+    const payload=b64(JSON.stringify({iss:key,sub:user.id,nbf:now,exp,video:{roomJoin:true,room:req.params.roomId,canPublish:true,canSubscribe:true,canPublishData:true}}));
+    const unsigned=header+'.'+payload;
+    const sig=crypto.createHmac('sha256',secret).update(unsigned).digest('base64url');
+    res.json({token:unsigned+'.'+sig,url});
+  }catch(e:any){res.status(500).json({error:e.message});}
+});
+
+// P2: per-user archive. This never deletes a room or affects other participants.
+chatRouter.put('/rooms/:roomId/archive', (req, res) => {
+  try {
+    const user = getAuthUser(req); if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+    const { roomId } = req.params; const conv = db.prepare('SELECT id FROM conversations WHERE id=?').get(roomId) as any;
+    if (!conv) return res.status(404).json({ error: 'الغرفة غير موجودة' });
+    if (!verifyConversationAccess(user.id, roomId).allowed) return res.status(403).json({ error: 'ليس لديك صلاحية' });
+    const archived = !!req.body?.archived; const now = new Date().toISOString();
+    if (archived) db.prepare('INSERT OR REPLACE INTO archived_rooms(user_id,room_id,archived_at) VALUES(?,?,?)').run(user.id, roomId, now);
+    else db.prepare('DELETE FROM archived_rooms WHERE user_id=? AND room_id=?').run(user.id, roomId);
+    res.json({ ok:true, archived });
+  } catch (e:any) { res.status(500).json({ error:e.message }); }
+});
+
+chatRouter.post('/users/:id/block', (req,res) => {
+  try {
+    const user=getAuthUser(req); if(!user) return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const target=String(req.params.id); if(target===user.id) return res.status(400).json({error:'لا يمكنك حظر نفسك'});
+    if(isTrialModeDenied(req)) return res.status(403).json({error:'الحظر غير متاح في وضع التجربة'});
+    const exists=db.prepare('SELECT id FROM users WHERE id=?').get(target); if(!exists) return res.status(404).json({error:'المستخدم غير موجود'});
+    db.prepare('INSERT OR IGNORE INTO blocked_users(blocker_id,blocked_id,created_at) VALUES(?,?,?)').run(user.id,target,new Date().toISOString());
+    sendToUser(target,{type:'user_blocked',payload:{userId:user.id}});
+    res.json({ok:true,blocked:true});
+  } catch(e:any){res.status(500).json({error:e.message});}
+});
+chatRouter.post('/users/:id/unblock',(req,res)=>{
+  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});db.prepare('DELETE FROM blocked_users WHERE blocker_id=? AND blocked_id=?').run(user.id,String(req.params.id));res.json({ok:true,blocked:false});}
+  catch(e:any){res.status(500).json({error:e.message});}
+});
+chatRouter.get('/users/blocked',(req,res)=>{
+  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const rows=db.prepare('SELECT u.id,u.display_name as name,u.email,u.avatar,u.phone,b.created_at as createdAt FROM blocked_users b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=? ORDER BY b.created_at DESC').all(user.id);res.json({users:rows});}
+  catch(e:any){res.status(500).json({error:e.message});}
+});
+
+chatRouter.put('/rooms/:roomId/auto-delete',(req,res)=>{
+  try{
+    const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const duration=Number(req.body?.duration||0); if(![0,3600,86400,604800].includes(duration))return res.status(400).json({error:'مدة الحذف غير صالحة'});
+    const access=verifyConversationAccess(user.id,req.params.roomId);
+    if(!access.allowed || (access.role!=='owner' && access.role!=='admin')) return res.status(403).json({error:'للمالك/المشرف فقط'});
+    db.prepare('UPDATE conversations SET auto_delete_duration=? WHERE id=?').run(duration,req.params.roomId);
+    broadcastToRoom(req.params.roomId,{type:'auto_delete_updated',payload:{roomId:req.params.roomId,duration}});
+    res.json({ok:true,duration});
+  }catch(e:any){res.status(500).json({error:e.message});}
+});
+
+chatRouter.put('/rooms/:roomId/settings',(req,res)=>{
+  try{
+    const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
+    const access=verifyConversationAccess(user.id,req.params.roomId);if(!access.allowed)return res.status(403).json({error:'ليس لديك صلاحية'});
+    const b=req.body||{}; const current=db.prepare('SELECT * FROM room_settings WHERE user_id=? AND room_id=?').get(user.id,req.params.roomId) as any;
+    const mute=b.mute===undefined?Number(current?.mute||0):b.mute?1:0;
+    const customSound=b.custom_sound===undefined?(current?.custom_sound||null):String(b.custom_sound||'')||null;
+    const muteUntil=b.custom_mute_until===undefined?(current?.custom_mute_until||null):b.custom_mute_until||null;
+    const wallpaperUrl=b.wallpaper_url===undefined?(current?.wallpaper_url||null):String(b.wallpaper_url||'')||null;
+    const wallpaperType=b.wallpaper_type===undefined?(current?.wallpaper_type||'default'):String(b.wallpaper_type||'default');
+    if(!['default','color','image'].includes(wallpaperType))return res.status(400).json({error:'نوع الخلفية غير صالح'});
+    db.prepare('INSERT OR REPLACE INTO room_settings(user_id,room_id,mute,custom_sound,custom_mute_until,wallpaper_url,wallpaper_type) VALUES(?,?,?,?,?,?,?)').run(user.id,req.params.roomId,mute,customSound,muteUntil,wallpaperUrl,wallpaperType);
+    res.json({ok:true,settings:{mute:!!mute,custom_sound:customSound,custom_mute_until:muteUntil,wallpaper_url:wallpaperUrl,wallpaper_type:wallpaperType}});
+  }catch(e:any){res.status(500).json({error:e.message});}
+});
+chatRouter.get('/rooms/:roomId/settings',(req,res)=>{
+  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const access=verifyConversationAccess(user.id,req.params.roomId);if(!access.allowed)return res.status(403).json({error:'ليس لديك صلاحية'});const s=db.prepare('SELECT * FROM room_settings WHERE user_id=? AND room_id=?').get(user.id,req.params.roomId) as any;res.json({settings:{mute:!!s?.mute,custom_sound:s?.custom_sound||null,custom_mute_until:s?.custom_mute_until||null,wallpaper_url:s?.wallpaper_url||null,wallpaper_type:s?.wallpaper_type||'default'}});}
+  catch(e:any){res.status(500).json({error:e.message});}
+});
+
+// Existing message-send endpoint is reused for forwarding.
 chatRouter.post('/stories',(req,res)=>{
  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const id='story_'+crypto.randomUUID();const now=new Date().toISOString();db.prepare('INSERT INTO stories(id,user_id,body,media_url,expires_at,created_at) VALUES(?,?,?,?,?,?)').run(id,user.id,String(req.body?.body||''),req.body?.mediaUrl||null,req.body?.expiresAt||new Date(Date.now()+86400000).toISOString(),now);res.json({ok:true,id})}catch(e:any){res.status(500).json({error:e.message})}
 });
