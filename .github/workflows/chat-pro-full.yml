@@ -12,6 +12,13 @@ on:
       - 'src/components/ChatSettingsModal.tsx'
       - 'src/components/HotChatView.tsx'
       - 'src/components/VoiceRoomModal.tsx'
+      - 'src/components/LiveKitCallModal.tsx'
+      - 'src/components/chat/CreateVoiceRoomModal.tsx'
+      - 'src/components/chat/CreateVideoRoomModal.tsx'
+      - 'src/components/chat/VoiceRoomView.tsx'
+      - 'src/hooks/useVoiceRoom.ts'
+      - 'src/config/voice.ts'
+      - 'scripts/verify-chat-p2p.mjs'
       - 'src/services/chatService.ts'
       - 'scripts/verify-chat-pro-full.mjs'
       - 'package.json'
@@ -27,5 +34,6 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run verify:chat-pro-full
+      - run: npm run verify:chat-p2p
       - run: npm run lint
       - run: npm run build
