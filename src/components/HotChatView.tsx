@@ -1700,7 +1700,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                       backgroundPosition: 'center',
                     }
                   : chatBackground
-                  ? { backgroundImage: chatBackground }
+                  ? (chatBackground.startsWith('#') ? { background: chatBackground } : { backgroundImage: `url(${chatBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' })
                   : undefined
               }
             >
