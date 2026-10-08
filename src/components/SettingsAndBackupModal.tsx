@@ -575,6 +575,28 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
           {/* ======================================================== */}
           {activeTab === 'profile' && (
             <div className="space-y-4 text-xs">
+              {/* إعدادات الحساب */}
+              <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900 dark:text-white">{isAr ? 'إعدادات الحساب' : 'Account Settings'}</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{isAr ? 'إدارة بيانات حسابك والخروج من الحساب بأمان.' : 'Manage your account and securely sign out.'}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  id="smart-time-logout-btn"
+                  className="w-full py-3 rounded-xl border border-rose-500/30 bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 font-black text-xs hover:bg-rose-500/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <span>↪</span>
+                  <span>{isAr ? 'تسجيل الخروج من الحساب' : 'Log out of account'}</span>
+                </button>
+              </div>
+
               {/* 1. اختيار صورة المستخدم من هاتفه أو من النماذج الجاهزة */}
               <div
                 onDragOver={(e) => {
@@ -2141,18 +2163,6 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={onLogout}
-            className="w-full py-2.5 rounded-xl border border-rose-500/30 text-rose-600 dark:text-rose-400 font-black text-xs hover:bg-rose-500/10 transition-all flex items-center justify-center gap-2"
-            id="smart-time-logout-btn"
-          >
-            <span>↪</span>
-            <span>{isAr ? 'تسجيل الخروج' : 'Log out'}</span>
-          </button>
         </div>
 
         {/* Footer Action: حفظ جميع التعديلات وربطها فوراً */}
