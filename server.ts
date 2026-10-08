@@ -22,6 +22,7 @@ import { createHttpVoiceDnaProvider, DisabledVoiceDnaProvider } from "./backend/
 import { POST as smartAiV2Infer } from "./app/api/ai/infer/route.js";
 import { getGroqHealth, groqProvider } from "./backend/ai/providers/groqProvider.js";
 import { verifyTurnstileToken } from "./backend/security/turnstile.js";
+import { sendPasswordResetEmail } from "./backend/auth/passwordResetEmail.js";
 
 dotenv.config();
 
@@ -539,23 +540,6 @@ async function checkPhoneOtp(phone: string, code: string): Promise<OtpCheckResul
   return { ok: true };
 }
 
-async function sendPasswordResetEmail(email:string, code:string){
-  const provider=String(process.env.EMAIL_PROVIDER||'').trim().toLowerCase();
-  const from=String(process.env.EMAIL_FROM||'').trim();
-  const subject='SMART TIME - رمز إعادة تعيين كلمة المرور';
-  const text=`رمز إعادة تعيين كلمة المرور في SMART TIME هو: ${code}. صالح لمدة ${PASSWORD_RESET_MINUTES} دقيقة. إذا لم تطلب ذلك، تجاهل هذه الرسالة.`;
-  if(provider==='resend'){
-    const key=String(process.env.RESEND_API_KEY||'').trim();
-    if(!key||!from) throw new Error('إعدادات البريد غير مكتملة: RESEND_API_KEY و EMAIL_FROM مطلوبان.');
-    const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[email],subject,text})});
-    if(!r.ok) throw new Error(`فشل إرسال البريد (${r.status}).`);
-    return {provider:'resend'};
-  }
-  if(String(process.env.ALLOW_DEV_EMAIL_CODE||'').toLowerCase()==='true') return {provider:'development',devCode:code};
-  throw new Error('خدمة البريد غير مكوّنة. اضبط EMAIL_PROVIDER=resend و RESEND_API_KEY و EMAIL_FROM أولاً.');
-}
-
-
 app.get('/api/trial/session', (req,res) => {
   if (!TRIAL_MODE) return res.status(404).json({ error: 'Trial mode is disabled' });
   try {
@@ -773,7 +757,7 @@ app.post('/api/auth/phone-login',async(req,res)=>{
 app.post('/api/auth/forgot-password',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "forgot-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.'});
   if (!(await requireTurnstile(req, res))) return;
-  try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code);res.json({ok:true,emailSent:true,provider:info.provider,devCode:info.devCode});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.status(503).json({error:mailErr.message||'تعذر إرسال رسالة إعادة تعيين كلمة المرور.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
+  try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code,PASSWORD_RESET_MINUTES);res.json({ok:true,emailSent:true,provider:info.provider,devCode:info.devCode});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.status(503).json({error:mailErr.message||'تعذر إرسال رسالة إعادة تعيين كلمة المرور.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
 app.post('/api/auth/reset-password',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "reset-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات تغيير كلمة المرور. حاول لاحقًا.'});
   if (!(await requireTurnstile(req, res))) return;
