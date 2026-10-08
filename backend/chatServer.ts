@@ -348,8 +348,10 @@ chatRouter.post('/users/resolve', (req, res) => {
     if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
 
     const phones = Array.isArray(req.body?.phones) ? req.body.phones : [];
-    const normalizedPhones = Array.from(new Set(
-      phones.map((phone: unknown) => normalizeEG(String(phone || ''))).filter((phone): phone is string => Boolean(phone))
+    const normalizedPhones: string[] = Array.from(new Set(
+      phones
+        .map((phone: unknown): string | null => normalizeEG(String(phone || '')))
+        .filter((phone): phone is string => Boolean(phone))
     )).slice(0, 50);
 
     if (!normalizedPhones.length) return res.json({ matches: [] });
