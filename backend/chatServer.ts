@@ -381,7 +381,7 @@ chatRouter.get('/users', (req, res) => {
       email: u.email,
       avatar: u.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80`,
       phone: u.phone,
-      isOnline: isUserOnline(u.id),
+      isOnline: isUserOnline(u.id) && !isBlockedBetween(user.id, u.id),
       isCurrent: user ? user.id === u.id : false,
     }));
 
