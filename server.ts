@@ -3,6 +3,7 @@ import http from "node:http";
 import path from "path";
 import dotenv from "dotenv";
 import crypto from "node:crypto";
+import { WebSocket } from "ws";
 import { Buffer } from "node:buffer";
 import { db, seedDefaultChatRooms } from "./backend/database.js";
 import { getCache, setCache } from "./backend/cache.js";
@@ -176,7 +177,7 @@ app.post("/api/voice/livekit-token", (req, res) => {
 
   const apiKey = String(process.env.LIVEKIT_API_KEY || "").trim();
   const apiSecret = String(process.env.LIVEKIT_API_SECRET || "").trim();
-  const serverUrl = String(process.env.LIVEKIT_URL || "").trim();
+  const serverUrl = String(process.env.LIVEKIT_PUBLIC_WS_URL || process.env.LIVEKIT_URL || "").trim();
   if (!apiKey || !apiSecret || !serverUrl) {
     return res.status(503).json({ error: "LiveKit voice transport is not configured." });
   }
@@ -2305,6 +2306,48 @@ async function startServer() {
 
   const httpServer = http.createServer(app);
   setupChatWebSocket(httpServer);
+  const liveKitOrigin = String(process.env.LIVEKIT_ORIGIN_WS_URL || "").trim();
+  if (liveKitOrigin) {
+    httpServer.on("upgrade", (req, socket, head) => {
+      const requestUrl = String(req.url || "");
+      if (!requestUrl.startsWith("/livekit/")) return;
+
+      try {
+        const targetUrl = new URL(requestUrl.replace(/^\/livekit/, ""), liveKitOrigin);
+        const upstream = new WebSocket(targetUrl.toString());
+        const client = new WebSocket.Server({ noServer: true });
+
+        const reject = () => {
+          try { socket.destroy(); } catch {}
+          try { upstream.close(); } catch {}
+        };
+
+        upstream.once("open", () => {
+          client.handleUpgrade(req, socket, head, (downstream) => {
+            downstream.on("message", (data) => {
+              if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
+            });
+            downstream.on("close", () => {
+              try { upstream.close(); } catch {}
+            });
+            downstream.on("error", reject);
+
+            upstream.on("message", (data) => {
+              if (downstream.readyState === WebSocket.OPEN) downstream.send(data);
+            });
+            upstream.on("close", (code, reason) => {
+              try { downstream.close(code, reason); } catch {}
+            });
+            upstream.on("error", reject);
+          });
+        });
+        upstream.once("error", reject);
+      } catch {
+        try { socket.destroy(); } catch {}
+      }
+    });
+  }
+
 
   queueDueEventReminders();
   const reminderScheduler = setInterval(() => {
