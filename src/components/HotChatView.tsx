@@ -222,6 +222,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
   const [chatBackground, setChatBackground] = useState<string>('');
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [selectedForwardRooms, setSelectedForwardRooms] = useState<string[]>([]);
 
   // Create room state
   const [newRoomTitle, setNewRoomTitle] = useState('');
@@ -924,11 +925,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const handleForwardMessage = async (msg: ChatMessage) => {
     const candidates = rooms.filter((r) => r.id !== activeRoomId);
     if (!candidates.length) return;
-    const raw = window.prompt((isAr ? 'اكتب أرقام الغرف مفصولة بفاصلة: ' : 'Enter room numbers separated by commas: ') + candidates.map((r,i)=>String(i+1)+':'+(r.title||r.name)).join(' | '));
-    if (!raw) return;
-    const indexes = raw.split(',').map((x)=>Number(x.trim())-1).filter((x)=>Number.isInteger(x)&&x>=0&&x<candidates.length);
-    for (const idx of Array.from(new Set(indexes))) await chatService.forwardMessage(candidates[idx].id,msg);
-    setForwardingMessage(null);
+    setSelectedForwardRooms([]);
+    setForwardingMessage(msg);
   };
 
   // Pin / Unpin
@@ -2282,6 +2280,18 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         language={language}
         onClose={() => setActiveCall(null)}
       />
+
+      {forwardingMessage && (
+        <div className="fixed inset-0 z-[140] bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-5 text-white">
+            <div className="flex items-center justify-between mb-4"><h3 className="font-black">{isAr?'توجيه الرسالة إلى':'Forward message to'}</h3><button onClick={()=>setForwardingMessage(null)}><X/></button></div>
+            <div className="max-h-72 overflow-y-auto space-y-2">
+              {rooms.filter(r=>r.id!==activeRoomId).map(r=><label key={r.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/70 cursor-pointer"><input type="checkbox" checked={selectedForwardRooms.includes(r.id)} onChange={(e)=>setSelectedForwardRooms(prev=>e.target.checked?[...prev,r.id]:prev.filter(id=>id!==r.id))}/><span className="text-sm">{r.title||r.name}</span></label>)}
+            </div>
+            <button disabled={!selectedForwardRooms.length} onClick={async()=>{for(const id of selectedForwardRooms) await chatService.forwardMessage(id,forwardingMessage);setForwardingMessage(null);setSelectedForwardRooms([]);}} className="mt-4 w-full py-2.5 rounded-xl bg-sky-600 disabled:opacity-40 font-bold">{isAr?'توجيه':'Forward'}</button>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: Create New Room */}
