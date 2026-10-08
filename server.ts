@@ -382,6 +382,24 @@ const ALLOWED_TOPUP_METHODS = new Set(['vodafone_cash', 'instapay', 'etisalat_ca
 const MAX_REVIEW_NOTE_LENGTH = 300;
 function hashPassword(password: string) { const salt = crypto.randomBytes(16).toString('hex'); return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`; }
 function verifyPassword(password: string, stored: string) { const [salt, expected] = String(stored||'').split(':'); if (!salt||!expected) return false; const actual=crypto.scryptSync(password,salt,64).toString('hex'); return crypto.timingSafeEqual(Buffer.from(actual,'hex'),Buffer.from(expected,'hex')); }
+function createRoleChoiceTicket(userId:string) {
+  const payload=base64Url(JSON.stringify({userId,exp:Date.now()+2*60_000}));
+  const secret=String(process.env.AUTH_ROLE_TICKET_SECRET||TURNSTILE_SECRET_KEY||PROGRAM_OWNER_EMAIL);
+  const sig=base64Url(crypto.createHmac('sha256',secret).update(payload).digest());
+  return payload+'.'+sig;
+}
+function verifyRoleChoiceTicket(ticket:string) {
+  const [payload,sig]=String(ticket||'').split('.');
+  if(!payload||!sig) return null;
+  const secret=String(process.env.AUTH_ROLE_TICKET_SECRET||TURNSTILE_SECRET_KEY||PROGRAM_OWNER_EMAIL);
+  const expected=base64Url(crypto.createHmac('sha256',secret).update(payload).digest());
+  try {
+    if(sig.length!==expected.length || !crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(expected))) return null;
+    const data=JSON.parse(Buffer.from(payload,'base64url').toString('utf8'));
+    if(!data?.userId || Number(data.exp||0)<Date.now()) return null;
+    return String(data.userId);
+  } catch { return null; }
+}
 function createSession(userId: string) { const token=crypto.randomBytes(32).toString('hex'); const now=new Date(); const expires=new Date(now.getTime()+AUTH_SESSION_DAYS*86400000).toISOString(); db.prepare('INSERT INTO sessions (id,user_id,expires_at,created_at) VALUES (?,?,?,?)').run(token,userId,expires,now.toISOString()); return token; }
 function authUser(req: express.Request) { const h=String(req.headers.authorization||''); const token=h.startsWith('Bearer ')?h.slice(7).trim():''; if(!token)return null; return db.prepare(`SELECT u.id,u.email,u.username,u.display_name as name,u.phone,u.phone_verified as phoneVerified,u.role,s.id as session_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND julianday(s.expires_at) > julianday('now')`).get(token) as any || null; }
 function effectiveRole(row:any): 'owner'|'admin'|'user'|'guest' {
@@ -628,12 +646,23 @@ app.post('/api/auth/login',async(req,res)=>{
     else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;
     if(!row||!verifyPassword(password,row.password_hash)) return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});
     const role=effectiveRole(row);
-    if(role === 'owner' && !selectedRole) return res.json({ok:true,requiresRoleChoice:true,availableRoles:['admin','user']});
+    if(role === 'owner' && !selectedRole) return res.json({ok:true,requiresRoleChoice:true,availableRoles:['admin','user'],roleChoiceTicket:createRoleChoiceTicket(row.id)});
     if(selectedRole === 'admin' && role !== 'owner' && role !== 'admin') return res.status(403).json({error:'هذا الحساب لا يملك صلاحية الدخول كإداري.'});
     const sessionRole=selectedRole === 'admin' ? role : 'user';
     const user={...row,name:row.display_name,phoneVerified:row.phone_verified,role:sessionRole};
     return res.json({token:createSession(row.id),user:publicUser(user)});
   } catch(e:any) { return res.status(500).json({error:e.message||'تعذر تسجيل الدخول'}); }
+});
+app.post('/api/auth/select-role',(req,res)=>{
+  try {
+    const ticketUserId=verifyRoleChoiceTicket(String(req.body?.roleChoiceTicket||''));
+    const selectedRole=requestedLoginRole(req.body?.role);
+    if(!ticketUserId || !selectedRole) return res.status(403).json({error:'انتهت صلاحية اختيار نوع الدخول. سجّل الدخول مرة أخرى.'});
+    const row=db.prepare('SELECT * FROM users WHERE id=?').get(ticketUserId) as any;
+    if(!row || effectiveRole(row)!=='owner') return res.status(403).json({error:'هذا الحساب لا يملك صلاحية اختيار الوضع الإداري.'});
+    const user={...row,name:row.display_name,phoneVerified:row.phone_verified,role:selectedRole};
+    return res.json({token:createSession(row.id),user:publicUser(user)});
+  } catch(e:any) { return res.status(500).json({error:e.message||'تعذر اختيار نوع الدخول'}); }
 });
 app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user)});});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
