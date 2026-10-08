@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT,
   phone_verified INTEGER NOT NULL DEFAULT 0,
   activation_status TEXT NOT NULL DEFAULT 'pending',
+  role TEXT NOT NULL DEFAULT 'user',
   activated_by TEXT,
   activated_at TEXT,
   trip_free_searches INTEGER NOT NULL DEFAULT 0,
