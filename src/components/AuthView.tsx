@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
-import { loginWithIdentifier, registerWithEmail, requestPasswordReset, resetPassword } from '../services/authService';
+import { loginWithIdentifier, registerWithEmail, requestPasswordReset, resetPassword, selectLoginRole } from '../services/authService';
 import { renderTurnstile, resetTurnstile } from '../services/turnstileService';
 
 interface Props {
@@ -25,6 +25,8 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const [resetSent, setResetSent] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileError, setTurnstileError] = useState('');
+  const [roleChoiceTicket, setRoleChoiceTicket] = useState('');
+  const [showRoleChoice, setShowRoleChoice] = useState(false);
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | number | null>(null);
 
@@ -99,9 +101,27 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         setError('تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'); return;
       }
       if (!email.trim()) throw new Error('أدخل بريدك الإلكتروني.');
-      await loginWithIdentifier(email.trim(), password, challenge); onAuthenticated();
+      const result = await loginWithIdentifier(email.trim(), password, challenge);
+      if ('requiresRoleChoice' in result && result.requiresRoleChoice) {
+        setRoleChoiceTicket(result.roleChoiceTicket || '');
+        setShowRoleChoice(true);
+        setError('');
+        return;
+      }
+      onAuthenticated();
     } catch (err:any) { setError(err.message || 'تعذر تنفيذ العملية.'); }
-    finally { setBusy(false); resetAuthChallenge(); }
+    finally { setBusy(false); if (!showRoleChoice) resetAuthChallenge(); }
+  };
+
+  const chooseRole = async (role: 'admin' | 'user') => {
+    setError(''); setBusy(true);
+    try {
+      if (!roleChoiceTicket) throw new Error('انتهت صلاحية اختيار نوع الدخول. سجّل الدخول مرة أخرى.');
+      const challenge = requireTurnstileToken();
+      await selectLoginRole(roleChoiceTicket, role);
+      onAuthenticated();
+    } catch (err:any) { setError(err.message || 'تعذر اختيار نوع الدخول.'); resetAuthChallenge(); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -109,10 +129,24 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       <div className="w-full max-w-md">
         <div className="rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,.10)] overflow-hidden">
           <header className="p-6 sm:p-7 bg-white border-b border-slate-100 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-lg"><ShieldCheck className="w-7 h-7" /></div>
+            <div className="mx-auto w-24 h-24 rounded-3xl bg-white border border-slate-100 shadow-xl overflow-hidden flex items-center justify-center p-2">
+              <img src="/logo.png" alt="SMART TIME" className="w-full h-full object-contain" />
+            </div>
             <h1 className="text-2xl font-black tracking-tight mt-4">SMART TIME</h1>
+            <p className="text-sm font-black text-slate-700 mt-1">eng/mamdouh saad</p>
             <p className="text-sm text-slate-500 mt-1">{mode === 'login' ? 'تسجيل الدخول إلى حسابك' : mode === 'register' ? 'إنشاء حساب جديد' : 'استعادة كلمة المرور'}</p>
           </header>
+          {showRoleChoice ? (
+            <div className="p-6 sm:p-7 space-y-4">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
+                <div className="text-lg font-black text-slate-950">اختيار نوع الدخول</div>
+                <p className="mt-1 text-sm font-bold text-slate-600">تم التعرف على حساب مالك البرنامج. اختر طريقة الدخول لهذه الجلسة.</p>
+              </div>
+              <button type="button" disabled={busy} onClick={() => chooseRole('admin')} className="w-full rounded-2xl bg-slate-950 text-white p-4 font-black shadow-lg disabled:opacity-50">دخول كـ Admin — كل الصلاحيات</button>
+              <button type="button" disabled={busy} onClick={() => chooseRole('user')} className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-black text-slate-900 disabled:opacity-50">دخول كمستخدم عادي</button>
+              {error && <div className="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-xs font-bold">{error}</div>}
+            </div>
+          ) : (
           <form onSubmit={submit} className="p-6 sm:p-7 space-y-4">
             {loginNotice && mode === 'login' && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">🔐 {loginNotice}</div>}
             {mode === 'register' && <>
@@ -130,6 +164,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
             {mode !== 'login' && <button type="button" onClick={()=>switchMode('login')} className="w-full text-xs font-bold text-slate-500">العودة لتسجيل الدخول</button>}
             <button type="button" onClick={onGuest} className="w-full py-3 rounded-2xl border border-slate-200 text-slate-800 font-black bg-white hover:bg-slate-50">الدخول كزائر</button>
           </form>
+          )}
         </div>
       </div>
     </main>
