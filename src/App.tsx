@@ -70,6 +70,7 @@ import ServicesPage from '../app/services/page';
 import SmartAIServicePage from '../app/services/smart-ai/page';
 import { AuthView } from './components/AuthView';
 import { CalendarView } from './components/CalendarView';
+import AdminCenter from './components/AdminCenter';
 import { getStoredSession, restoreSession, startTrialSession, logout as logoutAuth } from './services/authService';
 import { acknowledgeEventReminder, createCanonicalTask, deleteCanonicalTask, fetchPendingEventReminders, fetchSmartAiState, importCanonicalTasks, updateCanonicalTask } from './services/aiService';
 
@@ -404,6 +405,11 @@ export default function App() {
         onGuest={() => { void handleGuest(); }}
       />
     );
+  }
+
+  const sessionRole = getStoredSession()?.user.role;
+  if (authenticated && (sessionRole === 'owner' || sessionRole === 'admin')) {
+    return <AdminCenter onLogout={() => { setAuthenticated(false); setAuthChecked(true); }} />;
   }
 
   return (
