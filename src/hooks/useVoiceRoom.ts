@@ -16,19 +16,18 @@ export function useVoiceRoom(roomId: string) {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [error, setError] = useState('');
   const peers = useRef<Record<string, RTCPeerConnection>>({});
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const iceServersRef = useRef<RTCIceServer[]>(VOICE_CONFIG.stunServers);
   const remoteAudio = useRef<Record<string, HTMLAudioElement>>({});
   const remoteStreams = useRef<Record<string, MediaStream>>({});
   const selfId = useRef(getStoredSession()?.user?.id || '');
   const joined = useRef(false);
 
-  const iceServers = useMemo<RTCIceServer[]>(() => [
-    ...VOICE_CONFIG.stunServers,
-    ...(VOICE_CONFIG.turnUrl
-      ? [{ urls: VOICE_CONFIG.turnUrl, username: VOICE_CONFIG.turnUser || undefined, credential: VOICE_CONFIG.turnPass || undefined }]
-      : []),
-  ], []);
+  const iceServers = useMemo<RTCIceServer[]>(() => [...VOICE_CONFIG.stunServers, ...(VOICE_CONFIG.turnUrl ? [{ urls: VOICE_CONFIG.turnUrl, username: VOICE_CONFIG.turnUser || undefined, credential: VOICE_CONFIG.turnPass || undefined }] : [])], []);
+  useEffect(() => { iceServersRef.current = iceServers; }, [iceServers]);
 
   const closePeer = useCallback((userId: string) => {
     peers.current[userId]?.close();
@@ -36,6 +35,7 @@ export function useVoiceRoom(roomId: string) {
     remoteAudio.current[userId]?.pause();
     delete remoteAudio.current[userId];
     delete remoteStreams.current[userId];
+    setRemoteStreams((prev) => { const next={...prev}; delete next[userId]; return next; });
   }, []);
 
   const attachPeer = useCallback((remoteId: string, pc: RTCPeerConnection, stream: MediaStream) => {
@@ -47,6 +47,7 @@ export function useVoiceRoom(roomId: string) {
       const remoteStream = event.streams[0];
       if (!remoteStream) return;
       remoteStreams.current[remoteId] = remoteStream;
+      setRemoteStreams((prev) => ({ ...prev, [remoteId]: remoteStream }));
       const audio = remoteAudio.current[remoteId] || new Audio();
       audio.autoplay = true;
       audio.srcObject = remoteStream;
@@ -60,7 +61,7 @@ export function useVoiceRoom(roomId: string) {
 
   const createPeer = useCallback(async (remoteId: string, stream: MediaStream) => {
     if (!remoteId || remoteId === selfId.current || peers.current[remoteId]) return;
-    const pc = new RTCPeerConnection({ iceServers });
+    const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peers.current[remoteId] = pc;
     attachPeer(remoteId, pc, stream);
     if (selfId.current < remoteId) {
@@ -75,7 +76,7 @@ export function useVoiceRoom(roomId: string) {
     const remoteId = String(payload.fromUserId);
     let pc = peers.current[remoteId];
     if (!pc) {
-      pc = new RTCPeerConnection({ iceServers });
+      pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
       peers.current[remoteId] = pc;
       attachPeer(remoteId, pc, localStream);
     }
@@ -101,7 +102,10 @@ export function useVoiceRoom(roomId: string) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح لا يدعم الميكروفون/الكاميرا.');
     const stored = getStoredSession();
     selfId.current = stored?.user?.id || selfId.current;
+    const transport: any = await chatService.getVoiceToken(roomId);
+    if (Array.isArray(transport?.iceServers) && transport.iceServers.length) iceServersRef.current = transport.iceServers;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+    localStreamRef.current = stream;
     setLocalStream(stream);
     setIsCameraOn(isVideo);
     const response: any = await chatService.voiceJoin(roomId, 'guest');
@@ -119,25 +123,27 @@ export function useVoiceRoom(roomId: string) {
   const leave = useCallback(async () => {
     joined.current = false;
     Object.keys(peers.current).forEach(closePeer);
-    localStream?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
     setLocalStream(null);
+    setRemoteStreams({});
     setIsCameraOn(false);
     setIsMuted(false);
     await chatService.voiceLeave(roomId).catch(() => {});
-  }, [closePeer, localStream, roomId]);
+  }, [closePeer, roomId]);
 
   const toggleMute = useCallback(async () => {
     const nextMuted = !isMuted;
-    localStream?.getAudioTracks().forEach((track) => { track.enabled = !nextMuted; });
+    localStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !nextMuted; });
     setIsMuted(nextMuted);
     await chatService.voiceMute(roomId, nextMuted).catch(() => {});
-  }, [isMuted, localStream, roomId]);
+  }, [isMuted, roomId]);
 
   const toggleCamera = useCallback(() => {
     const next = !isCameraOn;
-    localStream?.getVideoTracks().forEach((track) => { track.enabled = next; });
+    localStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = next; });
     setIsCameraOn(next);
-  }, [isCameraOn, localStream]);
+  }, [isCameraOn]);
 
   useEffect(() => {
     const offUpdated = chatService.on('voice_room_updated', (payload: any) => {
@@ -164,9 +170,10 @@ export function useVoiceRoom(roomId: string) {
 
   useEffect(() => () => {
     Object.keys(peers.current).forEach(closePeer);
-    localStream?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
     if (joined.current) void chatService.voiceLeave(roomId).catch(() => {});
   }, [closePeer, localStream, roomId]);
 
-  return { participants, isMuted, isCameraOn, localStream, error, join, leave, toggleMute, toggleCamera, setError };
+  return { participants, isMuted, isCameraOn, localStream, remoteStreams, error, join, leave, toggleMute, toggleCamera, setError };
 }
