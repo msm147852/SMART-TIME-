@@ -664,6 +664,61 @@ app.post('/api/auth/select-role',(req,res)=>{
     return res.json({token:createSession(row.id),user:publicUser(user)});
   } catch(e:any) { return res.status(500).json({error:e.message||'تعذر اختيار نوع الدخول'}); }
 });
+const ADMIN_PERMISSION_SET = [
+  'users.read','users.create','users.update','users.activate','users.deactivate','users.delete','users.roles',
+  'services.manage','smart_ai.manage','voice.manage','rag.manage','reports.read','data.manage',
+  'audit.read','notifications.manage','system.settings','subscriptions.manage','backup.restore',
+  'integrations.manage','security.manage','runtime.read'
+] as const;
+function requireAdmin(req: express.Request, res: express.Response) {
+  const user=authUser(req);
+  if(!user) { res.status(401).json({error:'يجب تسجيل الدخول.'}); return null; }
+  const role=effectiveRole(user);
+  if(role!=='owner' && role!=='admin') { res.status(403).json({error:'صلاحيات الإدارة مطلوبة.'}); return null; }
+  return {...user, role};
+}
+function protectOwnerTarget(actor:any,target:any) {
+  if(!target) return 'الحساب غير موجود.';
+  if(String(target.email||'').trim().toLowerCase()===PROGRAM_OWNER_EMAIL) return 'حساب مالك البرنامج محمي ولا يمكن تعطيله أو حذفه أو خفض صلاحياته.';
+  if(String(actor.id)===String(target.id) && effectiveRole(actor)==='admin') return 'لا يمكن للإداري إزالة أو خفض صلاحيات حسابه الإداري.';
+  return null;
+}
+app.get('/api/admin/me',(req,res)=>{
+  const user=requireAdmin(req,res); if(!user) return;
+  res.json({role:user.role,permissions:[...ADMIN_PERMISSION_SET],ownerProtected:user.role==='owner'});
+});
+app.get('/api/admin/users',(req,res)=>{
+  const user=requireAdmin(req,res); if(!user) return;
+  const rows=db.prepare("SELECT id,email,username,display_name as name,activation_status,role,created_at,activated_by,activated_at FROM users WHERE id<>? ORDER BY created_at DESC").all(user.id);
+  res.json({users:rows.map((row:any)=>({...row,role:effectiveRole(row)}))});
+});
+app.patch('/api/admin/users/:id',(req,res)=>{
+  const actor=requireAdmin(req,res); if(!actor) return;
+  const target=db.prepare('SELECT * FROM users WHERE id=?').get(String(req.params.id)) as any;
+  const protectedError=protectOwnerTarget(actor,target); if(protectedError) return res.status(403).json({error:protectedError});
+  const activation=String(req.body?.activationStatus||'').trim().toLowerCase();
+  const requestedRole=String(req.body?.role||'').trim().toLowerCase();
+  const allowedActivation=new Set(['active','pending','suspended']);
+  if(activation && !allowedActivation.has(activation)) return res.status(400).json({error:'حالة الحساب غير صالحة.'});
+  if(requestedRole && !['admin','user'].includes(requestedRole)) return res.status(400).json({error:'الدور غير صالح.'});
+  const nextActivation=activation || String(target.activation_status||'pending');
+  const nextRole=requestedRole || effectiveRole(target);
+  db.prepare("UPDATE users SET activation_status=?,role=?,activated_by=?,activated_at=? WHERE id=?").run(nextActivation,nextRole,actor.email,new Date().toISOString(),target.id);
+  const refreshed=db.prepare("SELECT id,email,username,display_name as name,activation_status,role,created_at,activated_by,activated_at FROM users WHERE id=?").get(target.id) as any;
+  res.json({user:{...refreshed,role:effectiveRole(refreshed)}});
+});
+app.delete('/api/admin/users/:id',(req,res)=>{
+  const actor=requireAdmin(req,res); if(!actor) return;
+  const target=db.prepare('SELECT * FROM users WHERE id=?').get(String(req.params.id)) as any;
+  const protectedError=protectOwnerTarget(actor,target); if(protectedError) return res.status(403).json({error:protectedError});
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(target.id);
+  db.prepare('DELETE FROM users WHERE id=?').run(target.id);
+  res.json({ok:true,deletedUserId:target.id});
+});
+app.get('/api/admin/system/status',(req,res)=>{
+  const user=requireAdmin(req,res); if(!user) return;
+  res.json({ok:true,role:user.role,permissions:[...ADMIN_PERMISSION_SET],services:getServiceStatuses(),timestamp:new Date().toISOString()});
+});
 app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:publicUser(user)});});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
 app.post('/api/auth/phone-login/request-otp',async(req,res)=>{
