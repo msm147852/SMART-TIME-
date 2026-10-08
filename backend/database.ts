@@ -337,6 +337,8 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS archived_rooms (user_id TEXT NOT NULL,
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_archived_rooms_user ON archived_rooms(user_id, archived_at)'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS blocked_users (blocker_id TEXT NOT NULL, blocked_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(blocker_id, blocked_id))`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users(blocked_id)'); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS voice_participants (room_id TEXT NOT NULL, user_id TEXT NOT NULL, is_muted INTEGER NOT NULL DEFAULT 0, is_speaking INTEGER NOT NULL DEFAULT 0, is_camera_on INTEGER NOT NULL DEFAULT 0, joined_at TEXT NOT NULL, PRIMARY KEY(room_id,user_id))`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_voice_participants_room ON voice_participants(room_id)'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS room_settings (user_id TEXT NOT NULL, room_id TEXT NOT NULL, mute INTEGER NOT NULL DEFAULT 0, custom_sound TEXT, custom_mute_until TEXT, wallpaper_url TEXT, wallpaper_type TEXT NOT NULL DEFAULT 'default', PRIMARY KEY(user_id, room_id))`); } catch {}
 try { db.exec('ALTER TABLE room_settings ADD COLUMN wallpaper_url TEXT'); } catch {}
 try { db.exec("ALTER TABLE room_settings ADD COLUMN wallpaper_type TEXT NOT NULL DEFAULT 'default'"); } catch {}
