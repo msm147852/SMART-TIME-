@@ -91,8 +91,8 @@ export async function resetPassword(email: string, code: string, newPassword: st
   return request('/api/auth/reset-password', { email, code, newPassword, turnstileToken: turnstileToken || '' });
 }
 
-export async function registerWithEmail(name: string, username: string, email: string, password: string, phone: string, turnstileToken?: string): Promise<any> {
-  const data = await request('/api/auth/register', { name, username, email, password, phone, deviceId: getDeviceId(), turnstileToken: turnstileToken || '' });
+export async function registerWithEmail(name: string, username: string, email: string, password: string, turnstileToken?: string): Promise<any> {
+  const data = await request('/api/auth/register', { name, username, email, password, deviceId: getDeviceId(), turnstileToken: turnstileToken || '' });
   if (!data.token) return data;
   const session: AuthSession = { token: data.token, user: data.user };
   saveSession(session); applyUserToProfile(session.user);
