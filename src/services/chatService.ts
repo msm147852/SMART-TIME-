@@ -405,6 +405,29 @@ class ChatService {
     const data = await this.request(`/api/chat/search?q=${encodeURIComponent(q)}`);
     return data.results || [];
   }
+
+  async getStories(): Promise<Array<{
+    id: string;
+    userId: string;
+    name: string;
+    avatar?: string;
+    body?: string;
+    mediaUrl?: string;
+    expiresAt: string;
+    createdAt: string;
+  }>> {
+    const data = await this.request('/api/chat/stories');
+    return (data.stories || []).map((s: any) => ({
+      id: s.id,
+      userId: s.user_id,
+      name: s.name || 'مستخدم',
+      avatar: s.avatar || '',
+      body: s.body || '',
+      mediaUrl: s.media_url || '',
+      expiresAt: s.expires_at,
+      createdAt: s.created_at,
+    }));
+  }
   async voiceJoin(roomId: string, role: 'host'|'guest'|'listener' = 'guest') { return this.request(`/api/chat/rooms/${roomId}/voice/join`, { method:'POST', body: JSON.stringify({ role }) }); }
   async voiceLeave(roomId: string) { return this.request(`/api/chat/rooms/${roomId}/voice/leave`, { method:'POST' }); }
   async voiceMute(roomId: string, muted: boolean) { return this.request(`/api/chat/rooms/${roomId}/voice/mute`, { method:'POST', body: JSON.stringify({ muted }) }); }

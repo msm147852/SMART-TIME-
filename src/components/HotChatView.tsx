@@ -337,6 +337,16 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   useEffect(() => {
     loadRooms();
     chatService.authenticateSocket();
+    chatService.getStories().then((items) => {
+      if (!items.length) return;
+      setStories(items.map((item) => ({
+        id: item.id,
+        name: item.userId === currentUserId ? (isAr ? 'حالتي' : 'My Status') : item.name,
+        avatar: item.avatar || currentUserAvatar,
+        hasNew: new Date(item.expiresAt).getTime() > Date.now(),
+        time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      })));
+    }).catch(() => {});
   }, []);
 
   // Load Messages for Active Room

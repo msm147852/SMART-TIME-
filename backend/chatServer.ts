@@ -300,6 +300,30 @@ export function setupChatWebSocket(httpServer: http.Server) {
 // Router Setup
 export const chatRouter = express.Router();
 
+const chatWriteRate = new Map<string, { startedAt: number; count: number }>();
+const CHAT_WRITE_WINDOW_MS = 60_000;
+const CHAT_WRITE_LIMIT = 120;
+
+chatRouter.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const authHeader = String(req.headers.authorization || '');
+  const identity = authHeader.startsWith('Bearer ')
+    ? `user:${authHeader.slice(7, 71)}`
+    : `ip:${String(req.ip || req.socket.remoteAddress || 'unknown')}`;
+  const now = Date.now();
+  const current = chatWriteRate.get(identity);
+  if (!current || now - current.startedAt >= CHAT_WRITE_WINDOW_MS) {
+    chatWriteRate.set(identity, { startedAt: now, count: 1 });
+    return next();
+  }
+  if (current.count >= CHAT_WRITE_LIMIT) {
+    res.setHeader('Retry-After', String(Math.ceil((CHAT_WRITE_WINDOW_MS - (now - current.startedAt)) / 1000)));
+    return res.status(429).json({ error: 'طلبات المحادثة كثيرة، حاول مرة أخرى بعد قليل.' });
+  }
+  current.count += 1;
+  return next();
+});
+
 try { db.exec('ALTER TABLE users ADD COLUMN normalized_phone TEXT'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_users_normalized_phone ON users(normalized_phone)'); } catch {}
 
@@ -1539,8 +1563,15 @@ chatRouter.post('/rooms/:roomId/voice/mute',(req,res)=>{
 chatRouter.post('/upload', async (req,res)=>{
  try{
   const user=getAuthUser(req); if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});
-  const data=String(req.body?.data||''); const name=String(req.body?.name||'file'); const mime=String(req.body?.mime||'application/octet-stream');
+  const data=String(req.body?.data||''); const name=String(req.body?.name||'file'); const mime=String(req.body?.mime||'application/octet-stream').toLowerCase();
   if(!data)return res.status(400).json({error:'الملف مطلوب'});
+  const allowedMime = new Set([
+    'image/jpeg','image/png','image/gif','image/webp','image/heic',
+    'video/mp4','video/webm','video/quicktime',
+    'audio/webm','audio/ogg','audio/mpeg','audio/mp4','audio/wav','audio/x-wav',
+    'application/pdf','text/plain','application/zip','application/octet-stream'
+  ]);
+  if (!allowedMime.has(mime)) return res.status(415).json({ error: 'نوع الملف غير مسموح به' });
   const base64=data.includes(',')?data.split(',')[1]:data; const bytes=Buffer.from(base64,'base64');
   if(bytes.length>10*1024*1024)return res.status(413).json({error:'الملف أكبر من 10MB'});
   if(mime.startsWith('image/')){
