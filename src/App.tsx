@@ -408,7 +408,7 @@ export default function App() {
   }
 
   const sessionRole = getStoredSession()?.user.role;
-  if (authenticated && (sessionRole === 'owner' || sessionRole === 'admin')) {
+  if (authenticated && sessionRole === 'admin') {
     return <AdminCenter onLogout={() => { setAuthenticated(false); setAuthChecked(true); }} />;
   }
 
@@ -721,6 +721,7 @@ export default function App() {
           onThemeChange={handleThemeChange}
           onDataReset={handleResetData}
           onLogout={() => { void handleLogout(); }}
+          isOwner={sessionRole === 'owner'}
         />
 
         {/* Universal Notifications Modal (مركز الإشعارات الشامل لكل الأقسام) */}
