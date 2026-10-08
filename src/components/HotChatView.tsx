@@ -2530,6 +2530,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         onSave={handleSaveRoomSettings}
         onSavePersonalSettings={async (settings) => {
           await chatService.updateRoomSettings(activeRoomId, settings);
+          if (typeof settings.autoDeleteDuration === 'number') await chatService.setAutoDelete(activeRoomId, settings.autoDeleteDuration);
           try { localStorage.setItem('smart_time_room_settings_' + activeRoomId, JSON.stringify(settings)); } catch {}
         }}
         onClearHistory={handleClearRoomHistory}
