@@ -34,7 +34,8 @@
     "verify:phase12-stt-corpus": "node scripts/verify-phase12-stt-corpus.mjs",
     "test:groq-provider": "tsx backend/ai/providers/groqProvider.test.ts",
     "verify:phase-a2-stt": "node scripts/verify-phase-a2-stt.mjs",
-    "verify:chat-pro-full": "node scripts/verify-chat-pro-full.mjs"
+    "verify:chat-pro-full": "node scripts/verify-chat-pro-full.mjs",
+    "verify:chat-p2p": "node scripts/verify-chat-p2p.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
