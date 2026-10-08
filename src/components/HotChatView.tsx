@@ -943,10 +943,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     if (!newRoomTitle.trim()) return;
 
     try {
+      const isLiveRoomType = newRoomType === 'voice' || newRoomType === 'video';
       const res = await chatService.createRoom({
         title: newRoomTitle,
         description: newRoomDescription,
-        type: newRoomType,
+        type: isLiveRoomType ? 'public' : newRoomType,
         roomType: newRoomType,
         topic: newRoomDescription,
         isVoice: newRoomType === 'voice',
