@@ -79,6 +79,10 @@ import {
 } from '../types';
 import { translations } from '../services/i18n';
 import { ChatCameraModal } from './ChatCameraModal';
+import { VoiceRoomView } from './chat/VoiceRoomView';
+import { CreateVoiceRoomModal } from './chat/CreateVoiceRoomModal';
+import { CreateVideoRoomModal } from './chat/CreateVideoRoomModal';
+import { VOICE_CONFIG } from '../config/voice';
 import { ChatMembersSidebar } from './ChatMembersSidebar';
 import { ChatSettingsModal } from './ChatSettingsModal';
 import { SavedMessagesModal } from './SavedMessagesModal';
@@ -219,6 +223,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRoomInfoModal, setShowRoomInfoModal] = useState(false);
   const [showVoiceRoomModal, setShowVoiceRoomModal] = useState(false);
+  const [showCreateVoiceRoomModal, setShowCreateVoiceRoomModal] = useState(false);
+  const [showCreateVideoRoomModal, setShowCreateVideoRoomModal] = useState(false);
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
   const [chatBackground, setChatBackground] = useState<string>('');
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
@@ -1215,25 +1221,16 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             </button>
 
             <details className="relative shrink-0">
-              <summary
-                className="list-none w-11 h-11 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl flex items-center justify-center cursor-pointer"
-                aria-label={isAr ? 'المزيد' : 'More'}
-              >
+              <summary className="list-none w-11 h-11 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl flex items-center justify-center cursor-pointer" aria-label={isAr ? 'المزيد' : 'More'}>
                 <MoreVertical className="w-5 h-5 text-gray-600 dark:text-gray-300" />
               </summary>
-              <div className="absolute end-0 top-12 z-30 w-44 rounded-xl bg-white dark:bg-slate-900 shadow-lg border border-gray-200 dark:border-slate-700 p-1">
-                <button type="button" onClick={() => { setNewRoomType('group'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
-                  مجموعة جديدة
-                </button>
-                <button type="button" onClick={() => { setNewRoomType('voice'); setNewRoomTitle('غرفة صوتية جديدة'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
-                  غرفة صوتية
-                </button>
-                <button type="button" onClick={() => { setNewRoomType('video'); setNewRoomTitle('غرفة فيديو جديدة'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
-                  غرفة فيديو
-                </button>
+              <div className="absolute end-0 top-12 z-30 w-52 rounded-2xl bg-white dark:bg-slate-900 shadow-lg border border-gray-200 dark:border-slate-700 p-1">
+                <button type="button" onClick={() => setShowCreateModal(true)} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">{isAr?'مجموعة جديدة':'New group'}</button>
+                <button type="button" onClick={() => setShowCreateVoiceRoomModal(true)} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">{isAr?'غرفة صوتية':'Voice room'}</button>
+                <button type="button" onClick={() => setShowCreateVideoRoomModal(true)} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">{isAr?'غرفة فيديو':'Video room'}</button>
+                <button type="button" onClick={() => setActiveTab('archived')} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">{isAr?'الأرشيف':'Archive'}</button>
               </div>
-            </details>
-          </div>
+            </details>     </div>
 
           {/* Search Bar */}
           <div className="relative">
@@ -2271,243 +2268,13 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         </div>
       </div>
 
-      <LiveKitCallModal
-        isOpen={activeCall !== null}
-        roomId={activeRoomId}
-        roomTitle={activeRoom.title || activeRoom.name}
-        mode={activeCall || 'voice'}
-        language={language}
-        onClose={() => setActiveCall(null)}
-      />
-
-      {forwardingMessage && (
-        <div className="fixed inset-0 z-[140] bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-5 text-white">
-            <div className="flex items-center justify-between mb-4"><h3 className="font-black">{isAr?'توجيه الرسالة إلى':'Forward message to'}</h3><button onClick={()=>setForwardingMessage(null)}><X/></button></div>
-            <div className="max-h-72 overflow-y-auto space-y-2">
-              {rooms.filter(r=>r.id!==activeRoomId).map(r=><label key={r.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/70 cursor-pointer"><input type="checkbox" checked={selectedForwardRooms.includes(r.id)} onChange={(e)=>setSelectedForwardRooms(prev=>e.target.checked?[...prev,r.id]:prev.filter(id=>id!==r.id))}/><span className="text-sm">{r.title||r.name}</span></label>)}
-            </div>
-            <button disabled={!selectedForwardRooms.length} onClick={async()=>{for(const id of selectedForwardRooms) await chatService.forwardMessage(id,forwardingMessage);setForwardingMessage(null);setSelectedForwardRooms([]);}} className="mt-4 w-full py-2.5 rounded-xl bg-sky-600 disabled:opacity-40 font-bold">{isAr?'توجيه':'Forward'}</button>
-          </div>
-        </div>
+      {VOICE_CONFIG.mode === 'livekit' ? (
+        <>
+          <LiveKitCallModal isOpen={showVoiceRoomModal || activeCall !== null} roomId={activeRoomId} roomTitle={activeRoom.title || activeRoom.name} mode={activeCall || 'voice'} language={language} onClose={() => { setShowVoiceRoomModal(false); setActiveCall(null); }} />
+        </>
+      ) : (
+        <VoiceRoomView room={activeRoom} isVideo={activeCall === 'video'} language={language} onClose={() => { setShowVoiceRoomModal(false); setActiveCall(null); }} />
       )}
-
-      {/* ========================================================================= */}
-      {/* MODAL: Create New Room */}
-      {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div
-            className={`${
-              isDark ? 'bg-slate-900' : 'bg-white'
-            } border border-sky-500/40 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4`}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-500 flex items-center justify-center font-bold">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  {isAr ? 'إنشاء غرفة أو محادثة جديدة' : 'Create Room or Chat'}
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateRoom} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  {isAr ? 'اسم الغرفة أو المحادثة *' : 'Room Title *'}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newRoomTitle}
-                  onChange={(e) => setNewRoomTitle(e.target.value)}
-                  placeholder={isAr ? 'مثال: رحلة العمل ✈️، العائلة 🏡' : 'e.g. Work Trip ✈️'}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  {isAr ? 'الوصف (اختياري)' : 'Description (Optional)'}
-                </label>
-                <input
-                  type="text"
-                  value={newRoomDescription}
-                  onChange={(e) => setNewRoomDescription(e.target.value)}
-                  placeholder={isAr ? 'نبذة عن الغرفة...' : 'Brief description...'}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  {isAr ? 'نوع المحادثة' : 'Chat Type'}
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'group', label: isAr ? 'مجموعة 👥' : 'Group' },
-                    { id: 'direct', label: isAr ? 'خاص 👤' : 'Direct' },
-                    { id: 'public', label: isAr ? 'قناة عامة 📢' : 'Public' },
-                  ].map((type) => (
-                    <button
-                      key={type.id}
-                      type="button"
-                      onClick={() => setNewRoomType(type.id as any)}
-                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all ${
-                        newRoomType === type.id
-                          ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
-                          : 'border-slate-800 text-slate-400 hover:bg-slate-850'
-                      }`}
-                    >
-                      {type.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  {isAr ? 'اختر الأيقونة الرمزية' : 'Select Avatar'}
-                </label>
-                <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-                  {presetAvatars.map((av, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setNewRoomAvatar(av.url)}
-                      className={`relative rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
-                        newRoomAvatar === av.url
-                          ? 'border-sky-500 scale-105 shadow-md'
-                          : 'border-transparent opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={av.url} alt={av.label} className="w-12 h-12 object-cover" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
-                >
-                  {isAr ? 'إلغاء' : 'Cancel'}
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-md"
-                >
-                  {isAr ? 'إنشاء الغرفة الآن' : 'Create Room'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {preview && (
-        <MediaPreviewModal
-          {...preview}
-          open={!!preview}
-          onClose={() => setPreview(null)}
-        />
-      )}
-
-      {/* ========================================================================= */}
-      {/* SAVED MESSAGES MODAL */}
-      {/* ========================================================================= */}
-      <SavedMessagesModal
-        isOpen={showSavedModal}
-        onClose={() => setShowSavedModal(false)}
-        isAr={isAr}
-        isDark={isDark}
-        onJumpToMessage={(roomId, messageId) => jumpToMessage(roomId, messageId)}
-      />
-
-      {/* ========================================================================= */}
-      {/* ADD MEMBER MODAL */}
-      {/* ========================================================================= */}
-      <AddMemberModal
-        isOpen={showAddMemberModal}
-        onClose={() => setShowAddMemberModal(false)}
-        roomId={activeRoomId}
-        existingMembers={roomMembers}
-        isAr={isAr}
-        isDark={isDark}
-        onMemberAdded={async (newRoomId) => {
-          if (newRoomId) {
-            await loadRooms();
-            setActiveRoomId(newRoomId);
-            setActiveTab('private');
-            setMobileShowChat(true);
-          } else {
-            const detail = await chatService.getRoomDetails(activeRoomId);
-            if (detail?.members) setRoomMembers(detail.members);
-          }
-        }}
-      />
-
-      <LiveKitCallModal
-        isOpen={showVoiceRoomModal}
-        roomId={activeRoomId}
-        roomTitle={activeRoom.title || activeRoom.name}
-        mode="voice"
-        language={language}
-        onClose={() => setShowVoiceRoomModal(false)}
-      />
-
-      {/* ========================================================================= */}
-      {/* CHAT SETTINGS MODAL */}
-      {/* ========================================================================= */}
-      <ChatSettingsModal
-        isOpen={showRoomInfoModal}
-        onClose={() => setShowRoomInfoModal(false)}
-        room={{
-          ...activeRoom,
-          members: roomMembers,
-          settings: roomPrefs,
-          permissions: roomPermissions,
-          adminPermissions,
-          moderatorPermissions,
-          description: roomDescription || activeRoom.description,
-          background: chatBackground || activeRoom.background,
-        }}
-        isRoomOwner={isRoomOwner}
-        language={language}
-        isDark={isDark}
-        onSave={handleSaveRoomSettings}
-        onSavePersonalSettings={async (settings) => {
-          await chatService.updateRoomSettings(activeRoomId, settings);
-          if (typeof settings.autoDeleteDuration === 'number') await chatService.setAutoDelete(activeRoomId, settings.autoDeleteDuration);
-          try { localStorage.setItem('smart_time_room_settings_' + activeRoomId, JSON.stringify(settings)); } catch {}
-        }}
-        onClearHistory={handleClearRoomHistory}
-        onExportChat={() => {
-          const msgs = messagesMap[activeRoomId] || [];
-          const lines = msgs.map((m) => `[${m.timestamp || m.createdAt}] ${m.senderName}: ${m.text || m.body}`);
-          const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `chat_${(activeRoom.title || activeRoom.name || 'room').replace(/\s+/g, '_')}.txt`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        }}
-        onLeaveRoom={handleLeaveRoom}
-        onDeleteRoom={handleDeleteRoom}
-      />
 
       {/* ========================================================================= */}
       {/* LIVE CAMERA CAPTURE MODAL */}
