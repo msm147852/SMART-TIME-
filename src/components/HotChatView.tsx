@@ -228,6 +228,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
   const [showMembersSidebar, setShowMembersSidebar] = useState(true);
   const [chatBackground, setChatBackground] = useState<string>('');
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [selectedForwardRooms, setSelectedForwardRooms] = useState<string[]>([]);
 
   // Create room state
@@ -929,6 +930,10 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     setShowAttachMenu(false);
   };
 
+  const loadBlockedUsers = async () => {
+    try { setBlockedUsers(await chatService.getBlockedUsers()); } catch {}
+  };
+
   const handleArchiveRoom = async () => {
     try {
       const archived = activeTab !== 'archived';
@@ -1562,7 +1567,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             <button onClick={() => void handleArchiveRoom()} className="p-2 sm:p-2.5 rounded-xl text-amber-500 transition-all hover:scale-105" title={activeTab === 'archived' ? (isAr?'إلغاء الأرشفة':'Unarchive') : (isAr?'أرشفة':'Archive')}><Archive className="w-4 h-4" /></button>
             {activeRoom.type === 'direct' && <button onClick={() => void handleBlockActiveUser()} className="p-2 sm:p-2.5 rounded-xl text-rose-500 transition-all hover:scale-105" title={isAr?'حظر المستخدم':'Block user'}><Ban className="w-4 h-4" /></button>}
             <button
-              onClick={() => setShowRoomInfoModal(true)}
+              onClick={() => { setShowRoomInfoModal(true); void loadBlockedUsers(); }}
               className={`p-2 sm:p-2.5 rounded-xl ${chatIconButton} text-slate-600 dark:text-slate-300 transition-all hover:scale-105`}
               title={isAr ? 'إعدادات الغرفة' : 'Room Settings'}
             >
@@ -2344,6 +2349,16 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 </div>
               </div>
               {activeRoom.type==='direct' && <button type="button" onClick={()=>void handleBlockActiveUser()} className="w-full rounded-2xl bg-rose-600/15 border border-rose-500/30 p-3 text-start text-rose-300">{isAr?'حظر المستخدم':'Block user'}</button>}
+              {blockedUsers.length > 0 && (
+                <div className="rounded-2xl border border-slate-700/50 p-3">
+                  <div className="text-sm font-bold mb-2">{isAr?'المستخدمون المحظورون':'Blocked users'}</div>
+                  <div className="space-y-2">
+                    {blockedUsers.map((u:any)=><div key={u.id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-800/60 p-2"><span className="text-xs truncate">{u.name||u.email}</span><button type="button" onClick={async()=>{try{await chatService.unblockUser(u.id);setBlockedUsers(prev=>prev.filter(x=>x.id!==u.id));}catch(e:any){alert(e.message||'تعذر إلغاء الحظر');}}} className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300">{isAr?'إلغاء الحظر':'Unblock'}</button></div>)}
+                  </div>
+                </div>
+              )}
+
+
             </div>
           </div>
         </div>
