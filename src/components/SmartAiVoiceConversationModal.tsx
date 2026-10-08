@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, MessageCircle, Mic, MicOff, Sparkles, X } from 'lucide-react';
 import { Language } from '../types';
 import { transcribeVoiceBlob } from '../services/groqSttService';
+import { connectLiveKitVoice, disconnectLiveKitVoice, type LiveKitVoiceSession } from '../services/livekitVoiceService';
 
 type VoiceStatus = 'starting' | 'listening' | 'processing' | 'error';
 
@@ -46,6 +47,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const liveKitSessionRef = useRef<LiveKitVoiceSession | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const stopTimerRef = useRef<number | null>(null);
@@ -89,6 +91,11 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     speechStartedAtRef.current = null;
   };
 
+  const releaseLiveKit = () => {
+    disconnectLiveKitVoice(liveKitSessionRef.current);
+    liveKitSessionRef.current = null;
+  };
+
   const releaseStream = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -96,6 +103,7 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
 
   const resetRecorder = () => {
     clearTimer();
+    releaseLiveKit();
     cleanupVad();
     recorderRef.current = null;
     chunksRef.current = [];
@@ -193,6 +201,18 @@ export const SmartAiVoiceConversationModal: React.FC<Props> = ({
     }
 
     streamRef.current = stream;
+
+    try {
+      liveKitSessionRef.current = await connectLiveKitVoice(stream);
+    } catch (cause) {
+      releaseStream();
+      const code = cause instanceof Error ? String((cause as Error & { code?: string }).code || 'livekit-token-failed') : 'livekit-token-failed';
+      fail(code === 'authentication-required'
+        ? (language === 'ar' ? 'لازم تسجيل الدخول قبل تشغيل المحادثة الصوتية.' : 'An authenticated session is required for voice.')
+        : (language === 'ar' ? 'تعذر الاتصال بخادم الصوت.' : 'Could not connect to the voice server.'));
+      return;
+    }
+
     const mimeType = SUPPORTED_MIME_TYPES.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
 
     let recorder: MediaRecorder;
