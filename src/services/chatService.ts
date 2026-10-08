@@ -438,7 +438,9 @@ class ChatService {
     const data = await this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/reactions`);
     return data.reactions || {};
   }
-
+  async removeReaction(roomId: string, messageId: string, reaction: string): Promise<void> {
+    await this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/reactions?reaction=${encodeURIComponent(reaction)}`, { method:'DELETE' });
+  }
   async getStories(): Promise<Array<{
     id: string;
     userId: string;
