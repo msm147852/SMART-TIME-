@@ -113,7 +113,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     finally { setBusy(false); if (!showRoleChoice) resetAuthChallenge(); }
   };
 
-  const chooseRole = async (role: 'admin' | 'user') => {
+  const chooseRole = async (role: 'owner' | 'user') => {
     setError(''); setBusy(true);
     try {
       if (!roleChoiceTicket) throw new Error('انتهت صلاحية اختيار نوع الدخول. سجّل الدخول مرة أخرى.');
@@ -141,7 +141,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
                 <div className="text-lg font-black text-slate-950">اختيار نوع الدخول</div>
                 <p className="mt-1 text-sm font-bold text-slate-600">تم التعرف على حساب مالك البرنامج. اختر طريقة الدخول لهذه الجلسة.</p>
               </div>
-              <button type="button" disabled={busy} onClick={() => chooseRole('admin')} className="w-full rounded-2xl bg-slate-950 text-white p-4 font-black shadow-lg disabled:opacity-50">دخول كـ Admin — كل الصلاحيات</button>
+              <button type="button" disabled={busy} onClick={() => chooseRole('owner')} className="w-full rounded-2xl bg-slate-950 text-white p-4 font-black shadow-lg disabled:opacity-50">دخول كمالك (Owner) — إدارة النظام وAdmins</button>
               <button type="button" disabled={busy} onClick={() => chooseRole('user')} className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-black text-slate-900 disabled:opacity-50">دخول كمستخدم عادي</button>
               {error && <div className="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-xs font-bold">{error}</div>}
             </div>
