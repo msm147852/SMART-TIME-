@@ -77,6 +77,12 @@ export async function loginWithIdentifier(identifier: string, password: string, 
 }
 
 
+export async function selectLoginRole(roleChoiceTicket: string, role: 'admin' | 'user'): Promise<AuthSession> {
+  const data = await request('/api/auth/select-role', { roleChoiceTicket, role });
+  const session: AuthSession = { token: data.token, user: data.user };
+  saveSession(session); applyUserToProfile(session.user); return session;
+}
+
 export async function requestPhoneLoginOtp(phone: string, turnstileToken?: string) { return request('/api/auth/phone-login/request-otp', { phone, turnstileToken: turnstileToken || '' }); }
 
 export async function loginWithPhone(phone: string, code: string, turnstileToken?: string): Promise<AuthSession> {
