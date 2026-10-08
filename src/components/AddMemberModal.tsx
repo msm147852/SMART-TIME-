@@ -3,6 +3,7 @@ import { UserPlus, Search, X, Check, Contact, Smartphone, Share2 } from 'lucide-
 import { ChatMember } from '../types';
 import { chatService } from '../services/chatService';
 import { getStoredSession } from '../services/authService';
+import { normalizeEG } from '../utils/phoneNormalize';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -32,14 +33,19 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [contactsMessage, setContactsMessage] = useState('');
   const [inviteContact, setInviteContact] = useState<{ name: string; phone: string } | null>(null);
 
+  type ResolveState = 'idle' | 'searching' | 'found' | 'not_found' | 'error';
+
+  const [resolveState, setResolveState] = useState<ResolveState>('idle');
+  const [matchedUser, setMatchedUser] = useState<{ id: string; name: string; avatar: string; phone?: string } | null>(null);
+
   useEffect(() => {
     if (isOpen) {
-      setLoading(true);
-      chatService
-        .getUsers()
-        .then((list) => setUsers(list))
-        .catch((err) => console.warn('Failed to load users:', err))
-        .finally(() => setLoading(false));
+      setUsers([]);
+      setSelectedUserId(null);
+      setMatchedUser(null);
+      setInviteContact(null);
+      setContactsMessage('');
+      setResolveState('idle');
     }
   }, [isOpen]);
 
@@ -84,55 +90,80 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     } finally { setSubmitting(false); }
   };
 
-  const openPhoneContacts = async () => {
-    const contactsApi = (navigator as any).contacts;
-    if (!contactsApi?.select) {
-      setContactsMessage(isAr ? 'هذا المتصفح لا يدعم Contact Picker؛ تم تفعيل قائمة SMART TIME كبديل.' : 'Contact Picker is unavailable; SMART TIME users are shown as a fallback.');
-      setUsers((prev) => prev.length ? prev : []);
+  const resolveContactPhones = async (phones: string[], contactName = '') => {
+    const validPhones = Array.from(new Set(phones.map((phone) => normalizeEG(phone)).filter((phone): phone is string => Boolean(phone))));
+    if (!validPhones.length) {
+      setResolveState('error');
+      setSelectedUserId(null);
+      setMatchedUser(null);
+      setInviteContact(null);
+      setContactsMessage(isAr ? 'رقم الهاتف غير صالح للتحقق.' : 'The phone number is not valid for verification.');
       return;
     }
-    setContactsLoading(true); setContactsMessage(''); setInviteContact(null);
+
+    setResolveState('searching');
+    setSelectedUserId(null);
+    setMatchedUser(null);
+    setInviteContact(null);
+    setContactsMessage(isAr ? 'جاري البحث عن الحساب...' : 'Checking for a SMART TIME account...');
+
     try {
-      const picked = await contactsApi.select(['name', 'tel'], { multiple: true });
-      const selectedContacts = (picked || []).map((c: any) => ({ name: Array.isArray(c.name) ? (c.name[0] || '') : (c.name || ''), phones: Array.isArray(c.tel) ? c.tel.filter(Boolean) : [] })).filter((c: any) => c.phones.length);
-      if (!selectedContacts.length) { setContactsMessage(isAr ? 'لم يتم اختيار جهة اتصال بها رقم هاتف.' : 'No contact with a phone number was selected.'); return; }
-      const phones = selectedContacts.flatMap((c: any) => c.phones);
-      const matches = await chatService.lookupContacts(phones);
-
-      // The contact lookup is only a convenience. The source of truth for
-      // registration is the authenticated backend users list, never local
-      // storage or the device contacts database.
-      const normalizePhone = (phone: string) => {
-        const digits = String(phone || '').replace(/\\D/g, '');
-        return digits.length > 10 ? digits.slice(-10) : digits;
-      };
-
-      let registeredMatches = matches;
-      if (!registeredMatches.length) {
-        const registeredUsers = await chatService.getUsers();
-        const wantedPhones = new Set(phones.map(normalizePhone).filter(Boolean));
-        registeredMatches = registeredUsers.filter(
-          (user) => Boolean(user.phone) && wantedPhones.has(normalizePhone(user.phone || '')),
-        );
-      }
-
-      if (registeredMatches.length) {
-        setUsers((prev) => {
-          const map = new Map(prev.map((u) => [u.id, u]));
-          registeredMatches.forEach((u) => map.set(u.id, u));
-          return Array.from(map.values());
-        });
-        setSelectedUserId(registeredMatches[0].id);
-        setContactsMessage(isAr ? 'تم العثور على الحساب المسجل في SMART TIME.' : 'Registered SMART TIME account found.');
+      const matches = await chatService.resolveUsers(validPhones);
+      if (matches.length > 0) {
+        const match = matches[0];
+        setUsers(matches);
+        setMatchedUser(match);
+        setSelectedUserId(match.id);
+        setResolveState('found');
+        setContactsMessage(isAr ? 'تم العثور على حساب SMART TIME.' : 'SMART TIME account found.');
         return;
       }
 
-      // Only show Invite after the backend has confirmed that no registered
-      // SMART TIME account matches the selected phone number.
-      const firstContact = selectedContacts[0];
-      await shareInvite(firstContact.name, firstContact.phones[0]);
-    } catch (err: any) { if (err?.name !== 'AbortError') setContactsMessage(err.message || (isAr ? 'تعذر قراءة جهات الاتصال.' : 'Could not read phone contacts.')); }
-    finally { setContactsLoading(false); }
+      setUsers([]);
+      setMatchedUser(null);
+      setResolveState('not_found');
+      await shareInvite(contactName || validPhones[0], validPhones[0]);
+    } catch (err: any) {
+      setUsers([]);
+      setSelectedUserId(null);
+      setMatchedUser(null);
+      setInviteContact(null);
+      setResolveState('error');
+      setContactsMessage(isAr ? 'تعذر التحقق من الحساب، حاول مرة أخرى.' : 'Could not verify the account. Please try again.');
+    }
+  };
+
+  const openPhoneContacts = async () => {
+    const contactsApi = (navigator as any).contacts;
+    if (!contactsApi?.select) {
+      setContactsMessage(isAr ? 'هذا المتصفح لا يدعم اختيار جهات الاتصال.' : 'Contact Picker is unavailable in this browser.');
+      return;
+    }
+    setContactsLoading(true);
+    try {
+      const picked = await contactsApi.select(['name', 'tel'], { multiple: true });
+      const selectedContacts = (picked || [])
+        .map((c: any) => ({
+          name: Array.isArray(c.name) ? (c.name[0] || '') : (c.name || ''),
+          phones: Array.isArray(c.tel) ? c.tel.filter(Boolean) : [],
+        }))
+        .filter((c: any) => c.phones.length);
+      if (!selectedContacts.length) {
+        setResolveState('idle');
+        setContactsMessage(isAr ? 'لم يتم اختيار جهة اتصال بها رقم هاتف.' : 'No contact with a phone number was selected.');
+        return;
+      }
+      const phones = selectedContacts.flatMap((c: any) => c.phones);
+      await resolveContactPhones(phones, selectedContacts[0].name);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        setResolveState('error');
+        setInviteContact(null);
+        setContactsMessage(isAr ? 'تعذر التحقق من الحساب، حاول مرة أخرى.' : 'Could not verify the account. Please try again.');
+      }
+    } finally {
+      setContactsLoading(false);
+    }
   };
   const filteredUsers = users.filter((u) =>
     (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -162,7 +193,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <div className="flex items-center gap-2">
             <div className="flex flex-wrap gap-2 mb-3">
   <button type="button" onClick={openPhoneContacts} disabled={contactsLoading} className="px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-600 text-xs font-bold">📱 {contactsLoading?'جاري المزامنة...':'مزامنة جهات الاتصال'}</button>
-  <button type="button" onClick={() => { const name=window.prompt('اسم جهة الاتصال الجديدة؟')||''; const phone=window.prompt('رقم الهاتف؟')||''; if(phone.trim()) shareInvite(name,phone); }} className="px-3 py-2 rounded-xl bg-sky-500/15 text-sky-600 text-xs font-bold">➕ إضافة جهة اتصال جديدة</button>
+  <button type="button" onClick={async () => { const name=window.prompt('اسم جهة الاتصال الجديدة؟')||''; const phone=window.prompt('رقم الهاتف؟')||''; if(phone.trim()) await resolveContactPhones([phone], name); }} className="px-3 py-2 rounded-xl bg-sky-500/15 text-sky-600 text-xs font-bold">➕ إضافة جهة اتصال جديدة</button>
 </div>
 
 <button
@@ -216,13 +247,17 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
         {/* Users List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-60">
-          {loading ? (
+          {resolveState === 'searching' ? (
             <div className="py-8 text-center text-slate-400 text-xs animate-pulse">
-              {isAr ? 'جاري تحميل المستخدمين...' : 'Loading users...'}
+              {isAr ? 'جاري البحث عن الحساب...' : 'Checking account...'}
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="py-8 text-center text-slate-400 text-xs">
-              {isAr ? 'لا يوجد مستخدمون متطابقون' : 'No users found'}
+              {resolveState === 'error'
+                ? (isAr ? 'تعذر التحقق من الحساب، حاول مرة أخرى.' : 'Could not verify the account. Please try again.')
+                : resolveState === 'not_found'
+                ? (isAr ? 'لا يوجد حساب مرتبط بهذا الرقم' : 'No registered account is linked to this number')
+                : (isAr ? 'اختر جهة اتصال من الهاتف للتحقق من الحساب' : 'Choose a phone contact to verify the account')}
             </div>
           ) : (
             filteredUsers.map((u) => {
@@ -294,7 +329,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
         {selectedUserId && (
           <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-emerald-500/5 flex items-center justify-between gap-3">
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{isAr ? 'جهة الاتصال موجودة على SMART TIME.' : 'Contact is on SMART TIME.'}</p>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{resolveState === 'found' ? (isAr ? 'تم العثور على حساب SMART TIME.' : 'SMART TIME account found.') : ''}</p>
             <button type="button" disabled={submitting} onClick={() => void handleAdd(selectedUserId)} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold disabled:opacity-50">{isAr ? 'دردشة' : 'Chat'}</button>
           </div>
         )}

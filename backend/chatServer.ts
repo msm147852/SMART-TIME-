@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db } from './database.js';
 import { getChatUploadPath, uploadChatImage } from './storage.js';
+import { normalizeEG } from './utils/phoneNormalize.js';
 
 // Types
 export type WsClient = WebSocket & {
@@ -299,6 +300,19 @@ export function setupChatWebSocket(httpServer: http.Server) {
 // Router Setup
 export const chatRouter = express.Router();
 
+try { db.exec('ALTER TABLE users ADD COLUMN normalized_phone TEXT'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_users_normalized_phone ON users(normalized_phone)'); } catch {}
+
+function refreshNormalizedPhoneIndex() {
+  const rows = db.prepare("SELECT id, phone, normalized_phone FROM users WHERE phone IS NOT NULL AND phone != ''").all() as any[];
+  const update = db.prepare('UPDATE users SET normalized_phone = ? WHERE id = ?');
+  for (const row of rows) {
+    const normalized = normalizeEG(String(row.phone || ''));
+    if (normalized !== (row.normalized_phone || null)) update.run(normalized, row.id);
+  }
+}
+
+
 // 1. GET /api/chat/users - List users for direct chat or adding to group
 chatRouter.get('/users', (req, res) => {
   try {
@@ -324,6 +338,38 @@ chatRouter.get('/users', (req, res) => {
     res.json({ users: result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 1.5 POST /api/chat/users/resolve - Resolve selected phone numbers against registered users
+chatRouter.post('/users/resolve', (req, res) => {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+
+    const phones = Array.isArray(req.body?.phones) ? req.body.phones : [];
+    const normalizedPhones = Array.from(new Set(
+      phones.map((phone: unknown) => normalizeEG(String(phone || ''))).filter((phone): phone is string => Boolean(phone))
+    )).slice(0, 50);
+
+    if (!normalizedPhones.length) return res.json({ matches: [] });
+
+    refreshNormalizedPhoneIndex();
+
+    const placeholders = normalizedPhones.map(() => '?').join(', ');
+    const sql = "SELECT id, display_name as name, phone, avatar FROM users WHERE id != ? AND normalized_phone IN (" + placeholders + ")";
+    const rows = db.prepare(sql).all(user.id, ...normalizedPhones) as any[];
+
+    const matches = rows.map((row) => ({
+      id: row.id,
+      name: row.name || 'مستخدم',
+      phone: row.phone,
+      avatar: row.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+    }));
+
+    return res.json({ matches });
+  } catch {
+    return res.status(500).json({ error: 'تعذر التحقق من الحسابات' });
   }
 });
 

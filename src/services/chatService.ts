@@ -342,6 +342,20 @@ class ChatService {
     return data.users || [];
   }
 
+  // 17. Resolve selected phone numbers without exposing the users directory
+  async resolveUsers(phones: string[]): Promise<Array<{
+    id: string;
+    name: string;
+    avatar: string;
+    phone?: string;
+  }>> {
+    const data = await this.request('/api/chat/users/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ phones }),
+    });
+    return data.matches || [];
+  }
+
   // 17. Match phone contacts to SMART TIME users
   async lookupContacts(phones: string[]): Promise<Array<{
     id: string;
