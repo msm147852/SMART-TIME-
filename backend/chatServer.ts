@@ -1602,6 +1602,42 @@ chatRouter.post('/rooms/:roomId/messages/:messageId/vote',(req,res)=>{
   broadcastToRoom(roomId,{type:'poll_updated',payload:{roomId,messageId,poll}});res.json({ok:true,poll});
  }catch(e:any){res.status(500).json({error:e.message})}
 });
+// Message reactions: authenticated room members can toggle a bounded emoji reaction.
+chatRouter.post('/rooms/:roomId/messages/:messageId/reactions', (req, res) => {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+    const { roomId, messageId } = req.params;
+    const reaction = String(req.body?.reaction || '').trim();
+    const allowed = new Set(['👍','❤️','😂','😮','😢','😡','👏','🔥']);
+    if (!allowed.has(reaction)) return res.status(400).json({ error: 'تفاعل غير صالح' });
+    const access = verifyConversationAccess(user.id, roomId);
+    if (!access.allowed && !access.isPublic) return res.status(403).json({ error: 'ليس لديك صلاحية' });
+    const msg = db.prepare('SELECT id FROM messages WHERE id = ? AND conversation_id = ?').get(messageId, roomId) as any;
+    if (!msg) return res.status(404).json({ error: 'الرسالة غير موجودة' });
+    const exists = db.prepare('SELECT 1 FROM message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?').get(messageId, user.id, reaction);
+    if (exists) db.prepare('DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?').run(messageId, user.id, reaction);
+    else db.prepare('INSERT INTO message_reactions(message_id,user_id,reaction,created_at) VALUES(?,?,?,?)').run(messageId,user.id,reaction,new Date().toISOString());
+    const rows = db.prepare('SELECT reaction, COUNT(*) as count FROM message_reactions WHERE message_id = ? GROUP BY reaction').all(messageId) as any[];
+    const reactions = rows.reduce((acc:any,r:any)=>{acc[r.reaction]=Number(r.count);return acc;},{});
+    broadcastToRoom(roomId,{type:'message_reactions_updated',payload:{roomId,messageId,reactions}});
+    res.json({ ok:true, active:!exists, reaction, reactions });
+  } catch (err:any) { res.status(500).json({ error: err.message }); }
+});
+
+chatRouter.get('/rooms/:roomId/messages/:messageId/reactions', (req, res) => {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+    const { roomId, messageId } = req.params;
+    const access = verifyConversationAccess(user.id, roomId);
+    if (!access.allowed && !access.isPublic) return res.status(403).json({ error: 'ليس لديك صلاحية' });
+    const rows = db.prepare('SELECT reaction, COUNT(*) as count FROM message_reactions WHERE message_id = ? GROUP BY reaction').all(messageId) as any[];
+    const reactions = rows.reduce((acc:any,r:any)=>{acc[r.reaction]=Number(r.count);return acc;},{});
+    res.json({ reactions });
+  } catch (err:any) { res.status(500).json({ error: err.message }); }
+});
+
 chatRouter.post('/stories',(req,res)=>{
  try{const user=getAuthUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول'});const id='story_'+crypto.randomUUID();const now=new Date().toISOString();db.prepare('INSERT INTO stories(id,user_id,body,media_url,expires_at,created_at) VALUES(?,?,?,?,?,?)').run(id,user.id,String(req.body?.body||''),req.body?.mediaUrl||null,req.body?.expiresAt||new Date(Date.now()+86400000).toISOString(),now);res.json({ok:true,id})}catch(e:any){res.status(500).json({error:e.message})}
 });
