@@ -262,6 +262,9 @@ class ChatService {
     type?: 'text' | 'image' | 'video' | 'voice' | 'file' | 'location' | 'poll';
     mediaUrl?: string;
     extra?: any;
+    forwarded?: boolean;
+    originalMessageId?: string;
+    originalSender?: string;
   }): Promise<ChatMessage> {
     const data = await this.request(`/api/chat/rooms/${roomId}/messages`, {
       method: 'POST',
@@ -405,6 +408,21 @@ class ChatService {
     const data = await this.request(`/api/chat/search?q=${encodeURIComponent(q)}`);
     return data.results || [];
   }
+
+  async archiveRoom(roomId: string, archived: boolean): Promise<void> {
+    await this.request(`/api/chat/rooms/${roomId}/archive`, { method: 'PUT', body: JSON.stringify({ archived }) });
+  }
+  async blockUser(userId: string): Promise<void> { await this.request(`/api/chat/users/${userId}/block`, { method:'POST' }); }
+  async unblockUser(userId: string): Promise<void> { await this.request(`/api/chat/users/${userId}/unblock`, { method:'POST' }); }
+  async getBlockedUsers(): Promise<any[]> { const d=await this.request('/api/chat/users/blocked'); return d.users||[]; }
+  async setAutoDelete(roomId: string, duration: number): Promise<void> { await this.request(`/api/chat/rooms/${roomId}/auto-delete`, {method:'PUT',body:JSON.stringify({duration})}); }
+  async getRoomSettings(roomId: string): Promise<any> { const d=await this.request(`/api/chat/rooms/${roomId}/settings`); return d.settings||{}; }
+  async updateRoomSettings(roomId: string, settings: any): Promise<any> { const d=await this.request(`/api/chat/rooms/${roomId}/settings`,{method:'PUT',body:JSON.stringify(settings)}); return d.settings||{}; }
+  async forwardMessage(targetRoomId: string, message: ChatMessage): Promise<ChatMessage> {
+    const data=await this.request(`/api/chat/rooms/${targetRoomId}/messages`,{method:'POST',body:JSON.stringify({text: message.text||message.body||'',body:message.text||message.body||'',type:message.type||'text',mediaUrl:message.mediaUrl,forwarded:true,originalMessageId:message.id,originalSender:message.senderName})});
+    return data.message;
+  }
+  async getLiveKitToken(roomId: string): Promise<{token:string;url:string}> { return this.request(`/api/chat/rooms/${roomId}/voice/token`); }
 
   async toggleReaction(roomId: string, messageId: string, reaction: string): Promise<{ active: boolean; reactions: Record<string, number> }> {
     const data = await this.request(`/api/chat/rooms/${roomId}/messages/${messageId}/reactions`, {
