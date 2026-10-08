@@ -58,6 +58,8 @@ import {
   EducationPreferences,
 } from '../types';
 import { translations } from '../services/i18n';
+import { apiUrl } from '../services/apiConfig';
+import { authHeaders } from '../services/authService';
 import { BackupRepository, UserRepository, NotificationSoundService, NotificationSoundSettings } from '../services';
 import {
   calculateUserAge,
@@ -89,6 +91,7 @@ interface SettingsAndBackupModalProps {
   onThemeChange: (theme: ThemeMode) => void;
   onDataReset: () => void;
   onLogout: () => void;
+  isOwner?: boolean;
 }
 
 const AVATAR_PRESETS = [
@@ -116,6 +119,99 @@ const ZODIAC_LIST = [
   'برج الحوت',
 ];
 
+type OwnerAdminSettingsProps = { isAr: boolean; onShowToast: (msg: string) => void };
+
+const OwnerAdminSettings: React.FC<OwnerAdminSettingsProps> = ({ isAr, onShowToast }) => {
+  const [tab, setTab] = useState<'assign'|'remove'>('assign');
+  const [users, setUsers] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setError('');
+    try {
+      const base = apiUrl('/api/owner/admins');
+      const headers = authHeaders();
+      const [uRes, aRes] = await Promise.all([
+        fetch(base + '?view=users', { headers }),
+        fetch(base + '?view=admins', { headers }),
+      ]);
+      const u = await uRes.json().catch(() => ({}));
+      const a = await aRes.json().catch(() => ({}));
+      if (!uRes.ok) throw new Error(u.error || 'تعذر تحميل المستخدمين');
+      if (!aRes.ok) throw new Error(a.error || 'تعذر تحميل الإداريين');
+      setUsers(u.users || []);
+      setAdmins(a.admins || []);
+    } catch (e: any) { setError(e.message || 'تعذر تحميل البيانات'); }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const assign = async (id: string) => {
+    if (!window.confirm(isAr ? 'هل تريد تعيين هذا المستخدم كـ Admin؟' : 'Assign this user as Admin?')) return;
+    setBusy(true); setError('');
+    try {
+      const r = await fetch(apiUrl('/api/owner/admins/' + encodeURIComponent(id)), {
+        method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'assign' })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'تعذر تعيين Admin');
+      onShowToast(isAr ? 'تم تعيين Admin بنجاح.' : 'Admin assigned successfully.');
+      await load();
+    } catch (e: any) { setError(e.message || 'تعذر تنفيذ العملية'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm(isAr ? 'سيتم إلغاء صلاحية Admin وإعادة الحساب إلى User. هل تريد المتابعة؟' : 'Remove Admin role and return this account to User?')) return;
+    setBusy(true); setError('');
+    try {
+      const r = await fetch(apiUrl('/api/owner/admins/' + encodeURIComponent(id)), {
+        method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'remove' })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'تعذر حذف صلاحية Admin');
+      onShowToast(isAr ? 'تم حذف صلاحية Admin.' : 'Admin role removed.');
+      await load();
+    } catch (e: any) { setError(e.message || 'تعذر تنفيذ العملية'); }
+    finally { setBusy(false); }
+  };
+
+  return <div className="space-y-4 text-xs">
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="font-black text-base text-slate-900">👑 {isAr ? 'إدارة Admin بواسطة المالك' : 'Owner Admin Management'}</div>
+      <div className="mt-1 text-slate-600 font-bold">{isAr ? 'هذا القسم متاح للمالك فقط. تعيين أو حذف Admin يتم من السيرفر وليس من الواجهة فقط.' : 'Owner-only management enforced by the server.'}</div>
+    </div>
+    <div className="flex gap-2">
+      <button type="button" onClick={() => setTab('assign')} className={`flex-1 p-3 rounded-xl border font-black ${tab === 'assign' ? 'bg-slate-900 text-white' : ''}`}>{isAr ? 'تعيين Admin' : 'Assign Admin'}</button>
+      <button type="button" onClick={() => setTab('remove')} className={`flex-1 p-3 rounded-xl border font-black ${tab === 'remove' ? 'bg-slate-900 text-white' : ''}`}>{isAr ? 'حذف Admin' : 'Remove Admin'}</button>
+    </div>
+    {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 font-bold">{error}</div>}
+    {tab === 'assign' ? (
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="p-3 font-black border-b">{isAr ? 'جميع المستخدمين' : 'All users'}</div>
+        {users.length === 0 ? <div className="p-4 text-slate-500">{isAr ? 'لا يوجد مستخدمون متاحون للتعيين.' : 'No users available.'}</div> :
+          <div className="divide-y">{users.map(u => <div key={u.id} className="p-3 flex items-center justify-between gap-2">
+            <div><div className="font-black">{u.name || u.username || 'بدون اسم'}</div><div className="text-slate-500" dir="ltr">{u.email}</div><div className="text-[10px] mt-1 text-slate-500">{u.role} · {u.activation_status}</div></div>
+            <button type="button" disabled={busy} onClick={() => void assign(u.id)} className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 font-black text-slate-950 disabled:opacity-50">تعيين Admin</button>
+          </div>)}</div>}
+      </div>
+    ) : (
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="p-3 font-black border-b">{isAr ? 'الـAdmins الحاليون' : 'Current Admins'}</div>
+        {admins.length === 0 ? <div className="p-4 text-slate-500">{isAr ? 'لا يوجد Admin حاليًا.' : 'No Admins assigned.'}</div> :
+          <div className="divide-y">{admins.map(u => <div key={u.id} className="p-3 flex items-center justify-between gap-2">
+            <div><div className="font-black">{u.name || u.username || 'بدون اسم'}</div><div className="text-slate-500" dir="ltr">{u.email}</div></div>
+            <button type="button" disabled={busy} onClick={() => void remove(u.id)} className="shrink-0 rounded-xl bg-red-600 text-white px-3 py-2 font-black disabled:opacity-50">حذف Admin</button>
+          </div>)}</div>}
+      </div>
+    )}
+  </div>;
+};
+
 export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   isOpen,
   onClose,
@@ -131,12 +227,13 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
   onThemeChange,
   onDataReset,
   onLogout,
+  isOwner = false,
 }) => {
   const t = translations[language];
   const isAr = language === 'ar';
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'ticker' | 'sections' | 'preferences' | 'notifications' | 'permissions' | 'backup'
+    'profile' | 'ticker' | 'sections' | 'preferences' | 'notifications' | 'permissions' | 'backup' | 'ownerAdmin'
   >('profile');
 
   // 1. البيانات الشخصية
@@ -486,6 +583,18 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
             <User className="w-3.5 h-3.5" />
             <span>{isAr ? 'البيانات الشخصية' : 'Profile'}</span>
           </button>
+
+          {isOwner && (
+            <button
+              onClick={() => setActiveTab('ownerAdmin')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'ownerAdmin'
+                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+            >
+              <Shield className="w-3.5 h-3.5 text-amber-500" />
+              <span>{isAr ? 'تعيين Admin' : 'Admin Management'}</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('ticker')}
@@ -1920,6 +2029,10 @@ export const SettingsAndBackupModal: React.FC<SettingsAndBackupModalProps> = ({
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'ownerAdmin' && isOwner && (
+            <OwnerAdminSettings isAr={isAr} onShowToast={showToast} />
           )}
 
           {/* ======================================================== */}
