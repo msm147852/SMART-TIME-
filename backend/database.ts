@@ -331,6 +331,7 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON messa
 try { db.exec('ALTER TABLE conversations ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN archived_at TEXT'); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN auto_delete_duration INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN max_participants INTEGER NOT NULL DEFAULT 50'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(is_archived, updated_at)'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS archived_rooms (user_id TEXT NOT NULL, room_id TEXT NOT NULL, archived_at TEXT NOT NULL, PRIMARY KEY(user_id, room_id))`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_archived_rooms_user ON archived_rooms(user_id, archived_at)'); } catch {}
