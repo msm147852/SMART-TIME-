@@ -2276,6 +2276,38 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
         <VoiceRoomView room={activeRoom} isVideo={activeCall === 'video'} language={language} onClose={() => { setShowVoiceRoomModal(false); setActiveCall(null); }} />
       )}
 
+      {showRoomInfoModal && (
+        <div className="fixed inset-0 z-[140] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onMouseDown={()=>setShowRoomInfoModal(false)}>
+          <div className={`w-full max-w-md rounded-3xl border shadow-2xl p-5 ${isDark?'bg-slate-950 border-slate-700 text-white':'bg-white border-slate-200 text-slate-900'}`} onMouseDown={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h3 className="font-black">{isAr?'إعدادات المحادثة':'Chat settings'}</h3><button onClick={()=>setShowRoomInfoModal(false)}><X/></button></div>
+            <div className="space-y-3">
+              <button type="button" onClick={()=>void handleArchiveRoom()} className="w-full rounded-2xl border border-amber-500/30 p-3 text-start">{activeTab==='archived'?(isAr?'إلغاء الأرشفة':'Unarchive'):(isAr?'أرشفة المحادثة':'Archive chat')}</button>
+              <div className="rounded-2xl border border-slate-700/50 p-3">
+                <div className="text-sm font-bold mb-2">{isAr?'الحذف التلقائي':'Auto-delete'}</div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[0,3600,86400,604800].map(v=><button key={v} type="button" onClick={async()=>{try{await chatService.setAutoDelete(activeRoomId,v);setRooms(prev=>prev.map(r=>r.id===activeRoomId?{...r,autoDeleteDuration:v}:r));}catch(e:any){alert(e.message||'تعذر الحفظ');}}} className="rounded-xl bg-slate-800 px-2 py-2 text-xs">{v===0?(isAr?'إيقاف':'Off'):v===3600?(isAr?'1 ساعة':'1h'):v===86400?(isAr?'24 ساعة':'1d'):(isAr?'7 أيام':'7d')}</button>)}
+                </div>
+                {activeRoom.autoDeleteDuration&&activeRoom.autoDeleteDuration>0?<div className="mt-2 text-[11px] text-amber-400">{isAr?'الرسائل ستحذف تلقائياً بعد المدة المحددة.':'Messages will be deleted automatically.'}</div>:null}
+              </div>
+              <div className="rounded-2xl border border-slate-700/50 p-3">
+                <div className="text-sm font-bold mb-2">{isAr?'الإشعارات والصوت':'Notifications & sound'}</div>
+                <div className="flex gap-2 flex-wrap">
+                  {[{mute:false,label:isAr?'تشغيل':'On'},{mute:true,label:isAr?'صامت':'Silent'}].map(o=><button key={String(o.mute)} type="button" onClick={()=>void chatService.updateRoomSettings(activeRoomId,{mute:o.mute,custom_sound:o.mute?'silent':'default',custom_mute_until:null})} className="rounded-xl bg-slate-800 px-3 py-2 text-xs">{o.label}</button>)}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-700/50 p-3">
+                <div className="text-sm font-bold mb-2">{isAr?'الخلفية':'Wallpaper'}</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {['#efeae2','#dbeafe','#dcfce7','#fce7f3'].map(color=><button key={color} type="button" onClick={()=>{setChatBackground(color);void chatService.updateRoomSettings(activeRoomId,{wallpaper_url:color,wallpaper_type:'color'});try{localStorage.setItem('smart_time_room_wallpaper_'+activeRoomId,color);}catch{}}} style={{background:color}} className="h-10 rounded-xl border border-white/20"/>)}
+                </div>
+                <button type="button" onClick={()=>{setChatBackground('');void chatService.updateRoomSettings(activeRoomId,{wallpaper_url:null,wallpaper_type:'default'});try{localStorage.removeItem('smart_time_room_wallpaper_'+activeRoomId);}catch{}}} className="mt-2 w-full rounded-xl bg-slate-800 py-2 text-xs">{isAr?'الوضع الافتراضي':'Default'}</button>
+              </div>
+              {activeRoom.type==='direct' && <button type="button" onClick={()=>void handleBlockActiveUser()} className="w-full rounded-2xl bg-rose-600/15 border border-rose-500/30 p-3 text-start text-rose-300">{isAr?'حظر المستخدم':'Block user'}</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* LIVE CAMERA CAPTURE MODAL */}
       {/* ========================================================================= */}
