@@ -11,7 +11,7 @@ try {
         hostname: "smart-time-ai-preview-staging.up.railway.app",
         action: "smart-time-auth",
         "error-codes": [],
-      }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+      }), { status: 200, headers: { "Content-Type": "application/json" } })) as any;
 
     const result = await verifyTurnstileToken("valid-token", "test-secret", "127.0.0.1");
     assert.equal(result.success, true);
@@ -24,7 +24,7 @@ try {
       new Response(JSON.stringify({
         success: false,
         "error-codes": ["timeout-or-duplicate"],
-      }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+      }), { status: 200, headers: { "Content-Type": "application/json" } })) as any;
 
     const result = await verifyTurnstileToken("replayed-token", "test-secret");
     assert.equal(result.success, false);
@@ -46,7 +46,7 @@ try {
   {
     globalThis.fetch = (async () => {
       throw new Error("network down");
-    }) as typeof fetch;
+    }) as any;
 
     const result = await verifyTurnstileToken("token", "test-secret");
     assert.equal(result.success, false);
