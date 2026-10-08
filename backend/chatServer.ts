@@ -542,7 +542,7 @@ chatRouter.get('/rooms', (req, res) => {
         if (otherMember) {
           title = otherMember.name || title;
           avatar = otherMember.avatar || avatar;
-          isOnline = isUserOnline(otherMember.id);
+          isOnline = isUserOnline(otherMember.id) && !isBlockedBetween(userId, String(otherMember.id));
         }
       }
 
@@ -585,10 +585,14 @@ chatRouter.get('/rooms', (req, res) => {
         isArchived: !!db.prepare('SELECT 1 FROM archived_rooms WHERE user_id = ? AND room_id = ?').get(userId, r.id),
         autoDeleteDuration: Number(r.auto_delete_duration || 0),
         maxParticipants: Number(r.max_participants || 50),
+        otherUserId: r.type === 'direct' ? (() => { const m = db.prepare('SELECT user_id FROM conversation_members WHERE conversation_id=? AND user_id<>? LIMIT 1').get(r.id, userId) as any; return m?.user_id || null; })() : null,
       };
     });
 
-    const visibleRooms = rooms.filter((room: any) => archivedOnly ? !!room.isArchived : !room.isArchived);
+    const visibleRooms = rooms.filter((room: any) => {
+      if (room.type === 'direct' && room.otherUserId && isBlockedBetween(userId, String(room.otherUserId))) return false;
+      return archivedOnly ? !!room.isArchived : !room.isArchived;
+    });
     res.json({ rooms: visibleRooms });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1005,6 +1009,11 @@ chatRouter.get('/rooms/:roomId/messages', (req, res) => {
     const messages = rows.map((r) => {
       let extra = null;
       try { extra = JSON.parse(r.extra_json || '{}'); } catch {}
+      try {
+        const reactionRows = db.prepare('SELECT reaction, COUNT(*) as count FROM message_reactions WHERE message_id=? GROUP BY reaction').all(r.id) as any[];
+        if (reactionRows.length) extra = { ...(extra || {}), reactions: reactionRows.reduce((a:any,x:any)=>(a[x.reaction]=Number(x.count),a),{}) };
+      } catch {}
+
 
       return {
         id: r.id,
