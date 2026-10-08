@@ -132,8 +132,8 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     (currentSession?.user as any)?.avatar ||
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80';
 
-  // Tabs: 'all' | 'private' | 'rooms'
-  const [activeTab, setActiveTab] = useState<'all' | 'private' | 'rooms'>('all');
+  // Tabs: خاص | مجموعة | الغرف
+  const [activeTab, setActiveTab] = useState<'private' | 'group' | 'rooms'>('private');
 
   // Rooms State
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -999,8 +999,11 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
     const matchesSearch = (r.title || r.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
     if (activeTab === 'private') return r.type === 'direct';
-    if (activeTab === 'rooms') return r.type === 'group' || r.type === 'public';
-    return true;
+    if (activeTab === 'group') return r.type === 'group' || r.type === 'public';
+    if (activeTab === 'rooms') {
+      return r.type === 'group' || r.type === 'public' || (r as any).isVoice || (r as any).type === 'voice';
+    }
+    return r.type === 'direct';
   });
 
   // Filter messages in search mode
@@ -1041,7 +1044,7 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
               </div>
               <div>
                 <h2 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white tracking-wide">
-                  {isAr ? 'المحادثات المباشرة' : 'Live Chat Suite'}
+                  Smart Chat
                 </h2>
                 <div className="flex items-center gap-1.5 text-[10px] text-emerald-500 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1090,54 +1093,71 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
                 )}
               </button>
 
-              <div className="flex flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAddMemberModal(true)}
-                  className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
-                  id="fab-add-member"
-                  title={isAr ? 'إضافة عضو / بدء محادثة مباشرة' : 'Add member / start direct chat'}
-                >
-                  <UserPlus className="w-4 h-4 stroke-[2.5]" />
-                  <span>{isAr ? 'إضافة عضو' : 'Add member'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(true)}
-                  className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs shadow-md shadow-sky-500/20 active:scale-95 transition-all"
-                  id="fab-create-room"
-                  title={isAr ? 'إنشاء محادثة أو غرفة جديدة' : 'New Chat / Room'}
-                >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>{isAr ? 'جديد' : 'New'}</span>
-                </button>
-              </div>
             </div>
           </div>
 
-          {/* Stories / Status Bar */}
-          <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+          {/* Stories / Status Strip */}
+          <div
+            className="flex overflow-x-auto gap-3.5 py-3 px-2 scrollbar-hide snap-x snap-mandatory"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {stories.map((story) => (
-              <div key={story.id} className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group">
-                <div
-                  className={`w-12 h-12 rounded-full p-0.5 bg-gradient-to-tr ${
+              <div key={story.id} className="snap-start flex flex-col items-center shrink-0 cursor-pointer group">
+                <img
+                  src={story.avatar}
+                  alt={story.name}
+                  className={`w-16 h-16 rounded-full object-cover ${
                     story.hasNew
-                      ? 'from-sky-500 via-cyan-400 to-emerald-400'
-                      : 'from-slate-400 to-slate-500 dark:from-slate-700 dark:to-slate-600'
+                      ? 'ring-2 ring-green-500 ring-offset-2'
+                      : 'ring-2 ring-gray-200 ring-offset-2'
                   } group-hover:scale-105 transition-transform`}
-                >
-                  <img
-                    src={story.avatar}
-                    alt={story.name}
-                    className="w-full h-full rounded-full object-cover border-2 border-white dark:border-[#161616]"
-                  />
-                </div>
-                <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium truncate max-w-[56px]">
+                />
+                <span className="text-xs text-slate-700 dark:text-slate-300 truncate w-16 mt-1.5 text-center">
                   {story.name}
                 </span>
               </div>
             ))}
+          </div>
+
+          {/* Action Bar */}
+          <div className="flex gap-2 px-3 py-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAddMemberModal(true)}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl py-2.5 font-medium flex items-center justify-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{isAr ? '＋ عضو' : '+ Member'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-2.5 font-medium flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{isAr ? '＋ جديد' : '+ New'}</span>
+            </button>
+
+            <details className="relative shrink-0">
+              <summary
+                className="list-none w-11 h-11 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl flex items-center justify-center cursor-pointer"
+                aria-label={isAr ? 'المزيد' : 'More'}
+              >
+                <MoreVertical className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              </summary>
+              <div className="absolute end-0 top-12 z-30 w-44 rounded-xl bg-white dark:bg-slate-900 shadow-lg border border-gray-200 dark:border-slate-700 p-1">
+                <button type="button" onClick={() => { setNewRoomType('group'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
+                  مجموعة جديدة
+                </button>
+                <button type="button" onClick={() => { setNewRoomType('public'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
+                  غرفة صوتية
+                </button>
+                <button type="button" onClick={() => { setNewRoomType('public'); setShowCreateModal(true); }} className="w-full text-start px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-slate-800">
+                  غرفة فيديو
+                </button>
+              </div>
+            </details>
           </div>
 
           {/* Search Bar */}
@@ -1166,20 +1186,20 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
             </button>
           )}
 
-          {/* Tabs: الكل | الخاص | الغرف */}
-          <div className="grid grid-cols-3 gap-1 bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+          {/* Tabs: خاص | مجموعة | الغرف */}
+          <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-full flex mx-3 gap-1 mt-1">
             {[
-              { id: 'all', label: isAr ? 'الكل' : 'All' },
-              { id: 'private', label: isAr ? 'الخاص' : 'Private' },
+              { id: 'private', label: isAr ? 'خاص' : 'Private' },
+              { id: 'group', label: isAr ? 'مجموعة' : 'Group' },
               { id: 'rooms', label: isAr ? 'الغرف' : 'Rooms' },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                onClick={() => setActiveTab(tab.id as 'private' | 'group' | 'rooms')}
+                className={`flex-1 ${
                   activeTab === tab.id
-                    ? 'bg-sky-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-850'
+                    ? 'bg-white dark:bg-slate-700 shadow-sm rounded-full px-4 py-1.5 text-sm font-medium text-slate-900 dark:text-white'
+                    : 'px-4 py-1.5 text-sm text-gray-600 dark:text-slate-300 rounded-full'
                 }`}
               >
                 {tab.label}
@@ -1197,55 +1217,110 @@ export const HotChatView: React.FC<HotChatViewProps> = ({
           ) : (
             filteredRooms.map((room) => {
               const isSelected = room.id === activeRoomId;
+              const isVoiceRoom = activeTab === 'rooms' || Boolean((room as any).isVoice) || (room as any).type === 'voice';
+              const roomMembers = Array.isArray(room.members) ? room.members : [];
+              const listenerCount = room.membersCount ?? roomMembers.length ?? 0;
+
+              if (isVoiceRoom) {
+                return (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveRoomId(room.id);
+                      setMobileShowChat(true);
+                    }}
+                    className="w-full text-start bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm mb-2.5 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                          {isAr ? 'مباشر الآن' : 'Live now'}
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {listenerCount} {isAr ? 'مباشر' : 'live'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-3">
+                      <div className="flex items-center ps-2 shrink-0">
+                        {roomMembers.slice(0, 4).map((member, index) => (
+                          <img
+                            key={member.id}
+                            src={member.avatar || currentUserAvatar}
+                            alt={member.name || ''}
+                            className="w-9 h-9 rounded-full object-cover border-2 border-white dark:border-slate-900 -ms-2"
+                            style={{ zIndex: 10 - index }}
+                          />
+                        ))}
+                        {roomMembers.length === 0 && (
+                          <img
+                            src={room.avatar}
+                            alt={room.title || room.name || ''}
+                            className="w-9 h-9 rounded-full object-cover border-2 border-white dark:border-slate-900"
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                          {room.title || room.name}
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {room.description || (isAr ? 'غرفة صوتية مباشرة' : 'Live room')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <span className="block w-full bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-xl py-2.5 text-center text-sm font-medium">
+                        {isAr ? 'دخول' : 'Join'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              }
+
               return (
                 <button
                   key={room.id}
+                  type="button"
                   onClick={() => {
                     setActiveRoomId(room.id);
                     setMobileShowChat(true);
                   }}
-                  className={`w-full p-3.5 text-start flex items-center gap-3 transition-all ${
-                    isSelected
-                      ? 'bg-sky-500/10 border-s-4 border-sky-500'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-850/60'
+                  className={`w-full flex gap-3 p-3 text-start hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors ${
+                    isSelected ? 'bg-sky-50 dark:bg-sky-950/30' : ''
                   }`}
                 >
                   <div className="relative shrink-0">
-                    <img
-                      src={room.avatar}
-                      alt={room.title || room.name}
-                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
-                    />
-                    {room.isOnline && (
-                      <span className="absolute -bottom-0.5 -end-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-[#161616] rounded-full" />
+                    {room.type === 'direct' ? (
+                      <img src={room.avatar} alt={room.title || room.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-gray-500 dark:text-slate-300" />
+                      </div>
+                    )}
+                    {room.type === 'direct' && room.isOnline && (
+                      <span className="absolute -bottom-0.5 -end-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
                     )}
                   </div>
-
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
-                        {room.title || room.name}
-                      </h4>
-                      <span className="text-[10px] text-slate-400 shrink-0 font-mono-num">
-                        {room.lastMessageTime}
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="font-medium text-sm text-slate-900 dark:text-white truncate">{room.title || room.name}</h4>
+                      <span className="text-xs text-slate-400 shrink-0">{room.lastMessageTime}</span>
                     </div>
-
-                    <p className={`text-xs ${chatMuted} truncate`}>
+                    <p className="text-sm text-gray-500 dark:text-slate-400 truncate">
                       {typingUsers[room.id]
-                        ? isAr
-                          ? `✍️ ${typingUsers[room.id]} يكتب الآن...`
-                          : `✍️ ${typingUsers[room.id]} is typing...`
+                        ? (isAr ? `✍️ ${typingUsers[room.id]} يكتب الآن...` : `✍️ ${typingUsers[room.id]} is typing...`)
                         : room.lastMessage || (isAr ? 'لا توجد رسائل بعد' : 'No messages yet')}
                     </p>
                   </div>
-
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {room.unreadCount > 0 && (
-                      <span className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shadow-xs animate-scaleUp">
-                        {room.unreadCount}                      </span>
+                      <span className="min-w-5 h-5 px-1 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center">
+                        {room.unreadCount}
+                      </span>
                     )}
-                    <CheckCheck className="w-3.5 h-3.5 text-sky-500" />
                   </div>
                 </button>
               );
