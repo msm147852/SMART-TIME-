@@ -832,7 +832,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     return res.status(429).json({ ok: false, emailSent: false, message: 'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.' });
   }
   const email = String(req.body?.email || '').trim().toLowerCase();
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, emailSent: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
 
@@ -886,7 +886,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   const code = String(req.body?.code || '').trim();
   const newPassword = String(req.body?.newPassword || req.body?.password || '');
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
   if (!/^\\d{6}$/.test(code)) {
