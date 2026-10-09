@@ -143,7 +143,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       <section style={{ backgroundColor: 'transparent' }} className="w-full max-w-[440px] bg-transparent p-6 sm:p-8 border-0 shadow-none">
         <header className="mb-6 flex flex-col items-center text-center">
           <img
-            src="/logo-smarttime.svg"
+            src="/logo-smarttime-original.png"
             alt="SmartTime TIME GOLD"
             className="mb-2 h-auto w-[360px] max-w-full object-contain"
           />
