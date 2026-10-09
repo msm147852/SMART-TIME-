@@ -26,6 +26,17 @@ CREATE TABLE IF NOT EXISTS api_cache (
   expires_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS email_logs (
+  id TEXT PRIMARY KEY,
+  recipient TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  status TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  provider_id TEXT,
+  error_code TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON email_logs(created_at);
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
