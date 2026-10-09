@@ -2573,7 +2573,26 @@ app.get("/api/live/news", async (req, res) => {
 app.get("/api/live/weather", async (req, res) => {
   try {
     const requestedCity = String(req.query.city || "Cairo").trim() || "Cairo";
-    const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(requestedCity)}&count=1&language=en&format=json`);
+    // Open-Meteo's English-language geocoder can miss Arabic city names.
+    // Normalize common Arabic city names while preserving arbitrary user input.
+    const normalizedCity = ({
+      "القاهرة": "Cairo",
+      "القاهره": "Cairo",
+      "مصر الجديدة": "Heliopolis",
+      "الجيزة": "Giza",
+      "الجيزه": "Giza",
+      "الإسكندرية": "Alexandria",
+      "الاسكندرية": "Alexandria",
+      "اسكندرية": "Alexandria",
+      "شرم الشيخ": "Sharm el-Sheikh",
+      "الغردقة": "Hurghada",
+      "الغردقه": "Hurghada",
+      "الأقصر": "Luxor",
+      "الاقصر": "Luxor",
+      "أسوان": "Aswan",
+      "اسوان": "Aswan",
+    } as Record<string, string>)[requestedCity] || requestedCity;
+    const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(normalizedCity)}&count=1&language=en&format=json`);
     const place = geo?.results?.[0];
     if (!place?.latitude || !place?.longitude) {
       return res.status(404).json({ source: "open-meteo", error: "City not found" });
