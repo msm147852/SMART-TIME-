@@ -745,6 +745,64 @@ app.get('/api/admin/system/status',(req,res)=>{
   res.json({ok:true,role:user.role,permissions:[...ADMIN_PERMISSION_SET],services:getServiceStatuses(),timestamp:new Date().toISOString()});
 });
 app.get('/api/auth/me',(req,res)=>{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول منتهية'});res.json({user:{...publicUser(user),role:String(user.session_role||effectiveRole(user))}});});
+const USER_APP_DATA_KEYS = new Set([
+  'smart_time_user_profile','smart_time_notes','smart_time_note_folders','smart_time_note_tags',
+  'smart_time_calc_history','smart_time_daily_tasks','smart_time_expenses','smart_time_budget',
+  'smart_time_monthly_income','smart_time_bank_certificates','smart_time_vehicles',
+  'smart_time_fuel_records','smart_time_maint_records','smart_time_accident_records',
+  'smart_time_students','smart_time_lessons','smart_time_edu_expenses','smart_time_favorite_places',
+  'smart_time_recent_trips','smart_time_secure_records','smart_time_chat_rooms',
+  'smart_time_chat_messages','smart_time_media_folders','smart_time_media_items',
+  'smart_time_notifications','smart_time_athkar_items','smart_time_ai_chat_history',
+  'smart_time_notification_sound','smart_time_dashboard_layout','smart_time_dashboard_sections_v2',
+  'smart_time_workout_logs','smart_time_sports_cards_order','smart_time_expenses_sections_order'
+]);
+const USER_APP_DATA_MAX_BYTES = 512 * 1024;
+app.get('/api/user/app-data',(req,res)=>{
+  const user=authUser(req);
+  if(!user) return res.status(401).json({error:'جلسة الدخول منتهية'});
+  try {
+    const rows=db.prepare('SELECT data_key,payload_json,updated_at FROM user_app_data WHERE user_id=?').all(user.id) as any[];
+    const data:Record<string,unknown>={};
+    for(const row of rows) {
+      if(!USER_APP_DATA_KEYS.has(String(row.data_key))) continue;
+      try { data[String(row.data_key)]=JSON.parse(String(row.payload_json)); } catch {}
+    }
+    res.setHeader('Cache-Control','no-store');
+    res.json({ok:true,data});
+  } catch {
+    res.status(500).json({error:'تعذر تحميل بيانات الحساب'});
+  }
+});
+app.put('/api/user/app-data',(req,res)=>{
+  const user=authUser(req);
+  if(!user) return res.status(401).json({error:'جلسة الدخول منتهية'});
+  const key=String(req.body?.key||'');
+  if(!USER_APP_DATA_KEYS.has(key)) return res.status(400).json({error:'مفتاح البيانات غير مسموح'});
+  let payload:string;
+  try { payload=JSON.stringify(req.body?.value); } catch { return res.status(400).json({error:'صيغة البيانات غير صالحة'}); }
+  if(payload===undefined || Buffer.byteLength(payload,'utf8')>USER_APP_DATA_MAX_BYTES) return res.status(413).json({error:'حجم البيانات أكبر من الحد المسموح'});
+  try {
+    db.prepare('INSERT INTO user_app_data(user_id,data_key,payload_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id,data_key) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at')
+      .run(user.id,key,payload,new Date().toISOString());
+    res.setHeader('Cache-Control','no-store');
+    res.json({ok:true,key});
+  } catch {
+    res.status(500).json({error:'تعذر حفظ بيانات الحساب'});
+  }
+});
+app.delete('/api/user/app-data/:key',(req,res)=>{
+  const user=authUser(req);
+  if(!user) return res.status(401).json({error:'جلسة الدخول منتهية'});
+  const key=String(req.params.key||'');
+  if(!USER_APP_DATA_KEYS.has(key)) return res.status(400).json({error:'مفتاح البيانات غير مسموح'});
+  try {
+    db.prepare('DELETE FROM user_app_data WHERE user_id=? AND data_key=?').run(user.id,key);
+    res.json({ok:true});
+  } catch {
+    res.status(500).json({error:'تعذر حذف بيانات الحساب'});
+  }
+});
 app.post('/api/auth/owner/activate',(req,res)=>{try{const ownerEmail=String(req.body.ownerEmail||'').trim().toLowerCase(),key=String(req.body.activationKey||'').trim(),userEmail=String(req.body.userEmail||'').trim().toLowerCase();if(ownerEmail!==PROGRAM_OWNER_EMAIL)return res.status(403).json({error:'هذا الإجراء مخصص لصاحب البرنامج.'});if(!PROGRAM_OWNER_ACTIVATION_KEY||key!==PROGRAM_OWNER_ACTIVATION_KEY)return res.status(403).json({error:'مفتاح تفعيل المالك غير صحيح أو غير مُكوّن.'});const user=db.prepare('SELECT id FROM users WHERE email=?').get(userEmail) as any;if(!user)return res.status(404).json({error:'الحساب غير موجود.'});db.prepare("UPDATE users SET activation_status='active',activated_by=?,activated_at=? WHERE id=?").run(ownerEmail,new Date().toISOString(),user.id);res.json({ok:true,message:'تم اعتماد الحساب بنجاح.'});}catch(e:any){res.status(500).json({error:e.message||'تعذر اعتماد الحساب'});}});
 app.post('/api/auth/phone-login/request-otp',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "phone-login-request")) return res.status(429).json({error:'تم تجاوز عدد محاولات طلب رمز الدخول. حاول لاحقًا.'});
