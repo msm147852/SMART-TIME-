@@ -673,7 +673,49 @@ app.post('/api/auth/login',async(req,res)=>{
     let row:any=null;
     if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE lower(email)=? LIMIT 1').get(normalizedEmail) as any;
     else row=db.prepare('SELECT * FROM users WHERE lower(username)=? LIMIT 1').get(normalizedUsername) as any;
-    if(!row||!verifyPassword(password,row.password_hash)) return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});
+
+    let localPasswordValid=Boolean(row && verifyPassword(password,row.password_hash));
+    // Legacy accounts may exist only in Oracle. Never create an account based
+    // only on /check-email: authenticate against Oracle first, then persist locally.
+    if ((!row || !localPasswordValid) && identifier.includes('@') && password) {
+      try {
+        const oracleLogin = await proxyOracleAuth('/api/auth/login', { email: normalizedEmail, identifier: normalizedEmail, password });
+        const oracleUser = oracleLogin.data?.user;
+        const oracleAuthenticated = oracleLogin.status >= 200 && oracleLogin.status < 300 &&
+          oracleLogin.data?.ok !== false && Boolean(oracleUser) &&
+          (Boolean(oracleLogin.data?.token) || oracleLogin.data?.authenticated === true || oracleLogin.data?.ok === true);
+        if (oracleAuthenticated) {
+          if (row) {
+            // Oracle validated the current password; bring the local credential
+            // back into sync without changing role, phone verification, or profile.
+            db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(password), row.id);
+            row = db.prepare('SELECT * FROM users WHERE id=?').get(row.id) as any;
+          } else {
+            const email = normalizedEmail;
+            const base = normalizeUsername(email.split('@')[0]).replace(/[^a-z0-9_.-]/g,'').slice(0,24);
+            const stem = base.length >= 3 ? base : 'user';
+            let username = stem;
+            let suffix = 1;
+            while (db.prepare('SELECT id FROM users WHERE lower(username)=? LIMIT 1').get(username)) {
+              username = `${stem.slice(0, 24)}${suffix++}`.slice(0,30);
+            }
+            const name = String(oracleUser.name || oracleUser.display_name || stem).trim().slice(0,100) || stem;
+            const id = `usr_${crypto.randomUUID()}`;
+            const now = new Date().toISOString();
+            db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,role,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,?,0)")
+              .run(id,email,username,hashPassword(password),name,now,null,0,'active','user');
+            row = db.prepare('SELECT * FROM users WHERE id=?').get(id) as any;
+          }
+          localPasswordValid = Boolean(row && verifyPassword(password,row.password_hash));
+          console.info('[AUTH] Oracle-authenticated account persisted locally', { email: normalizedEmail, created: !Boolean(oracleUser.id) });
+        }
+      } catch (error) {
+        console.warn('[AUTH] Oracle login fallback unavailable', {
+          reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
+        });
+      }
+    }
+    if(!row || !localPasswordValid) return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});
     const role=effectiveRole(row);
     if(role === 'owner' && !selectedRole) return res.json({ok:true,requiresRoleChoice:true,availableRoles:['owner','user'],roleChoiceTicket:createRoleChoiceTicket(row.id)});
     if(selectedRole === 'owner' && role !== 'owner') return res.status(403).json({error:'دخول المالك متاح لحساب المالك فقط.'});
@@ -856,9 +898,9 @@ app.post('/api/auth/phone-login',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "phone-login")) return res.status(429).json({error:'تم تجاوز عدد محاولات تسجيل الدخول بالهاتف. حاول لاحقًا.'});
   try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({token:createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
 const ORACLE_AUTH_BASE_URL = "https://smart-time-ai.duckdns.org";
-async function proxyOracleAuth(pathname: string, payload: Record<string, unknown>) {
+async function proxyOracleAuth(pathname: string, payload: Record<string, unknown>, timeoutMs = 12_000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${ORACLE_AUTH_BASE_URL}${pathname}`, {
       method: "POST",
@@ -885,7 +927,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     return res.status(400).json({ ok: false, emailSent: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
   try {
-    const result = await proxyOracleAuth('/api/auth/forgot-password', { email });
+    const result = await proxyOracleAuth('/api/auth/forgot-password', { email }, 10_000);
     return res.status(result.status).json(result.data);
   } catch (error) {
     console.error('[AUTH_PROXY] Forgot-password request failed', {
@@ -919,10 +961,29 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(result.status).json(result.data);
     }
 
-    let localUpdate;
+    const hashedPassword = hashPassword(newPassword);
     try {
-      localUpdate = db.prepare('UPDATE users SET password_hash=? WHERE lower(email)=?')
-        .run(hashPassword(newPassword), email);
+      const existing = db.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').get(email) as any;
+      if (existing) {
+        const localUpdate = db.prepare('UPDATE users SET password_hash=? WHERE id=?')
+          .run(hashedPassword, existing.id);
+        if (localUpdate.changes < 1) throw new Error('local password update affected no rows');
+      } else {
+        // A successful one-time Oracle reset code proves mailbox control.
+        // Create a local account only after that verification, never from
+        // an unauthenticated /check-email response.
+        const localPart = normalizeUsername(email.split('@')[0]).replace(/[^a-z0-9_.-]/g,'').slice(0,24);
+        const stem = localPart.length >= 3 ? localPart : 'user';
+        let username = stem;
+        let suffix = 1;
+        while (db.prepare('SELECT id FROM users WHERE lower(username)=? LIMIT 1').get(username)) {
+          username = `${stem.slice(0,24)}${suffix++}`.slice(0,30);
+        }
+        const id = `usr_${crypto.randomUUID()}`;
+        const now = new Date().toISOString();
+        db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,role,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,?,0)")
+          .run(id,email,username,hashedPassword,stem,now,null,0,'active','user');
+      }
     } catch (error) {
       console.error('[AUTH_PROXY] Local password sync failed after Oracle reset', {
         reason: 'local-database-update-failed',
@@ -931,21 +992,12 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(500).json({
         ok: false,
         code: 'LOCAL_PASSWORD_SYNC_FAILED',
-        message: 'تم التحقق من رمز الاستعادة، لكن تعذر تحديث كلمة المرور في قاعدة تسجيل الدخول. لم يتم تأكيد نجاح العملية؛ تواصل مع الدعم لإكمال المزامنة.',
+        message: 'تم التحقق من رمز الاستعادة، لكن تعذر حفظ كلمة المرور في قاعدة تسجيل الدخول. لم يتم تأكيد نجاح العملية؛ حاول مرة أخرى أو تواصل مع الدعم.',
       });
     }
 
-    if (localUpdate.changes < 1) {
-      console.error('[AUTH_PROXY] Oracle reset succeeded but no matching local account exists', { email });
-      return res.status(409).json({
-        ok: false,
-        code: 'LOCAL_ACCOUNT_NOT_FOUND',
-        message: 'تم التحقق من رمز الاستعادة، لكن الحساب غير موجود في قاعدة تسجيل الدخول لهذا السيرفر. يلزم إصلاح مزامنة الحساب قبل تسجيل الدخول.',
-      });
-    }
-
-    console.info('[AUTH_PROXY] Local password hash updated after verified Oracle reset', { email });
-    return res.json({ ok: true, message: 'تم تغيير كلمة المرور بنجاح - يمكنك تسجيل الدخول الآن' });
+    console.info('ANY USER Railway password updated', email);
+    return res.json({ ok: true, emailSent: undefined, message: 'تم تغيير كلمة المرور بنجاح - يمكنك تسجيل الدخول الآن' });
   } catch (error) {
     console.error('[AUTH_PROXY] Reset-password request failed', {
       reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
