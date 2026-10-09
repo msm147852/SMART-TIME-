@@ -101,6 +101,7 @@ app.use((req, res, next) => {
   const allowed =
     !origin ||
     /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin) ||
+    origin === "https://smart-time-production-661f.up.railway.app" ||
     /^https?:\/\/localhost(?::\\d+)?$/i.test(origin) ||
     /^https?:\/\/127\.0\.0\.1(?::\\d+)?$/i.test(origin);
 
