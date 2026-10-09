@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
-import { forgotPassword, loginWithIdentifier, registerWithEmail, resetPassword, selectLoginRole } from '../services/authService';
+import { forgotPassword, loginWithIdentifier, register as registerWithOracle, registerWithEmail, resetPassword, selectLoginRole } from '../services/authService';
 
 interface Props {
   onAuthenticated: () => void;
@@ -36,6 +36,12 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         if (name.trim().length < 2) throw new Error('اكتب اسمًا صحيحًا.');
         if (!username.trim()) throw new Error('اسم المستخدم مطلوب.');
         await registerWithEmail(name.trim(), username.trim(), email.trim(), password, challenge);
+        try {
+          await registerWithOracle(email.trim(), name.trim(), password);
+        } catch (oracleError) {
+          // The primary registration succeeded; Oracle mirroring is best-effort.
+          console.warn('[Auth] Oracle registration sync failed:', oracleError);
+        }
         onAuthenticated(); return;
       }
       if (mode === 'forgot') {
