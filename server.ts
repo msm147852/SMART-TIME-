@@ -818,7 +818,7 @@ app.post('/api/auth/forgot-password',async(req,res)=>{
   try {
     const email=String(req.body.email||'').trim().toLowerCase();
     const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;
-    if(!row) return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});
+    if(!row) return res.json({ok:true,accountExists:false,emailSent:false,code:'EMAIL_NOT_REGISTERED',message:'هذا البريد الإلكتروني غير مسجل. أنشئ حسابًا جديدًا أولًا.'});
     const code=String(crypto.randomInt(100000,1000000));
     const expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();
     db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());
@@ -829,7 +829,7 @@ app.post('/api/auth/forgot-password',async(req,res)=>{
         db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
           .run(crypto.randomUUID(),email,'password_reset','accepted',info.provider,info.messageId||null,null,new Date().toISOString());
       } catch { console.error('EMAIL_LOG_WRITE_FAILED', { purpose:'password_reset' }); }
-      res.json({ok:true,emailSent:true,provider:info.provider});
+      res.json({ok:true,accountExists:true,emailSent:true,provider:info.provider,message:'تم إرسال رمز استعادة كلمة المرور إلى بريدك الإلكتروني.'});
     } catch(mailErr:any) {
       db.prepare('DELETE FROM password_resets WHERE email=?').run(email);
       const codeValue=typeof mailErr?.code==='string' ? mailErr.code.slice(0,80) : 'MAIL_SEND_FAILED';
@@ -838,7 +838,7 @@ app.post('/api/auth/forgot-password',async(req,res)=>{
           .run(crypto.randomUUID(),email,'password_reset','failed',provider,null,codeValue,new Date().toISOString());
       } catch { console.error('EMAIL_LOG_WRITE_FAILED', { purpose:'password_reset' }); }
       console.error('PASSWORD_RESET_EMAIL_FAILED', { provider, code:codeValue });
-      res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});
+      res.json({ok:false,accountExists:true,emailSent:false,code:'EMAIL_DELIVERY_FAILED',message:'البريد مسجل، لكن تعذر إرسال رمز الاستعادة حاليًا. حاول لاحقًا.'});
     }
   } catch(e:any) {
     res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});
