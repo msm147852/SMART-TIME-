@@ -1,4 +1,4 @@
-export type PasswordResetEmailResult = { provider: "resend" | "smtp" | "development"; messageId?: string; devCode?: string };
+export type PasswordResetEmailResult = { provider: "resend"; messageId?: string };
 
 function required(name: string): string {
   const value = String(process.env[name] || "").trim();
@@ -6,52 +6,79 @@ function required(name: string): string {
   return value;
 }
 
+function maskEmail(email: string): string {
+  const [local, domain] = String(email || "").split("@");
+  if (!local || !domain) return "[invalid-email]";
+  return `${local.slice(0, 1)}***@${domain}`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export async function sendPasswordResetEmail(email: string, code: string, ttlMinutes: number): Promise<PasswordResetEmailResult> {
   const provider = String(process.env.EMAIL_PROVIDER || "").trim().toLowerCase();
-  const from = required("EMAIL_FROM");
-  const subject = "SMART TIME - رمز إعادة تعيين كلمة المرور";
-  const text = `رمز إعادة تعيين كلمة المرور في SMART TIME هو: ${code}. صالح لمدة ${ttlMinutes} دقيقة. إذا لم تطلب ذلك، تجاهل هذه الرسالة.`;
+  if (provider !== "resend") {
+    throw new Error("خدمة البريد غير مكوّنة. اضبط EMAIL_PROVIDER=resend.");
+  }
 
-  if (provider === "resend") {
-    const key = required("RESEND_API_KEY");
+  const key = required("RESEND_API_KEY");
+  const from = required("EMAIL_FROM");
+  const frontendUrl = String(process.env.FRONTEND_URL || "https://smart-time-orcin-six.vercel.app").trim();
+  const subject = "SMART-TIME password reset";
+  const safeCode = escapeHtml(code);
+  const safeTtl = escapeHtml(String(ttlMinutes));
+  const safeFrontendUrl = escapeHtml(frontendUrl);
+
+  console.log("RESEND_ATTEMPT", { to: maskEmail(email), provider: "resend" });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [email], subject, text }),
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject,
+        text: `رمز استعادة كلمة مرور SMART-TIME هو: ${code}. صالح لمدة ${ttlMinutes} دقيقة. إذا لم تطلب الاستعادة فتجاهل الرسالة.`,
+        html: `<!doctype html><html lang="ar"><body dir="rtl" style="font-family:Arial,sans-serif;line-height:1.8;color:#172033"><h2>استعادة كلمة مرور SMART-TIME</h2><p>استخدم الرمز التالي داخل التطبيق لإكمال استعادة كلمة المرور:</p><p style="font-size:30px;font-weight:700;letter-spacing:6px">${safeCode}</p><p>صلاحية الرمز ${safeTtl} دقيقة.</p><p><a href="${safeFrontendUrl}">فتح SMART-TIME</a></p><p>إذا لم تطلب الاستعادة، تجاهل هذه الرسالة.</p></body></html>`,
+      }),
+      signal: controller.signal,
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`فشل إرسال البريد عبر Resend (${response.status}).`);
-    return { provider: "resend", messageId: typeof payload?.id === "string" ? payload.id : undefined };
-  }
 
-  if (provider === "smtp") {
-    const nodemailer = await import("nodemailer") as any;
-    const host = required("SMTP_HOST");
-    const port = Number(process.env.SMTP_PORT || 465);
-    const user = required("SMTP_USER");
-    const pass = required("SMTP_PASS");
-    const secure = String(process.env.SMTP_SECURE || (port === 465 ? "true" : "false")).toLowerCase() === "true";
-    const createTransport = nodemailer.default?.createTransport ?? nodemailer.createTransport;
-    console.info("Password reset SMTP attempt", { host, port, secure });
-    const transporter = createTransport({ host, port, secure, auth: { user, pass } });
-    try {
-      const info = await transporter.sendMail({ from, to: email, subject, text });
-      console.info("Password reset SMTP sent", { messageId: typeof info?.messageId === "string" ? info.messageId : undefined });
-      return { provider: "smtp", messageId: typeof info?.messageId === "string" ? info.messageId : undefined };
-    } catch (error: any) {
-      console.error("Password reset SMTP failed", {
-        code: error?.code,
-        responseCode: error?.responseCode,
-        command: error?.command,
-        message: typeof error?.message === "string" ? error.message.replace(/(pass(word)?|auth|authorization|token|secret)[^,;\\n]*/gi, "$1=[REDACTED]") : undefined,
-      });
+    const payload: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = typeof payload?.message === "string" ? payload.message : typeof payload?.error === "string" ? payload.error : "Resend API request failed";
+      const error: any = new Error(message);
+      error.code = typeof payload?.name === "string" ? payload.name : `HTTP_${response.status}`;
+      console.error("RESEND_FAILED", { status: response.status, error: message, code: error.code });
       throw error;
     }
-  }
 
-  if (String(process.env.ALLOW_DEV_EMAIL_CODE || "").toLowerCase() === "true") {
-    return { provider: "development", devCode: code };
+    const messageId = typeof payload?.id === "string" ? payload.id : undefined;
+    console.log("RESEND_SENT", { id: messageId });
+    return { provider: "resend", messageId };
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      console.error("RESEND_FAILED", { status: undefined, error: "Request timed out after 10 seconds", code: "RESEND_TIMEOUT" });
+      const timeoutError: any = new Error("Resend request timed out after 10 seconds.");
+      timeoutError.code = "RESEND_TIMEOUT";
+      throw timeoutError;
+    }
+    if (!error?.code || error.code === "ECONNRESET" || error.code === "ENOTFOUND" || error.code === "EAI_AGAIN") {
+      console.error("RESEND_FAILED", {
+        status: undefined,
+        error: error instanceof Error ? error.message : "Unknown Resend transport error",
+        code: typeof error?.code === "string" ? error.code : "RESEND_NETWORK_ERROR",
+      });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  throw new Error("خدمة البريد غير مكوّنة. استخدم EMAIL_PROVIDER=resend أو EMAIL_PROVIDER=smtp واضبط المتغيرات المطلوبة.");
 }
