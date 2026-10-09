@@ -143,13 +143,13 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   };
 
   return (
-    <main className="min-h-screen bg-[#fffdf2] text-slate-950 flex items-center justify-center px-4 py-8 relative overflow-hidden" dir="rtl">
-      <div aria-hidden="true" className="pointer-events-none absolute -top-20 -left-24 h-64 w-64 rounded-full border-[18px] border-[#d6a33b]/15" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 rounded-full border-[20px] border-[#d6a33b]/15" />
+    <main className="min-h-screen bg-white text-slate-950 flex items-center justify-center px-4 py-8 relative overflow-hidden" dir="rtl">
+      <div aria-hidden="true" className="pointer-events-none absolute -top-20 -left-24 h-64 w-64 rounded-full border-[18px] border-slate-100" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 rounded-full border-[20px] border-slate-100" />
       <div className="w-full max-w-md relative">
-        <div className="rounded-[30px] border border-[#e4c36d]/50 bg-[#fffef7]/95 shadow-[0_24px_80px_rgba(112,77,12,.14)] overflow-hidden">
-          <header className="p-6 sm:p-7 bg-gradient-to-b from-[#fffef7] to-[#fffdf2] border-b border-[#e8d8ae]/50 text-center">
-            <div className="mx-auto w-56 h-44 sm:w-64 sm:h-48 rounded-2xl bg-transparent overflow-hidden flex items-center justify-center p-1">
+        <div className="rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,.10)] overflow-hidden">
+          <header className="p-6 sm:p-7 bg-white border-b border-slate-100 text-center">
+            <div className="mx-auto w-64 h-48 sm:w-72 sm:h-52 bg-white overflow-hidden flex items-center justify-center p-0">
               <img src="/logo-smarttime.svg" alt="SmartTime Time Gold" className="w-full h-full object-contain" />
             </div>
             <h1 className="sr-only">SMART TIME</h1>
