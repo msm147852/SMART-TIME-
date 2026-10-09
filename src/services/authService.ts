@@ -91,8 +91,42 @@ export async function loginWithPhone(phone: string, code: string, turnstileToken
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
-export async function requestPasswordReset(email: string, turnstileToken?: string) {
-  return request('/api/auth/forgot-password', { email, turnstileToken: turnstileToken || '' });
+const PASSWORD_RESET_API = 'https://smart-time-ai.duckdns.org/api/auth/forgot-password';
+
+export async function forgotPassword(email: string) {
+  const normalizedEmail = email.trim();
+  if (!normalizedEmail) throw new Error('أدخل بريدك الإلكتروني.');
+
+  let response: Response;
+  try {
+    response = await fetch(PASSWORD_RESET_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail }),
+    });
+  } catch {
+    throw new Error('تعذر الاتصال بخدمة استعادة كلمة المرور. تحقق من الإنترنت وحاول مرة أخرى.');
+  }
+
+  const data: any = await response.json().catch(() => ({}));
+  const exists = data.accountExists ?? data.registered;
+
+  if (response.status === 404 || exists === false) {
+    throw new Error('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
+  }
+  if (!response.ok) {
+    throw new Error(data.message || data.error || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
+  }
+  if (exists !== true) {
+    throw new Error(data.message || 'لم نتمكن من التحقق من تسجيل البريد الإلكتروني.');
+  }
+
+  return data;
+}
+
+// Compatibility alias for existing callers; the reset request now uses the Oracle API.
+export async function requestPasswordReset(email: string, _turnstileToken?: string) {
+  return forgotPassword(email);
 }
 
 export async function resetPassword(email: string, code: string, newPassword: string, turnstileToken?: string) {
