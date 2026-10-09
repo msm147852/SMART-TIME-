@@ -177,3 +177,28 @@ export async function logout() {
   try { await api('/api/auth/logout', { method: 'POST', headers: authHeaders() }); } catch {}
   clearSession();
 }
+
+
+/**
+ * Best-effort mirror registration to the Oracle API so forgot-password can find
+ * accounts created through the primary app registration flow.
+ */
+export async function register(email: string, name: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const usernameBase = (normalizedEmail.split("@")[0] || "user")
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/g, "_")
+    .slice(0, 30);
+  const username = usernameBase.length >= 3 ? usernameBase : `usr_${usernameBase}`;
+
+  const response = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: normalizedEmail, name: name.trim(), password, username }),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Oracle registration failed (${response.status})`);
+  }
+  return data;
+}
