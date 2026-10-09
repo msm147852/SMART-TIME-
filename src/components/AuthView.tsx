@@ -143,49 +143,100 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   };
 
   return (
-    <main className="min-h-screen bg-white text-slate-950 flex items-center justify-center px-4 py-8 relative overflow-hidden" dir="rtl">
-      <div aria-hidden="true" className="pointer-events-none absolute -top-20 -left-24 h-64 w-64 rounded-full border-[18px] border-slate-100" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 rounded-full border-[20px] border-slate-100" />
-      <div className="w-full max-w-md relative">
-        <div className="rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,.10)] overflow-hidden">
-          <header className="p-6 sm:p-7 bg-white border-b border-slate-100 text-center">
-            <div className="mx-auto w-64 h-48 sm:w-72 sm:h-52 bg-white overflow-hidden flex items-center justify-center p-0">
-              <img src="/logo-smarttime.svg" alt="SmartTime Time Gold" className="w-full h-full object-contain" />
+    <main className="min-h-screen bg-white text-black flex items-center justify-center px-4 py-8 font-sans" dir="ltr">
+      <section className="w-full max-w-[420px] rounded-3xl border border-gray-100 bg-white p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
+        <header className="mb-6 flex flex-col items-center text-center">
+          <img
+            src="/logo-smarttime.svg"
+            alt="SmartTime TIME GOLD"
+            className="mb-2 h-auto w-[280px] max-w-full object-contain"
+          />
+          <p className="mt-2 font-serif text-lg tracking-wide text-black">Eng.mamdouh saad</p>
+          <h1 className="mt-3 font-serif text-[28px] font-semibold leading-tight text-black">
+            {mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create account' : 'Forgot password?'}
+          </h1>
+        </header>
+
+        {showRoleChoice ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+              <div className="text-lg font-semibold text-black">Choose sign-in type</div>
+              <p className="mt-1 text-sm text-gray-600">Choose how to enter for this session.</p>
             </div>
-            <h1 className="sr-only">SMART TIME</h1>
-            <p className="text-base sm:text-lg font-black tracking-[.12em] text-slate-900 mt-1">ENG.MAMDOUH</p>
-            <p className="text-sm text-slate-500 mt-2">{mode === 'login' ? 'تسجيل الدخول إلى حسابك' : mode === 'register' ? 'إنشاء حساب جديد' : 'استعادة كلمة المرور'}</p>
-          </header>
-          {showRoleChoice ? (
-            <div className="p-6 sm:p-7 space-y-4">
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
-                <div className="text-lg font-black text-slate-950">اختيار نوع الدخول</div>
-                <p className="mt-1 text-sm font-bold text-slate-600">تم التعرف على حساب مالك البرنامج. اختر طريقة الدخول لهذه الجلسة.</p>
-              </div>
-              <button type="button" disabled={busy} onClick={() => chooseRole('owner')} className="w-full rounded-2xl bg-slate-950 text-white p-4 font-black shadow-lg disabled:opacity-50">دخول كمالك (Owner) — إدارة النظام وAdmins</button>
-              <button type="button" disabled={busy} onClick={() => chooseRole('user')} className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-black text-slate-900 disabled:opacity-50">دخول كمستخدم عادي</button>
-              {error && <div className="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-xs font-bold">{error}</div>}
-            </div>
-          ) : (
-          <form onSubmit={submit} className="p-6 sm:p-7 space-y-4">
-            {loginNotice && mode === 'login' && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">🔐 {loginNotice}</div>}
+            <button type="button" disabled={busy} onClick={() => chooseRole('owner')} className="w-full rounded-xl bg-black p-3.5 font-medium text-[#C5A059] transition hover:bg-gray-900 disabled:opacity-50">Continue as Owner</button>
+            <button type="button" disabled={busy} onClick={() => chooseRole('user')} className="w-full rounded-xl border border-gray-300 bg-white p-3.5 font-medium text-black transition hover:bg-gray-50 disabled:opacity-50">Continue as User</button>
+            {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            {loginNotice && mode === 'login' && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{loginNotice}</div>}
+
             {mode === 'register' && <>
-              <label className="block"><span className="text-xs font-bold text-slate-700">الاسم</span><div className="relative mt-1"><UserRound className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required value={name} onChange={e=>setName(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="اكتب اسمك" /></div></label>
-              <label className="block"><span className="text-xs font-bold text-slate-700">اسم المستخدم</span><input required dir="ltr" value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,'').slice(0,30))} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="ahmed_123" /></label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-800">Full name</span>
+                <div className="relative">
+                  <UserRound className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                  <input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name" className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-4 outline-none transition focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="Your name" />
+                </div>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-800">Username</span>
+                <input required dir="ltr" value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,'').slice(0,30))} autoComplete="username" className="h-12 w-full rounded-xl border border-gray-300 px-4 outline-none transition focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="username" />
+              </label>
             </>}
-            <label className="block"><span className="text-xs font-bold text-slate-700">البريد الإلكتروني</span><div className="relative mt-1"><Mail className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required type="email" value={email} onChange={e=>{setEmail(e.target.value); setError('');}} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="name@example.com" /></div></label>
-            {mode === 'forgot' && resetSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز إعادة التعيين المرسل بالبريد</span><input required value={code} onChange={e=>setCode(e.target.value)} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.3em]" placeholder="أدخل الرمز" /></label>}
-            {mode !== 'forgot' || resetSent ? <label className="block"><span className="text-xs font-bold text-slate-700">{mode === 'forgot' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</span><div className="relative mt-1"><LockKeyhole className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required minLength={8} type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} className="w-full pr-10 pl-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="8 أحرف على الأقل" /><button type="button" aria-label={show?'إخفاء كلمة المرور':'إظهار كلمة المرور'} onClick={()=>setShow(!show)} className="absolute left-3 top-3 text-slate-500">{show?<EyeOff className="w-5"/>:<Eye className="w-5"/>}</button></div></label> : null}
-            {error && <div className={`rounded-xl p-3 text-xs font-bold ${error.includes('تم ') ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'}`}>{error}</div>}
-            <button disabled={busy || (mode === 'register' && emailExistsInRailway)} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black shadow-lg hover:bg-slate-800 transition disabled:opacity-50">{busy?'جارٍ التنفيذ…':mode==='register'?'إنشاء الحساب':mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'):'دخول'}</button>
-            {mode === 'login' && <div className="flex items-center justify-between gap-3 text-xs font-bold"><button type="button" onClick={()=>switchMode('forgot')} className="text-slate-600 hover:text-slate-950">نسيت كلمة المرور؟</button><button type="button" onClick={()=>switchMode('register')} className="text-slate-600 hover:text-slate-950">إنشاء حساب</button></div>}
-            {mode === 'register' && emailExistsInRailway && <button type="button" onClick={()=>switchMode('login')} className="w-full py-2 rounded-xl bg-amber-50 border border-amber-200 text-sm font-black text-amber-900">هذا البريد مسجل بالفعل — الانتقال لتسجيل الدخول</button>}
-            {mode !== 'login' && <button type="button" onClick={()=>switchMode('login')} className="w-full text-xs font-bold text-slate-500">العودة لتسجيل الدخول</button>}
-            <button type="button" onClick={onGuest} className="w-full py-3 rounded-2xl border border-slate-200 text-slate-800 font-black bg-white hover:bg-slate-50">الدخول كزائر</button>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-gray-800">Email</span>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                <input required type="email" autoComplete="email" dir="ltr" value={email} onChange={e=>{setEmail(e.target.value); setError('');}} className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-4 outline-none transition placeholder:text-gray-500 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="email@example.com" />
+              </div>
+            </label>
+
+            {mode === 'forgot' && resetSent && (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-800">Reset code</span>
+                <input required dir="ltr" value={code} onChange={e=>setCode(e.target.value)} className="h-12 w-full rounded-xl border border-gray-300 px-4 text-center tracking-[.3em] outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="Enter the code from your email" />
+              </label>
+            )}
+
+            {mode !== 'forgot' || resetSent ? (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-800">{mode === 'forgot' ? 'New password' : 'Password'}</span>
+                <div className="relative">
+                  <LockKeyhole className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                  <input required minLength={8} type={show?'text':'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e=>setPassword(e.target.value)} className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-12 outline-none transition placeholder:text-gray-400 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="••••••••" />
+                  <button type="button" aria-label={show?'Hide password':'Show password'} onClick={()=>setShow(!show)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-black focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">{show?<EyeOff className="h-5 w-5"/>:<Eye className="h-5 w-5"/>}</button>
+                </div>
+              </label>
+            ) : null}
+
+            {error && <div role="alert" className={`rounded-xl p-3 text-sm font-medium ${error.includes('تم ') ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-700'}`}>{error}</div>}
+
+            <button disabled={busy || (mode === 'register' && emailExistsInRailway)} className="flex h-[52px] w-full items-center justify-center rounded-xl bg-black px-4 font-medium text-[#C5A059] transition hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              {busy?'Please wait…':mode==='register'?'Create account':mode==='forgot'?(resetSent?'Reset password':'Send reset code'):'Sign In'}
+            </button>
+
+            {mode === 'login' && (
+              <div className="flex flex-col items-center gap-3 pt-1 text-sm">
+                <button type="button" onClick={()=>switchMode('forgot')} className="text-[#C5A059] transition hover:underline">Forgot password?</button>
+                <p className="text-center text-gray-700">Don't have an account?{' '}
+                  <button type="button" onClick={()=>switchMode('register')} className="font-semibold text-[#C5A059] transition hover:text-[#A68136] hover:underline">Sign up</button>
+                </p>
+              </div>
+            )}
+            {mode === 'register' && emailExistsInRailway && <button type="button" onClick={()=>switchMode('login')} className="w-full rounded-xl border border-amber-200 bg-amber-50 py-3 text-sm font-semibold text-amber-900">Email already registered — Sign In</button>}
+            {mode !== 'login' && <button type="button" onClick={()=>switchMode('login')} className="w-full py-2 text-sm text-gray-600 transition hover:text-black hover:underline">Back to Sign In</button>}
+            <div className="pt-1">
+              <div className="mb-4 flex items-center gap-3 text-sm text-gray-500"><span className="h-px flex-1 bg-gray-300"/><span>or continue as</span><span className="h-px flex-1 bg-gray-300"/></div>
+              <button type="button" onClick={onGuest} className="flex h-[50px] w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-3 text-[15px] text-gray-800 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
+                <UserRound className="h-5 w-5 shrink-0 text-gray-500"/>
+                <span>الدخول كزائر — Continue as Guest</span>
+              </button>
+            </div>
           </form>
-          )}
-        </div>
-      </div>
+        )}
+      </section>
     </main>
   );
 };
