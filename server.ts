@@ -922,18 +922,51 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   if (!consumeAuthRateLimit(req, 'forgot-password')) {
     return res.status(429).json({ ok: false, emailSent: false, message: 'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.' });
   }
+
   const email = String(req.body?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, emailSent: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
+
+  // Oracle is the primary password-reset sender. Railway must not attempt to
+  // initialize a local Gmail transport just to proxy this request.
   try {
     const result = await proxyOracleAuth('/api/auth/forgot-password', { email }, 10_000);
+    const responseText = JSON.stringify(result.data ?? {});
+    const missingSmtpCredentials = /missing credentials for\s+["']?plain|credentials.*plain/i.test(responseText);
+
+    // Oracle may be reachable while its mail transport is misconfigured.
+    // Never expose Nodemailer internals or pass this through as an HTTP 500.
+    if (missingSmtpCredentials) {
+      console.error('[AUTH_PROXY] Oracle forgot-password mail transport is not configured');
+      return res.status(503).json({
+        ok: false,
+        emailSent: false,
+        code: 'PASSWORD_RESET_MAIL_UNAVAILABLE',
+        message: 'خدمة استعادة كلمة المرور غير متاحة حاليًا. إعدادات البريد الإلكتروني غير مكتملة على خادم الإرسال.',
+      });
+    }
+
     return res.status(result.status).json(result.data);
   } catch (error) {
-    console.error('[AUTH_PROXY] Forgot-password request failed', {
-      reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
+    const timedOut = error instanceof Error && error.name === 'AbortError';
+    const hasRailwayMailCredentials = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASS);
+
+    console.error('[AUTH_PROXY] Forgot-password Oracle request failed', {
+      reason: timedOut ? 'timeout' : 'upstream-unavailable',
+      railwayMailConfigured: hasRailwayMailCredentials,
     });
-    return res.status(502).json({ ok: false, emailSent: false, code: 'AUTH_UPSTREAM_UNAVAILABLE', message: 'خدمة استعادة كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا.' });
+
+    // There is no separate Railway mailer in this route. If Oracle is down,
+    // fail closed with a clear 503 instead of crashing on missing PLAIN creds.
+    return res.status(503).json({
+      ok: false,
+      emailSent: false,
+      code: 'AUTH_UPSTREAM_UNAVAILABLE',
+      message: hasRailwayMailCredentials
+        ? 'تعذر الاتصال بخدمة استعادة كلمة المرور. حاول مرة أخرى لاحقًا.'
+        : 'خدمة استعادة كلمة المرور غير متاحة حاليًا؛ خادم الإرسال غير متصل وإعدادات البريد الاحتياطية غير مكتملة.',
+    });
   }
 });
 
