@@ -1,4 +1,4 @@
-export type PasswordResetEmailResult = { provider: "resend"; messageId?: string };
+export type PasswordResetEmailResult = { provider: "resend" | "oracle-relay"; messageId?: string };
 
 function required(name: string): string {
   const value = String(process.env[name] || "").trim();
@@ -18,8 +18,45 @@ function escapeHtml(value: string): string {
 
 export async function sendPasswordResetEmail(email: string, code: string, ttlMinutes: number): Promise<PasswordResetEmailResult> {
   const provider = String(process.env.EMAIL_PROVIDER || "").trim().toLowerCase();
+
+  if (provider === "oracle-relay") {
+    const relayUrl = required("ORACLE_EMAIL_RELAY_URL");
+    const secret = required("ORACLE_EMAIL_RELAY_SECRET");
+    let parsedUrl: URL;
+    try { parsedUrl = new URL(relayUrl); } catch { throw new Error("ORACLE_EMAIL_RELAY_URL must be a valid HTTPS URL."); }
+    if (parsedUrl.protocol !== "https:") throw new Error("Oracle email relay must use HTTPS.");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const response = await fetch(relayUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-secret": secret },
+        body: JSON.stringify({ email, code, ttlMinutes }),
+        signal: controller.signal,
+      });
+      const payload: any = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok !== true) {
+        const error: any = new Error("Oracle email relay rejected the request.");
+        error.code = `ORACLE_RELAY_HTTP_${response.status}`;
+        throw error;
+      }
+      const messageId = typeof payload?.messageId === "string" ? payload.messageId : undefined;
+      console.log("PASSWORD_RESET_EMAIL_ACCEPTED", { provider: "oracle-relay", recipient: maskEmail(email) });
+      return { provider: "oracle-relay", messageId };
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        const timeoutError: any = new Error("Oracle email relay request timed out.");
+        timeoutError.code = "ORACLE_RELAY_TIMEOUT";
+        throw timeoutError;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   if (provider !== "resend") {
-    throw new Error("خدمة البريد غير مكوّنة. اضبط EMAIL_PROVIDER=resend.");
+    throw new Error("خدمة البريد غير مكوّنة. استخدم EMAIL_PROVIDER=oracle-relay أو resend.");
   }
 
   const key = required("RESEND_API_KEY");
