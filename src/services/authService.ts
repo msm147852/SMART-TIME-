@@ -91,7 +91,7 @@ export async function loginWithPhone(phone: string, code: string, turnstileToken
   saveSession(session); applyUserToProfile(session.user); return session;
 }
 
-const PASSWORD_RESET_API = 'https://smart-time-ai.duckdns.org/api/auth/forgot-password';
+const API_BASE = 'https://smart-time-ai.duckdns.org';
 
 export async function forgotPassword(email: string) {
   const normalizedEmail = email.trim();
@@ -99,7 +99,7 @@ export async function forgotPassword(email: string) {
 
   let response: Response;
   try {
-    response = await fetch(PASSWORD_RESET_API, {
+    response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: normalizedEmail }),
@@ -110,18 +110,17 @@ export async function forgotPassword(email: string) {
 
   const data: any = await response.json().catch(() => ({}));
   const exists = data.accountExists ?? data.registered;
+  const sent = data.emailSent ?? data.ok;
 
-  if (response.status === 404 || exists === false) {
-    throw new Error('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
+  if (!exists || response.status === 404) {
+    throw new Error(data.message || 'هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
   }
   if (!response.ok) {
     throw new Error(data.message || data.error || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
   }
-  if (exists !== true) {
-    throw new Error(data.message || 'لم نتمكن من التحقق من تسجيل البريد الإلكتروني.');
-  }
+  if (exists && sent) return data;
 
-  return data;
+  throw new Error(data.message || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
 }
 
 // Compatibility alias for existing callers; the reset request now uses the Oracle API.
