@@ -814,7 +814,6 @@ app.post('/api/auth/phone-login',async(req,res)=>{
   try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({token:createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
 app.post('/api/auth/forgot-password',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "forgot-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.'});
-  if (!(await requireTurnstile(req, res))) return;
   try {
     const email=String(req.body.email||'').trim().toLowerCase();
     const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;
