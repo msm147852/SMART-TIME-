@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-labelledby="title desc">
+<title id="title">SmartTime Time Gold</title><desc id="desc">Black and gold SmartTime emblem with crowned ST, clock and hourglass</desc>
+<defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a1"/><stop offset=".25" stop-color="#c68a18"/><stop offset=".52" stop-color="#ffdc68"/><stop offset=".78" stop-color="#8f5708"/><stop offset="1" stop-color="#f7d66b"/></linearGradient><linearGradient id="black" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#252525"/><stop offset="1" stop-color="#030303"/></linearGradient></defs>
+<g transform="translate(0 8)">
+<path d="M287 42l-18-27 18-6 18 6-18 27zm-40 24l-16-25 17-4 16 20zm80 0l-17-9 16-20 17 4z" fill="url(#gold)" stroke="#94600c" stroke-width="2"/>
+<path d="M237 65l-9-28 23 18 15-31 20 29 20-29 15 31 23-18-9 28z" fill="url(#gold)" stroke="#8d5b0a" stroke-width="3"/>
+<path d="M221 77h154l-13 16H234z" fill="url(#gold)"/>
+<circle cx="277" cy="205" r="116" fill="url(#black)" stroke="url(#gold)" stroke-width="9"/><circle cx="277" cy="205" r="91" fill="#080808" stroke="url(#gold)" stroke-width="3"/>
+<g stroke="url(#gold)" stroke-width="7" stroke-linecap="round"><path d="M277 117v17M277 276v17M189 205h17M348 205h17M215 143l12 13M328 254l12 13M215 267l12-13M328 156l12-13"/></g>
+<path d="M276 205l62-64" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/><circle cx="276" cy="205" r="10" fill="url(#gold)"/>
+<path d="M90 155C83 103 125 70 179 75h150c25 0 39 17 39 35 0 22-17 34-43 34H267c-30 0-42 13-42 31 0 17 15 29 35 29h58c30 0 46 18 46 42 0 32-24 54-62 54H145c-41 0-65-26-65-57 0-22 12-40 29-49l30-17c-25-2-45-9-49-22z" fill="url(#black)" stroke="url(#gold)" stroke-width="7"/>
+<path d="M391 92h179l-20 32c-11 16-28 20-52 20h-48c-24 0-37 13-37 38v111h-49V177c0-32 20-56 52-56h29z" fill="url(#black)" stroke="url(#gold)" stroke-width="6"/>
+<path d="M448 198c20-22 40-34 60-34 19 0 31 13 31 29 0 17-14 25-33 25h-31c-11 0-18 6-18 15s8 14 20 14h30c18 0 29 12 29 26 0 16-13 27-32 27h-72" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round"/>
+<path d="M477 180h61l-7 14h-47zm3 109h55l7 13h-68z" fill="url(#gold)" stroke="#8f5b0a" stroke-width="3"/>
+<path d="M484 195h47l-7 34-17 18-16-18z" fill="#f8f5e9" stroke="url(#gold)" stroke-width="3"/><path d="M491 245l16 13 16-13-6 29h-20z" fill="url(#gold)"/>
+<text x="320" y="390" text-anchor="middle" font-family="Georgia,serif" font-size="76" font-weight="bold" letter-spacing="-4" fill="url(#black)" stroke="#8e5a0a" stroke-width="1">Smart<tspan fill="url(#gold)">Time</tspan></text>
+<path d="M95 414h125m200 0h125" stroke="url(#gold)" stroke-width="4"/><text x="320" y="427" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="bold" letter-spacing="10" fill="url(#gold)">TIME GOLD</text>
+</g></svg>
