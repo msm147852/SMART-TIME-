@@ -671,8 +671,8 @@ app.post('/api/auth/login',async(req,res)=>{
     const password=String(req.body.password||'');
     const selectedRole=requestedLoginRole(req.body.role);
     let row:any=null;
-    if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail) as any;
-    else row=db.prepare('SELECT * FROM users WHERE username=?').get(normalizedUsername) as any;
+    if(identifier.includes('@')) row=db.prepare('SELECT * FROM users WHERE lower(email)=? LIMIT 1').get(normalizedEmail) as any;
+    else row=db.prepare('SELECT * FROM users WHERE lower(username)=? LIMIT 1').get(normalizedUsername) as any;
     if(!row||!verifyPassword(password,row.password_hash)) return res.status(401).json({error:'بيانات الدخول غير صحيحة. تأكد من البريد أو اسم المستخدم وكلمة المرور.'});
     const role=effectiveRole(row);
     if(role === 'owner' && !selectedRole) return res.json({ok:true,requiresRoleChoice:true,availableRoles:['owner','user'],roleChoiceTicket:createRoleChoiceTicket(row.id)});
@@ -912,15 +912,40 @@ app.post('/api/auth/reset-password', async (req, res) => {
     return res.status(400).json({ ok: false, message: 'كلمة المرور يجب أن تكون بين 8 و256 حرفًا.' });
   }
   try {
+    // Oracle validates and consumes the reset code. After it confirms the reset,
+    // update the local database used by /api/auth/login before reporting success.
     const result = await proxyOracleAuth('/api/auth/reset-password', { email, code, newPassword, password: newPassword });
-    if (result.status >= 200 && result.status < 300 && result.data?.ok !== false) {
-      try {
-        db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword), email);
-      } catch {
-        console.error('[AUTH_PROXY] Local password sync failed after Oracle reset', { reason: 'local-database-update-failed' });
-      }
+    if (!(result.status >= 200 && result.status < 300 && result.data?.ok !== false)) {
+      return res.status(result.status).json(result.data);
     }
-    return res.status(result.status).json(result.data);
+
+    let localUpdate;
+    try {
+      localUpdate = db.prepare('UPDATE users SET password_hash=? WHERE lower(email)=?')
+        .run(hashPassword(newPassword), email);
+    } catch (error) {
+      console.error('[AUTH_PROXY] Local password sync failed after Oracle reset', {
+        reason: 'local-database-update-failed',
+        detail: error instanceof Error ? error.message : 'unknown',
+      });
+      return res.status(500).json({
+        ok: false,
+        code: 'LOCAL_PASSWORD_SYNC_FAILED',
+        message: 'تم التحقق من رمز الاستعادة، لكن تعذر تحديث كلمة المرور في قاعدة تسجيل الدخول. لم يتم تأكيد نجاح العملية؛ تواصل مع الدعم لإكمال المزامنة.',
+      });
+    }
+
+    if (localUpdate.changes < 1) {
+      console.error('[AUTH_PROXY] Oracle reset succeeded but no matching local account exists', { email });
+      return res.status(409).json({
+        ok: false,
+        code: 'LOCAL_ACCOUNT_NOT_FOUND',
+        message: 'تم التحقق من رمز الاستعادة، لكن الحساب غير موجود في قاعدة تسجيل الدخول لهذا السيرفر. يلزم إصلاح مزامنة الحساب قبل تسجيل الدخول.',
+      });
+    }
+
+    console.info('[AUTH_PROXY] Local password hash updated after verified Oracle reset', { email });
+    return res.json({ ok: true, message: 'تم تغيير كلمة المرور بنجاح - يمكنك تسجيل الدخول الآن' });
   } catch (error) {
     console.error('[AUTH_PROXY] Reset-password request failed', {
       reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
