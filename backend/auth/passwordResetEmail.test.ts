@@ -28,6 +28,25 @@ try {
     /EMAIL_FROM مطلوب/
   );
 
+
+  process.env.EMAIL_PROVIDER = "oracle-relay";
+  process.env.ORACLE_EMAIL_RELAY_URL = "https://smart-time-ai.duckdns.org/api/internal/send-reset";
+  process.env.ORACLE_EMAIL_RELAY_SECRET = "unit-test-secret";
+  let relayRequest: any = null;
+  globalThis.fetch = (async (input: any, init?: any) => {
+    relayRequest = { url: String(input), headers: init.headers, body: JSON.parse(init.body) };
+    return new Response(JSON.stringify({ ok: true, messageId: "relay-test-1" }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as any;
+  const relayResult = await sendPasswordResetEmail("user@example.com", "654321", 15);
+  assert.equal(relayResult.provider, "oracle-relay");
+  assert.equal(relayResult.messageId, "relay-test-1");
+  assert.equal(relayRequest.url, process.env.ORACLE_EMAIL_RELAY_URL);
+  assert.equal(relayRequest.headers["x-internal-secret"], "unit-test-secret");
+  assert.deepEqual(relayRequest.body, { email: "user@example.com", code: "654321", ttlMinutes: 15 });
+
+  process.env.ORACLE_EMAIL_RELAY_URL = "http://insecure.example/api/internal/send-reset";
+  await assert.rejects(() => sendPasswordResetEmail("user@example.com", "654321", 15), /must use HTTPS/);
+
   console.log("password reset email provider tests: PASS");
 } finally {
   process.env = originalEnv;
