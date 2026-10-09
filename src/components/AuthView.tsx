@@ -91,14 +91,6 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       if (mode === 'forgot') {
         if (!resetSent) {
           const d:any = await forgotPassword(email.trim());
-          if (d.accountExists === false) {
-            setMode('register');
-            setResetSent(false);
-            setCode('');
-            setPassword('');
-            setError('هذا البريد الإلكتروني غير مسجل. أنشئ حسابًا جديدًا أولًا، ثم يمكنك استخدام استعادة كلمة المرور.');
-            return;
-          }
           if (d.emailSent !== true) {
             throw new Error(d.message || 'تعذر إرسال رمز الاستعادة حاليًا. حاول لاحقًا.');
           }
