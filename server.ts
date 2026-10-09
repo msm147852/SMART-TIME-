@@ -832,57 +832,105 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     return res.status(429).json({ ok: false, emailSent: false, message: 'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.' });
   }
   const email = String(req.body?.email || '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, emailSent: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
+
+  // Registration and login use Railway's SQLite users table. Always handle
+  // locally registered accounts here first; Oracle may have a separate users DB.
   try {
-    const result = await proxyOracleAuth("/api/auth/forgot-password", { email });
+    const localUser = db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;
+    if (localUser) {
+      const code = String(crypto.randomInt(100000, 1000000));
+      const now = new Date().toISOString();
+      const expires = new Date(Date.now() + PASSWORD_RESET_MINUTES * 60_000).toISOString();
+      db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at)
+        VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET
+        code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`)
+        .run(email, otpHash(code), expires, 0, now);
+      const provider = String(process.env.EMAIL_PROVIDER || 'unconfigured').trim().toLowerCase();
+      try {
+        const info = await sendPasswordResetEmail(email, code, PASSWORD_RESET_MINUTES);
+        try {
+          db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
+            .run(crypto.randomUUID(), email, 'password_reset', 'accepted', info.provider, info.messageId || null, null, now);
+        } catch { console.error('[AUTH] Password reset email log write failed'); }
+        return res.json({ ok: true, accountExists: true, emailSent: true, provider: info.provider, message: 'تم إرسال رمز استعادة كلمة المرور إلى بريدك الإلكتروني.' });
+      } catch (mailError: any) {
+        db.prepare('DELETE FROM password_resets WHERE email=?').run(email);
+        const errorCode = typeof mailError?.code === 'string' ? mailError.code.slice(0, 80) : 'MAIL_SEND_FAILED';
+        try {
+          db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
+            .run(crypto.randomUUID(), email, 'password_reset', 'failed', provider, null, errorCode, now);
+        } catch { console.error('[AUTH] Password reset email failure log write failed'); }
+        console.error('[AUTH] Password reset email delivery failed', { provider, code: errorCode });
+        return res.status(503).json({ ok: false, accountExists: true, emailSent: false, code: 'EMAIL_DELIVERY_FAILED', message: 'الحساب مسجل بالفعل، لكن تعذر إرسال رمز الاستعادة حاليًا. لم يتم تحويلك إلى التسجيل.' });
+      }
+    }
+
+    // Preserve support for accounts that exist only in Oracle.
+    const result = await proxyOracleAuth('/api/auth/forgot-password', { email });
     return res.status(result.status).json(result.data);
   } catch (error) {
-    console.error("[AUTH_PROXY] Oracle forgot-password request failed", {
-      reason: error instanceof Error && error.name === "AbortError" ? "timeout" : "upstream-unavailable",
+    console.error('[AUTH_PROXY] Forgot-password request failed', {
+      reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
     });
-    return res.status(502).json({ ok: false, emailSent: false, code: "AUTH_UPSTREAM_UNAVAILABLE", message: "خدمة استعادة كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا." });
+    return res.status(502).json({ ok: false, emailSent: false, code: 'AUTH_UPSTREAM_UNAVAILABLE', message: 'خدمة استعادة كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا.' });
   }
 });
 
 app.post('/api/auth/reset-password', async (req, res) => {
-  if (!consumeAuthRateLimit(req, "reset-password")) {
+  if (!consumeAuthRateLimit(req, 'reset-password')) {
     return res.status(429).json({ ok: false, message: 'تم تجاوز عدد محاولات تغيير كلمة المرور. حاول لاحقًا.' });
   }
   const email = String(req.body?.email || '').trim().toLowerCase();
   const code = String(req.body?.code || '').trim();
   const newPassword = String(req.body?.newPassword || req.body?.password || '');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
-  if (!/^\d{6}$/.test(code)) {
+  if (!/^\\d{6}$/.test(code)) {
     return res.status(400).json({ ok: false, message: 'أدخل رمز الاستعادة المكوّن من 6 أرقام.' });
   }
   if (newPassword.length < 8 || newPassword.length > 256) {
     return res.status(400).json({ ok: false, message: 'كلمة المرور يجب أن تكون بين 8 و256 حرفًا.' });
   }
+
   try {
-    const result = await proxyOracleAuth("/api/auth/reset-password", {
-      email, code, newPassword, password: newPassword,
-    });
-    // Keep Railway's local auth database aligned with Oracle after Oracle
-    // confirms the reset, so the new password also works on Railway login.
+    const localReset = db.prepare('SELECT * FROM password_resets WHERE email=?').get(email) as any;
+    if (localReset) {
+      if (new Date(localReset.expires_at).getTime() < Date.now()) {
+        db.prepare('DELETE FROM password_resets WHERE email=?').run(email);
+        return res.status(400).json({ ok: false, code: 'RESET_CODE_EXPIRED', message: 'رمز الاستعادة منتهي الصلاحية. اطلب رمزًا جديدًا.' });
+      }
+      if (Number(localReset.attempts || 0) >= 5) {
+        return res.status(429).json({ ok: false, code: 'RESET_ATTEMPTS_EXCEEDED', message: 'تم تجاوز عدد المحاولات. اطلب رمز استعادة جديدًا.' });
+      }
+      db.prepare('UPDATE password_resets SET attempts=attempts+1 WHERE email=?').run(email);
+      if (otpHash(code) !== String(localReset.code_hash)) {
+        return res.status(400).json({ ok: false, code: 'INVALID_RESET_CODE', message: 'رمز الاستعادة غير صحيح.' });
+      }
+      const updated = db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword), email);
+      if (!updated.changes) return res.status(404).json({ ok: false, message: 'الحساب غير موجود في قاعدة بيانات تسجيل الدخول.' });
+      db.prepare('DELETE FROM password_resets WHERE email=?').run(email);
+      return res.json({ ok: true, message: 'تم تغيير كلمة المرور بنجاح.' });
+    }
+
+    // Oracle-only accounts continue to use Oracle's own reset token store.
+    const result = await proxyOracleAuth('/api/auth/reset-password', { email, code, newPassword, password: newPassword });
     if (result.status >= 200 && result.status < 300 && result.data?.ok !== false) {
       try {
         db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword), email);
-      } catch (syncError) {
-        console.error("[AUTH_PROXY] Local password sync failed after Oracle reset", {
-          reason: "local-database-update-failed",
-        });
+      } catch {
+        console.error('[AUTH_PROXY] Local password sync failed after Oracle reset', { reason: 'local-database-update-failed' });
       }
     }
     return res.status(result.status).json(result.data);
   } catch (error) {
-    console.error("[AUTH_PROXY] Oracle reset-password request failed", {
-      reason: error instanceof Error && error.name === "AbortError" ? "timeout" : "upstream-unavailable",
+    console.error('[AUTH_PROXY] Reset-password request failed', {
+      reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
     });
-    return res.status(502).json({ ok: false, code: "AUTH_UPSTREAM_UNAVAILABLE", message: "خدمة تغيير كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا." });
+    return res.status(502).json({ ok: false, code: 'AUTH_UPSTREAM_UNAVAILABLE', message: 'خدمة تغيير كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا.' });
   }
 });
 app.post('/api/auth/logout',(req,res)=>{const h=String(req.headers.authorization||''),token=h.startsWith('Bearer ')?h.slice(7).trim():'';if(token)db.prepare('DELETE FROM sessions WHERE id=?').run(token);res.json({ok:true});});
