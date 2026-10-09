@@ -143,16 +143,16 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   };
 
   return (
-    <main className="min-h-screen bg-white text-black flex items-center justify-center px-4 py-8 font-sans" dir="ltr">
-      <section className="w-full max-w-[420px] rounded-3xl border border-gray-100 bg-white p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
-        <header className="mb-6 flex flex-col items-center text-center">
+    <main style={{ backgroundColor: '#FFFFFF' }} className="min-h-screen w-full bg-white text-black flex items-center justify-center px-4 py-6 font-sans" dir="ltr">
+      <section style={{ backgroundColor: '#FFFFFF' }} className="w-full max-w-[420px] rounded-3xl border border-gray-100 bg-white p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
+        <header className="mb-5 flex flex-col items-center text-center">
           <img
             src="/logo-smarttime.svg"
             alt="SmartTime TIME GOLD"
-            className="mb-2 h-auto w-[280px] max-w-full object-contain"
+            className="mb-0 h-auto w-[320px] max-w-full object-contain"
           />
-          <p className="mt-2 font-serif text-lg tracking-wide text-black">Eng.mamdouh saad</p>
-          <h1 className="mt-3 font-serif text-[28px] font-semibold leading-tight text-black">
+          <p className="-mt-1 font-serif text-xl tracking-wide text-[#C5A059]">Eng.mamdouh saad</p>
+          <h1 className="mt-4 font-serif text-[28px] font-semibold leading-tight text-black">
             {mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create account' : 'Forgot password?'}
           </h1>
         </header>
