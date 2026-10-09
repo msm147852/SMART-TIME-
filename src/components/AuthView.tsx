@@ -81,7 +81,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setBusy(true);
     try {
-      const challenge = requireTurnstileToken();
+      const challenge = mode === 'forgot' && !resetSent ? '' : requireTurnstileToken();
       if (mode === 'register') {
         if (name.trim().length < 2) throw new Error('اكتب اسمًا صحيحًا.');
         if (!username.trim()) throw new Error('اسم المستخدم مطلوب.');
@@ -95,7 +95,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
             throw new Error(d.message || 'تعذر إرسال رمز الاستعادة حاليًا. حاول لاحقًا.');
           }
           setResetSent(true); setCode('');
-          setError('تم إرسال الكود');
+          setError('تم إرسال كود استعادة كلمة المرور إلى بريدك الإلكتروني');
           return;
         }
         await resetPassword(email.trim(), code.trim(), password, challenge);
@@ -113,15 +113,17 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       onAuthenticated();
     } catch (err:any) {
       const message = err?.message || 'تعذر تنفيذ العملية.';
-      setError(message);
       if (mode === 'forgot' && message.includes('غير مسجل')) {
+        setError('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
         window.setTimeout(() => {
           setMode('register');
           setResetSent(false);
           setCode('');
           setPassword('');
-          setError('هذا البريد غير مسجل، يرجى التسجيل أولاً');
+          setError('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
         }, 2000);
+      } else {
+        setError(message);
       }
     }
     finally { setBusy(false); if (!showRoleChoice) resetAuthChallenge(); }
