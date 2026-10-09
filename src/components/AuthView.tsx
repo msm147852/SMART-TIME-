@@ -38,12 +38,9 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       setError('');
       return;
     }
-
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        // Oracle's check-email is deliberately permissive; Railway is the
-        // authority for whether this app already has a local account.
         await fetch('https://smart-time-ai.duckdns.org/check-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -117,8 +114,6 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     } catch (err:any) {
       const message = err?.message || 'تعذر تنفيذ العملية.';
       if (mode === 'forgot' && message.includes('غير مسجل')) {
-        // Never force users out of recovery flow because an upstream account
-        // index is stale; keep them in place and let Oracle validate the code.
         setError('لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.');
       } else {
         if (mode === 'register' && /مسجل بالفعل|already exists/i.test(message)) {
@@ -143,15 +138,17 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   };
 
   return (
-    <main style={{ backgroundColor: '#FFFFFF' }} className="min-h-screen w-full bg-white text-black flex items-center justify-center px-4 py-6 font-sans" dir="ltr">
-      <section style={{ backgroundColor: '#FFFFFF' }} className="w-full max-w-[420px] rounded-3xl border border-gray-100 bg-white p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
-        <header className="mb-5 flex flex-col items-center text-center">
+    <main style={{ backgroundColor: '#FFFFFF' }} className="min-h-screen w-full bg-[#FFFFFF] text-black flex items-center justify-center px-4 py-8 font-sans" dir="ltr">
+      {/* Transparent card - pure white background */}
+      <section style={{ backgroundColor: 'transparent' }} className="w-full max-w-[440px] bg-transparent p-6 sm:p-8 border-0 shadow-none">
+        <header className="mb-6 flex flex-col items-center text-center">
           <img
             src="/logo-smarttime.svg"
             alt="SmartTime TIME GOLD"
-            className="mb-0 h-auto w-[320px] max-w-full object-contain"
+            className="mb-2 h-auto w-[360px] max-w-full object-contain"
           />
-          <p className="-mt-1 font-serif text-xl tracking-wide text-[#C5A059]">Eng.mamdouh saad</p>
+          {/* Eng.mamdouh saad in GOLD */}
+          <p className="mt-1 font-serif text-[24px] font-medium tracking-wide text-[#C5A059]">Eng.mamdouh saad</p>
           <h1 className="mt-4 font-serif text-[28px] font-semibold leading-tight text-black">
             {mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create account' : 'Forgot password?'}
           </h1>
@@ -176,12 +173,12 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
                 <span className="mb-2 block text-sm font-medium text-gray-800">Full name</span>
                 <div className="relative">
                   <UserRound className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
-                  <input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name" className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-4 outline-none transition focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="Your name" />
+                  <input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name" className="h-12 w-full rounded-xl border border-[#D4AF37]/50 bg-white pl-12 pr-4 outline-none transition focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="Your name" />
                 </div>
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-gray-800">Username</span>
-                <input required dir="ltr" value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,'').slice(0,30))} autoComplete="username" className="h-12 w-full rounded-xl border border-gray-300 px-4 outline-none transition focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="username" />
+                <input required dir="ltr" value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,'').slice(0,30))} autoComplete="username" className="h-12 w-full rounded-xl border border-[#D4AF37]/50 bg-white px-4 outline-none transition focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="username" />
               </label>
             </>}
 
@@ -189,14 +186,14 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
               <span className="mb-2 block text-sm font-medium text-gray-800">Email</span>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
-                <input required type="email" autoComplete="email" dir="ltr" value={email} onChange={e=>{setEmail(e.target.value); setError('');}} className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-4 outline-none transition placeholder:text-gray-500 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="email@example.com" />
+                <input required type="email" autoComplete="email" dir="ltr" value={email} onChange={e=>{setEmail(e.target.value); setError('');}} className="h-12 w-full rounded-xl border border-[#D4AF37]/50 bg-white pl-12 pr-4 outline-none transition placeholder:text-gray-500 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="email@example.com" />
               </div>
             </label>
 
             {mode === 'forgot' && resetSent && (
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-gray-800">Reset code</span>
-                <input required dir="ltr" value={code} onChange={e=>setCode(e.target.value)} className="h-12 w-full rounded-xl border border-gray-300 px-4 text-center tracking-[.3em] outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="Enter the code from your email" />
+                <input required dir="ltr" value={code} onChange={e=>setCode(e.target.value)} className="h-12 w-full rounded-xl border border-[#D4AF37]/50 bg-white px-4 text-center tracking-[.3em] outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="Enter the code from your email" />
               </label>
             )}
 
@@ -205,7 +202,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
                 <span className="mb-2 block text-sm font-medium text-gray-800">{mode === 'forgot' ? 'New password' : 'Password'}</span>
                 <div className="relative">
                   <LockKeyhole className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
-                  <input required minLength={8} type={show?'text':'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e=>setPassword(e.target.value)} className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-12 outline-none transition placeholder:text-gray-400 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="••••••••" />
+                  <input required minLength={8} type={show?'text':'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e=>setPassword(e.target.value)} className="h-12 w-full rounded-xl border border-[#D4AF37]/50 bg-white pl-12 pr-12 outline-none transition placeholder:text-gray-400 focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20" placeholder="••••••••" />
                   <button type="button" aria-label={show?'Hide password':'Show password'} onClick={()=>setShow(!show)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-black focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">{show?<EyeOff className="h-5 w-5"/>:<Eye className="h-5 w-5"/>}</button>
                 </div>
               </label>
@@ -213,41 +210,60 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
 
             {error && <div role="alert" className={`rounded-xl p-3 text-sm font-medium ${error.includes('تم ') ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-700'}`}>{error}</div>}
 
-            <button disabled={busy || (mode === 'register' && emailExistsInRailway)} className="flex h-[52px] w-full items-center justify-center rounded-xl bg-black px-4 font-medium text-[#C5A059] transition hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+            <button disabled={busy || (mode === 'register' && emailExistsInRailway)} className="flex h-[52px] w-full items-center justify-center rounded-full bg-black px-4 font-medium text-[#C5A059] transition hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
               {busy?'Please wait…':mode==='register'?'Create account':mode==='forgot'?(resetSent?'Reset password':'Send reset code'):'Sign In'}
             </button>
 
             {mode === 'login' && (
               <>
-                <div className="flex flex-col items-center gap-3 pt-1 text-sm">
+                {/* Forgot + Sign up */}
+                <div className="flex flex-col items-center gap-3 pt-2 text-sm">
                   <button type="button" onClick={()=>switchMode('forgot')} className="text-[#C5A059] transition hover:underline">Forgot password?</button>
                   <p className="text-center text-gray-700">Don't have an account?{' '}
                     <button type="button" onClick={()=>switchMode('register')} className="font-semibold text-[#C5A059] transition hover:text-[#A68136] hover:underline">Sign up</button>
                   </p>
                 </div>
-                <div className="pt-1">
-                  <div className="mb-4 flex items-center gap-3 text-sm text-gray-500"><span className="h-px flex-1 bg-gray-300"/><span>or continue with</span><span className="h-px flex-1 bg-gray-300"/></div>
-                  <button type="button" onClick={()=>setError('Google sign-in is not configured on this deployment yet.')} className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
+
+                {/* Divider + Google BETWEEN Sign up and Guest */}
+                <div className="pt-2">
+                  <div className="mb-4 flex items-center gap-3 text-sm text-gray-500">
+                    <span className="h-px flex-1 bg-[#D4AF37]/40"/>
+                    <span>or continue with</span>
+                    <span className="h-px flex-1 bg-[#D4AF37]/40"/>
+                  </div>
+                  <button type="button" onClick={()=>setError('Google sign-in is not configured on this deployment yet.')} className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#D4AF37]/50 bg-white px-4 py-3 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
                     <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18c-.72 1.44-1.13 3.07-1.13 4.93s.41 3.49 1.13 4.93l3.66-2.84z"/>
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
-                    <span className="font-medium text-gray-700">Continue with Google</span>
+                    <span className="font-medium text-gray-800">Continue with Google</span>
+                  </button>
+                </div>
+
+                {/* Guest directly after Google - no second divider */}
+                <div className="pt-3">
+                  <button type="button" onClick={onGuest} className="flex h-[52px] w-full items-center justify-center gap-3 rounded-xl border border-[#D4AF37]/50 bg-white px-3 text-[15px] text-gray-800 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
+                    <UserRound className="h-5 w-5 shrink-0 text-[#C5A059]"/>
+                    <span>الدخول كزائر — Continue as Guest</span>
                   </button>
                 </div>
               </>
             )}
+
             {mode === 'register' && emailExistsInRailway && <button type="button" onClick={()=>switchMode('login')} className="w-full rounded-xl border border-amber-200 bg-amber-50 py-3 text-sm font-semibold text-amber-900">Email already registered — Sign In</button>}
             {mode !== 'login' && <button type="button" onClick={()=>switchMode('login')} className="w-full py-2 text-sm text-gray-600 transition hover:text-black hover:underline">Back to Sign In</button>}
-            <div className="pt-1">
-              <div className="mb-4 flex items-center gap-3 text-sm text-gray-500"><span className="h-px flex-1 bg-gray-300"/><span>or continue as</span><span className="h-px flex-1 bg-gray-300"/></div>
-              <button type="button" onClick={onGuest} className="flex h-[50px] w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-3 text-[15px] text-gray-800 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
-                <UserRound className="h-5 w-5 shrink-0 text-gray-500"/>
-                <span>الدخول كزائر — Continue as Guest</span>
-              </button>
-            </div>
+
+            {/* Guest for register/forgot modes */}
+            {mode !== 'login' && (
+              <div className="pt-3">
+                <button type="button" onClick={onGuest} className="flex h-[52px] w-full items-center justify-center gap-3 rounded-xl border border-[#D4AF37]/50 bg-white px-3 text-[15px] text-gray-800 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
+                  <UserRound className="h-5 w-5 shrink-0 text-[#C5A059]"/>
+                  <span>الدخول كزائر — Continue as Guest</span>
+                </button>
+              </div>
+            )}
           </form>
         )}
       </section>
