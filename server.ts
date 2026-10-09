@@ -707,7 +707,7 @@ app.post('/api/auth/login',async(req,res)=>{
             row = db.prepare('SELECT * FROM users WHERE id=?').get(id) as any;
           }
           localPasswordValid = Boolean(row && verifyPassword(password,row.password_hash));
-          console.info('[AUTH] Oracle-authenticated account persisted locally', { email: normalizedEmail, created: !Boolean(oracleUser.id) });
+          console.info('[AUTH] Oracle-authenticated account persisted locally', { email: normalizedEmail, created: accountWasMissing });
         }
       } catch (error) {
         console.warn('[AUTH] Oracle login fallback unavailable', {
@@ -997,7 +997,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     }
 
     console.info('ANY USER Railway password updated', email);
-    return res.json({ ok: true, emailSent: undefined, message: 'تم تغيير كلمة المرور بنجاح - يمكنك تسجيل الدخول الآن' });
+    return res.json({ ok: true, message: 'تم تغيير كلمة المرور بنجاح - يمكنك تسجيل الدخول الآن' });
   } catch (error) {
     console.error('[AUTH_PROXY] Reset-password request failed', {
       reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'upstream-unavailable',
