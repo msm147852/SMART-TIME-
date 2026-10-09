@@ -757,7 +757,35 @@ app.post('/api/auth/phone-login',async(req,res)=>{
 app.post('/api/auth/forgot-password',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "forgot-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.'});
   if (!(await requireTurnstile(req, res))) return;
-  try{const email=String(req.body.email||'').trim().toLowerCase();const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;if(!row)return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});const code=String(crypto.randomInt(100000,1000000)),expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());try{const info=await sendPasswordResetEmail(email,code,PASSWORD_RESET_MINUTES);res.json({ok:true,emailSent:true,provider:info.provider,devCode:info.devCode});}catch(mailErr:any){db.prepare('DELETE FROM password_resets WHERE email=?').run(email);const safeMailError = mailErr instanceof Error ? mailErr.message : String(mailErr || 'Unknown mail delivery error'); console.error('Password reset email delivery failed:', safeMailError.replace(/(pass(word)?|auth|authorization|token|secret)[^,;\n]*/gi, '$1=[REDACTED]'));res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});}});
+  try {
+    const email=String(req.body.email||'').trim().toLowerCase();
+    const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;
+    if(!row) return res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});
+    const code=String(crypto.randomInt(100000,1000000));
+    const expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();
+    db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());
+    const provider=String(process.env.EMAIL_PROVIDER||'unconfigured').trim().toLowerCase();
+    try {
+      const info=await sendPasswordResetEmail(email,code,PASSWORD_RESET_MINUTES);
+      try {
+        db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
+          .run(crypto.randomUUID(),email,'password_reset','accepted',info.provider,info.messageId||null,null,new Date().toISOString());
+      } catch { console.error('EMAIL_LOG_WRITE_FAILED', { purpose:'password_reset' }); }
+      res.json({ok:true,emailSent:true,provider:info.provider});
+    } catch(mailErr:any) {
+      db.prepare('DELETE FROM password_resets WHERE email=?').run(email);
+      const codeValue=typeof mailErr?.code==='string' ? mailErr.code.slice(0,80) : 'MAIL_SEND_FAILED';
+      try {
+        db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
+          .run(crypto.randomUUID(),email,'password_reset','failed',provider,null,codeValue,new Date().toISOString());
+      } catch { console.error('EMAIL_LOG_WRITE_FAILED', { purpose:'password_reset' }); }
+      console.error('PASSWORD_RESET_EMAIL_FAILED', { provider, code:codeValue });
+      res.json({ok:true,emailSent:false,message:'إذا كان البريد مسجلاً فستصلك تعليمات الاستعادة.'});
+    }
+  } catch(e:any) {
+    res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});
+  }
+});
 app.post('/api/auth/reset-password',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "reset-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات تغيير كلمة المرور. حاول لاحقًا.'});
   if (!(await requireTurnstile(req, res))) return;
