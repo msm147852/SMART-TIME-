@@ -568,23 +568,20 @@ app.post('/check-email', async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, registered: false, accountExists: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
-  // Compatibility behavior requested for the forgot-password UI: do not
-  // redirect users to registration just because Oracle's account index lags.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    await fetch('https://smart-time-ai.duckdns.org/check-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-      signal: controller.signal,
-    });
-  } catch {
-    console.warn('[AUTH] Oracle check-email unavailable; keeping recovery UI available');
-  } finally {
-    clearTimeout(timer);
+  // ANY USER compatibility mode: never send a valid email back to registration
+  // just because Oracle's account index has not synchronized yet.
+  return res.json({ ok: true, registered: true, accountExists: true });
+});
+
+// The registration page uses this separate local lookup to distinguish a
+// duplicate Railway account from a new address. Keep the email normalized.
+app.post('/api/auth/check', (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return res.status(400).json({ ok: false, accountExists: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
-  return res.json({ ok: true, registered: true, accountExists: true, emailSent: false, message: 'الايميل مسجل' });
+  const existing = db.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').get(email);
+  return res.json({ ok: true, accountExists: Boolean(existing) });
 });
 
 app.post('/api/auth/register', async (req,res)=>{
@@ -596,31 +593,38 @@ app.post('/api/auth/register', async (req,res)=>{
     if(!/^[a-z0-9_.-]{3,30}$/.test(username))return res.status(400).json({error:'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا، باستخدام حروف إنجليزية أو أرقام أو _ أو - أو .'});
     if(!/^\S+@\S+\.\S+$/.test(email))return res.status(400).json({error:'البريد الإلكتروني غير صحيح'});
     if(password.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});
-    if(db.prepare('SELECT id FROM users WHERE email=?').get(email))return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});
+
+    const syncOracle = async () => {
+      const oracleController = new AbortController();
+      const oracleTimer = setTimeout(() => oracleController.abort(), 10000);
+      try {
+        const oracleResponse = await fetch('https://smart-time-ai.duckdns.org/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name, username, password }),
+          signal: oracleController.signal,
+        });
+        if (!oracleResponse.ok) console.warn('[AUTH] Oracle registration mirror returned non-2xx', { status: oracleResponse.status });
+      } catch {
+        console.warn('[AUTH] Oracle registration mirror unavailable; Railway registration remains active');
+      } finally {
+        clearTimeout(oracleTimer);
+      }
+    };
+
+    const existing = db.prepare('SELECT id,username,display_name FROM users WHERE lower(email)=? LIMIT 1').get(email) as any;
+    if (existing) {
+      // Keep account creation idempotent and repair Oracle mirroring, but do
+      // not mint a session or claim the user is logged in on a duplicate email.
+      await syncOracle();
+      return res.json({ ok:true, registered:true, alreadyExists:true, message:'مسجل بالفعل' });
+    }
     if(db.prepare('SELECT id FROM users WHERE username=?').get(username))return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
     const id=`usr_${crypto.randomUUID()}`, now=new Date().toISOString();
     db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,0)").run(id,email,username,hashPassword(password),name,now,null,0,'active');
     const user={id,email,username,name,phone:undefined,phoneVerified:false,activationStatus:'active'};
-    // Keep Railway's existing account/session behavior, and mirror credentials
-    // to Oracle so the Oracle-backed recovery flow can find newly registered users.
-    const oracleController = new AbortController();
-    const oracleTimer = setTimeout(() => oracleController.abort(), 10000);
-    try {
-      const oracleResponse = await fetch('https://smart-time-ai.duckdns.org/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, username, password }),
-        signal: oracleController.signal,
-      });
-      if (!oracleResponse.ok) {
-        console.warn('[AUTH] Oracle registration mirror returned non-2xx', { status: oracleResponse.status });
-      }
-    } catch {
-      console.warn('[AUTH] Oracle registration mirror unavailable; Railway registration remains active');
-    } finally {
-      clearTimeout(oracleTimer);
-    }
-    return res.json({token:createSession(id),user});
+    await syncOracle();
+    return res.json({ok:true,registered:true,token:createSession(id),user});
   }catch(e:any){res.status(500).json({error:e.message||'تعذر إنشاء الحساب'});}
 });
 
