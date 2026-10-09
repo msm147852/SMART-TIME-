@@ -98,11 +98,13 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       if (mode === 'forgot') {
         if (!resetSent) {
           const d:any = await forgotPassword(email.trim());
-          if (!(d.emailSent ?? d.ok)) {
+          if (!d.ok && !d.emailSent) {
             throw new Error(d.message || 'تعذر إرسال رمز الاستعادة حاليًا. حاول لاحقًا.');
           }
           setResetSent(true); setCode('');
-          setError('تم إرسال كود استعادة كلمة المرور إلى بريدك الإلكتروني');
+          setError(d.emailSent
+            ? 'تم إرسال كود استعادة كلمة المرور إلى بريدك الإلكتروني'
+            : (d.message || 'لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.'));
           return;
         }
         await resetPassword(email.trim(), code.trim(), password, challenge);
