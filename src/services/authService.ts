@@ -97,23 +97,28 @@ export async function forgotPassword(email: string) {
   const normalizedEmail = email.trim();
   if (!normalizedEmail) throw new Error('أدخل بريدك الإلكتروني.');
 
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: normalizedEmail }),
+      signal: controller.signal,
     });
   } catch {
     throw new Error('تعذر الاتصال بخدمة استعادة كلمة المرور. تحقق من الإنترنت وحاول مرة أخرى.');
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
   const data: any = await response.json().catch(() => ({}));
   const exists = data.accountExists ?? data.registered;
   const sent = data.emailSent ?? data.ok;
 
-  if (!exists || response.status === 404) {
-    throw new Error(data.message || 'هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
+  if (response.status === 404 || !exists) {
+    throw new Error('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
   }
   if (!response.ok) {
     throw new Error(data.message || data.error || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
