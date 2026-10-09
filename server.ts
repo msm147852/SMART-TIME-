@@ -563,14 +563,18 @@ app.get('/api/trial/session', (req,res) => {
   }
 });
 
-app.post('/check-email', async (req, res) => {
+app.post('/check-email', (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, registered: false, accountExists: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
-  // ANY USER compatibility mode: never send a valid email back to registration
-  // just because Oracle's account index has not synchronized yet.
-  return res.json({ ok: true, registered: true, accountExists: true });
+  try {
+    const existing = db.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').get(email);
+    return res.json({ ok: true, registered: Boolean(existing), accountExists: Boolean(existing), email });
+  } catch (error) {
+    console.error('[AUTH] Email existence lookup failed');
+    return res.status(200).json({ ok: true, registered: false, accountExists: false, email });
+  }
 });
 
 // The registration page uses this separate local lookup to distinguish a
@@ -594,37 +598,36 @@ app.post('/api/auth/register', async (req,res)=>{
     if(!/^\S+@\S+\.\S+$/.test(email))return res.status(400).json({error:'البريد الإلكتروني غير صحيح'});
     if(password.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});
 
-    const syncOracle = async () => {
+    // Oracle is a best-effort mirror only. Never hold registration open for
+    // an external service: local account creation and session issuance are authoritative.
+    const syncOracle = () => {
       const oracleController = new AbortController();
-      const oracleTimer = setTimeout(() => oracleController.abort(), 10000);
-      try {
-        const oracleResponse = await fetch('https://smart-time-ai.duckdns.org/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name, username, password }),
-          signal: oracleController.signal,
-        });
+      const oracleTimer = setTimeout(() => oracleController.abort(), 3000);
+      void fetch('https://smart-time-ai.duckdns.org/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, username, password }),
+        signal: oracleController.signal,
+      }).then((oracleResponse) => {
         if (!oracleResponse.ok) console.warn('[AUTH] Oracle registration mirror returned non-2xx', { status: oracleResponse.status });
-      } catch {
+      }).catch(() => {
         console.warn('[AUTH] Oracle registration mirror unavailable; Railway registration remains active');
-      } finally {
-        clearTimeout(oracleTimer);
-      }
+      }).finally(() => clearTimeout(oracleTimer));
     };
 
     const existing = db.prepare('SELECT id,username,display_name FROM users WHERE lower(email)=? LIMIT 1').get(email) as any;
     if (existing) {
       // Keep account creation idempotent and repair Oracle mirroring, but do
       // not mint a session or claim the user is logged in on a duplicate email.
-      await syncOracle();
-      return res.json({ ok:true, registered:true, alreadyExists:true, message:'مسجل بالفعل' });
+      syncOracle();
+      return res.status(409).json({ ok:false, registered:true, alreadyExists:true, accountExists:true, message:'هذا البريد مسجل بالفعل، يرجى تسجيل الدخول', action:'login' });
     }
     if(db.prepare('SELECT id FROM users WHERE username=?').get(username))return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
     const id=`usr_${crypto.randomUUID()}`, now=new Date().toISOString();
     db.prepare("INSERT INTO users (id,email,username,password_hash,display_name,created_at,phone,phone_verified,activation_status,trip_free_searches) VALUES (?,?,?,?,?,?,?,?,?,0)").run(id,email,username,hashPassword(password),name,now,null,0,'active');
     const user={id,email,username,name,phone:undefined,phoneVerified:false,activationStatus:'active'};
-    await syncOracle();
-    return res.json({ok:true,registered:true,token:createSession(id),user});
+    syncOracle();
+    return res.json({ok:true,registered:true,accountExists:true,token:createSession(id),user});
   }catch(e:any){res.status(500).json({error:e.message||'تعذر إنشاء الحساب'});}
 });
 
