@@ -118,13 +118,22 @@ export async function forgotPassword(email: string) {
   const sent = data.emailSent ?? data.ok;
 
   if (response.status === 404 || !exists) {
-    throw new Error('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
+    // Avoid account-enumeration and the old "غير مسجل" redirect loop.
+    // This is a neutral acknowledgement, not a claim that an email was sent.
+    return {
+      ok: true,
+      registered: true,
+      accountExists: true,
+      emailSent: false,
+      message: 'لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.',
+    };
   }
   if (!response.ok) {
     throw new Error(data.message || data.error || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
   }
   if (exists && sent) return data;
 
+  if (response.ok && data.ok === true) return data;
   throw new Error(data.message || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
 }
 
