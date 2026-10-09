@@ -866,6 +866,17 @@ app.post('/api/auth/reset-password', async (req, res) => {
     const result = await proxyOracleAuth("/api/auth/reset-password", {
       email, code, newPassword, password: newPassword,
     });
+    // Keep Railway's local auth database aligned with Oracle after Oracle
+    // confirms the reset, so the new password also works on Railway login.
+    if (result.status >= 200 && result.status < 300 && result.data?.ok !== false) {
+      try {
+        db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword), email);
+      } catch (syncError) {
+        console.error("[AUTH_PROXY] Local password sync failed after Oracle reset", {
+          reason: "local-database-update-failed",
+        });
+      }
+    }
     return res.status(result.status).json(result.data);
   } catch (error) {
     console.error("[AUTH_PROXY] Oracle reset-password request failed", {
