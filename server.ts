@@ -806,40 +806,74 @@ app.post('/api/auth/phone-login/request-otp',async(req,res)=>{
 app.post('/api/auth/phone-login',async(req,res)=>{
   if (!consumeAuthRateLimit(req, "phone-login")) return res.status(429).json({error:'تم تجاوز عدد محاولات تسجيل الدخول بالهاتف. حاول لاحقًا.'});
   try{const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});const row=db.prepare('SELECT * FROM users WHERE phone=? AND phone_verified=1').get(phone) as any;if(!row)return res.status(404).json({error:'هذا الرقم غير مرتبط بحساب موثق.'});db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);res.json({token:createSession(row.id),user:publicUser({...row,name:row.display_name,phoneVerified:row.phone_verified})});}catch(e:any){res.status(500).json({error:e.message||'تعذر تسجيل الدخول بالهاتف'});}});
-app.post('/api/auth/forgot-password',async(req,res)=>{
-  if (!consumeAuthRateLimit(req, "forgot-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.'});
+const ORACLE_AUTH_BASE_URL = "https://smart-time-ai.duckdns.org";
+async function proxyOracleAuth(pathname: string, payload: Record<string, unknown>) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
-    const email=String(req.body.email||'').trim().toLowerCase();
-    const row=db.prepare('SELECT id FROM users WHERE email=?').get(email) as any;
-    if(!row) return res.json({ok:true,accountExists:false,emailSent:false,code:'EMAIL_NOT_REGISTERED',message:'هذا البريد الإلكتروني غير مسجل. أنشئ حسابًا جديدًا أولًا.'});
-    const code=String(crypto.randomInt(100000,1000000));
-    const expires=new Date(Date.now()+PASSWORD_RESET_MINUTES*60000).toISOString();
-    db.prepare(`INSERT INTO password_resets(email,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at`).run(email,otpHash(code),expires,0,new Date().toISOString());
-    const provider=String(process.env.EMAIL_PROVIDER||'unconfigured').trim().toLowerCase();
-    try {
-      const info=await sendPasswordResetEmail(email,code,PASSWORD_RESET_MINUTES);
-      try {
-        db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
-          .run(crypto.randomUUID(),email,'password_reset','accepted',info.provider,info.messageId||null,null,new Date().toISOString());
-      } catch { console.error('EMAIL_LOG_WRITE_FAILED', { purpose:'password_reset' }); }
-      res.json({ok:true,accountExists:true,emailSent:true,provider:info.provider,message:'تم إرسال رمز استعادة كلمة المرور إلى بريدك الإلكتروني.'});
-    } catch(mailErr:any) {
-      db.prepare('DELETE FROM password_resets WHERE email=?').run(email);
-      const codeValue=typeof mailErr?.code==='string' ? mailErr.code.slice(0,80) : 'MAIL_SEND_FAILED';
-      try {
-        db.prepare('INSERT INTO email_logs(id,recipient,purpose,status,provider,provider_id,error_code,created_at) VALUES(?,?,?,?,?,?,?,?)')
-          .run(crypto.randomUUID(),email,'password_reset','failed',provider,null,codeValue,new Date().toISOString());
-      } catch { console.error('EMAIL_LOG_WRITE_FAILED', { purpose:'password_reset' }); }
-      console.error('PASSWORD_RESET_EMAIL_FAILED', { provider, code:codeValue });
-      res.json({ok:false,accountExists:true,emailSent:false,code:'EMAIL_DELIVERY_FAILED',message:'البريد مسجل، لكن تعذر إرسال رمز الاستعادة حاليًا. حاول لاحقًا.'});
-    }
-  } catch(e:any) {
-    res.status(500).json({error:e.message||'تعذر بدء استعادة كلمة المرور'});
+    const response = await fetch(`${ORACLE_AUTH_BASE_URL}${pathname}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const raw = await response.text();
+    let data: any;
+    try { data = JSON.parse(raw); }
+    catch { throw new Error("Oracle auth service returned an invalid response"); }
+    return { status: response.status, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  if (!consumeAuthRateLimit(req, "forgot-password")) {
+    return res.status(429).json({ ok: false, emailSent: false, message: 'تم تجاوز عدد محاولات الاستعادة. حاول لاحقًا.' });
+  }
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return res.status(400).json({ ok: false, emailSent: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
+  }
+  try {
+    const result = await proxyOracleAuth("/api/auth/forgot-password", { email });
+    return res.status(result.status).json(result.data);
+  } catch (error) {
+    console.error("[AUTH_PROXY] Oracle forgot-password request failed", {
+      reason: error instanceof Error && error.name === "AbortError" ? "timeout" : "upstream-unavailable",
+    });
+    return res.status(502).json({ ok: false, emailSent: false, code: "AUTH_UPSTREAM_UNAVAILABLE", message: "خدمة استعادة كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا." });
   }
 });
-app.post('/api/auth/reset-password',async(req,res)=>{
-  if (!consumeAuthRateLimit(req, "reset-password")) return res.status(429).json({error:'تم تجاوز عدد محاولات تغيير كلمة المرور. حاول لاحقًا.'});
-  try{const email=String(req.body.email||'').trim().toLowerCase(),code=String(req.body.code||'').trim(),newPassword=String(req.body.newPassword||'');if(newPassword.length<8)return res.status(400).json({error:'كلمة المرور يجب أن تكون 8 أحرف على الأقل'});const reset=db.prepare('SELECT * FROM password_resets WHERE email=?').get(email) as any;if(!reset||new Date(reset.expires_at).getTime()<Date.now())return res.status(400).json({error:'رمز الاستعادة منتهي أو غير موجود'});if(reset.attempts>=5)return res.status(429).json({error:'تم تجاوز عدد المحاولات.'});db.prepare('UPDATE password_resets SET attempts=attempts+1 WHERE email=?').run(email);if(otpHash(code)!==reset.code_hash)return res.status(400).json({error:'رمز الاستعادة غير صحيح'});db.prepare('UPDATE users SET password_hash=? WHERE email=?').run(hashPassword(newPassword),email);db.prepare('DELETE FROM password_resets WHERE email=?').run(email);res.json({ok:true});}catch(e:any){res.status(500).json({error:e.message||'تعذر تغيير كلمة المرور'});}});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  if (!consumeAuthRateLimit(req, "reset-password")) {
+    return res.status(429).json({ ok: false, message: 'تم تجاوز عدد محاولات تغيير كلمة المرور. حاول لاحقًا.' });
+  }
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const code = String(req.body?.code || '').trim();
+  const newPassword = String(req.body?.newPassword || req.body?.password || '');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return res.status(400).json({ ok: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
+  }
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ ok: false, message: 'أدخل رمز الاستعادة المكوّن من 6 أرقام.' });
+  }
+  if (newPassword.length < 8 || newPassword.length > 256) {
+    return res.status(400).json({ ok: false, message: 'كلمة المرور يجب أن تكون بين 8 و256 حرفًا.' });
+  }
+  try {
+    const result = await proxyOracleAuth("/api/auth/reset-password", {
+      email, code, newPassword, password: newPassword,
+    });
+    return res.status(result.status).json(result.data);
+  } catch (error) {
+    console.error("[AUTH_PROXY] Oracle reset-password request failed", {
+      reason: error instanceof Error && error.name === "AbortError" ? "timeout" : "upstream-unavailable",
+    });
+    return res.status(502).json({ ok: false, code: "AUTH_UPSTREAM_UNAVAILABLE", message: "خدمة تغيير كلمة المرور غير متاحة حاليًا. حاول مرة أخرى لاحقًا." });
+  }
+});
 app.post('/api/auth/logout',(req,res)=>{const h=String(req.headers.authorization||''),token=h.startsWith('Bearer ')?h.slice(7).trim():'';if(token)db.prepare('DELETE FROM sessions WHERE id=?').run(token);res.json({ok:true});});
 app.post('/api/auth/chat/request-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'يجب تسجيل الدخول بالبريد أولاً'});const phone=normalizePhone(req.body.phone);if(phone.length<8)return res.status(400).json({error:'رقم الهاتف غير صحيح'});const taken=db.prepare('SELECT id FROM users WHERE phone=? AND id<>?').get(phone,user.id) as any;if(taken)return res.status(409).json({error:'رقم الهاتف مرتبط بحساب آخر'});try{const otpResult=await requestPhoneOtp(phone);res.json({ok:true,expiresAt:otpResult.expires,devCode:otpResult.devCode,smsProvider:otpResult.provider});}catch(err:any){return res.status(503).json({error:err.message||'تعذر إرسال SMS'});}}catch(e:any){res.status(500).json({error:e.message||'تعذر إرسال رمز التحقق'});}});
 app.post('/api/auth/chat/verify-otp',async(req,res)=>{try{const user=authUser(req);if(!user)return res.status(401).json({error:'جلسة الدخول غير صالحة'});const phone=normalizePhone(req.body.phone),code=String(req.body.code||'').trim();const check=await checkPhoneOtp(phone,code);if(!check.ok)return res.status(check.status).json({error:check.error});db.prepare('UPDATE users SET phone=?,phone_verified=1 WHERE id=?').run(phone,user.id);db.prepare('DELETE FROM phone_otps WHERE phone=?').run(phone);const refreshed=db.prepare('SELECT id,email,username,display_name as name,phone,phone_verified as phoneVerified,activation_status FROM users WHERE id=?').get(user.id) as any;res.json({token:createSession(user.id),user:publicUser(refreshed)});}catch(e:any){res.status(500).json({error:e.message||'تعذر تأكيد الرقم'});}});
