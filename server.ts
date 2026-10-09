@@ -617,9 +617,8 @@ app.post('/api/auth/register', async (req,res)=>{
 
     const existing = db.prepare('SELECT id,username,display_name FROM users WHERE lower(email)=? LIMIT 1').get(email) as any;
     if (existing) {
-      // Keep account creation idempotent and repair Oracle mirroring, but do
-      // not mint a session or claim the user is logged in on a duplicate email.
-      syncOracle();
+      // Never mirror a password supplied to the registration form for an
+      // existing account; that could overwrite credentials without login/reset.
       return res.status(409).json({ ok:false, registered:true, alreadyExists:true, accountExists:true, message:'هذا البريد مسجل بالفعل، يرجى تسجيل الدخول', action:'login' });
     }
     if(db.prepare('SELECT id FROM users WHERE username=?').get(username))return res.status(409).json({error:'اسم المستخدم مستخدم بالفعل.'});
