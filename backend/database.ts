@@ -3,13 +3,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SMART_AI_CANONICAL_SCHEMA_SQL } from './database/canonicalSchema.js';
 
-const dataDir = path.join(process.cwd(), 'data');
-fs.mkdirSync(dataDir, { recursive: true });
-
+const defaultDataDir = path.join(process.cwd(), 'data');
+const railwayVolumePath = process.env.RAILWAY_VOLUME_MOUNT_PATH?.trim();
 const configuredDbPath = process.env.SMART_TIME_DB_PATH?.trim();
+const dataDir = railwayVolumePath ? path.resolve(railwayVolumePath) : defaultDataDir;
 const dbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(dataDir, 'smart-time.db');
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+
+// When Railway first attaches a persistent volume, preserve the legacy SQLite
+// database if it is still visible and the persistent target has not been created.
+// Copy WAL/SHM sidecars too so committed transactions can be recovered by SQLite.
+if ((railwayVolumePath || configuredDbPath) && !fs.existsSync(dbPath)) {
+  const legacyDbPath = path.join(defaultDataDir, 'smart-time.db');
+  if (path.resolve(legacyDbPath) !== path.resolve(dbPath) && fs.existsSync(legacyDbPath)) {
+    fs.copyFileSync(legacyDbPath, dbPath);
+    for (const suffix of ['-wal', '-shm']) {
+      const source = `${legacyDbPath}${suffix}`;
+      if (fs.existsSync(source)) fs.copyFileSync(source, `${dbPath}${suffix}`);
+    }
+  }
+}
+
 export const db = new DatabaseSync(dbPath);
 db.exec(`
 PRAGMA journal_mode = WAL;
