@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS email_logs (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON email_logs(created_at);
+CREATE TABLE IF NOT EXISTS user_app_data (
+  user_id TEXT NOT NULL,
+  data_key TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(user_id, data_key)
+);
+CREATE INDEX IF NOT EXISTS idx_user_app_data_user ON user_app_data(user_id);
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
