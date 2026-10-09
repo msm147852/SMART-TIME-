@@ -101,7 +101,7 @@ export async function forgotPassword(email: string) {
   const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    response = await fetch(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: normalizedEmail }),
