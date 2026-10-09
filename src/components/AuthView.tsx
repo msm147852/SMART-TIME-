@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
-import { forgotPassword, loginWithIdentifier, register as registerWithOracle, registerWithEmail, resetPassword, selectLoginRole } from '../services/authService';
+import { forgotPassword, loginWithIdentifier, registerWithEmail, resetPassword, selectLoginRole } from '../services/authService';
 import { apiUrl } from '../services/apiConfig';
 
 interface Props {
@@ -87,12 +87,6 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         if (registration?.alreadyExists || registration?.registered && !registration?.token) {
           throw new Error('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
         }
-        try {
-          await registerWithOracle(email.trim(), name.trim(), password);
-        } catch (oracleError) {
-          // The primary registration succeeded; Oracle mirroring is best-effort.
-          console.warn('[Auth] Oracle registration sync failed:', oracleError);
-        }
         onAuthenticated(); return;
       }
       if (mode === 'forgot') {
@@ -123,16 +117,16 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     } catch (err:any) {
       const message = err?.message || 'تعذر تنفيذ العملية.';
       if (mode === 'forgot' && message.includes('غير مسجل')) {
-        setError('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
-        window.setTimeout(() => {
-          setMode('register');
-          setResetSent(false);
-          setCode('');
-          setPassword('');
-          setError('هذا البريد الإلكتروني غير مسجل لدينا، يرجى التسجيل أولاً');
-        }, 2000);
+        // Never force users out of recovery flow because an upstream account
+        // index is stale; keep them in place and let Oracle validate the code.
+        setError('لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.');
       } else {
-        setError(message);
+        if (mode === 'register' && /مسجل بالفعل|already exists/i.test(message)) {
+          setEmailExistsInRailway(true);
+          setError('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
+        } else {
+          setError(message);
+        }
       }
     }
     finally { setBusy(false); }
@@ -181,8 +175,9 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
             {mode === 'forgot' && resetSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز إعادة التعيين المرسل بالبريد</span><input required value={code} onChange={e=>setCode(e.target.value)} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.3em]" placeholder="أدخل الرمز" /></label>}
             {mode !== 'forgot' || resetSent ? <label className="block"><span className="text-xs font-bold text-slate-700">{mode === 'forgot' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</span><div className="relative mt-1"><LockKeyhole className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required minLength={8} type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} className="w-full pr-10 pl-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="8 أحرف على الأقل" /><button type="button" aria-label={show?'إخفاء كلمة المرور':'إظهار كلمة المرور'} onClick={()=>setShow(!show)} className="absolute left-3 top-3 text-slate-500">{show?<EyeOff className="w-5"/>:<Eye className="w-5"/>}</button></div></label> : null}
             {error && <div className={`rounded-xl p-3 text-xs font-bold ${error.includes('تم ') ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'}`}>{error}</div>}
-            <button disabled={busy} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black shadow-lg hover:bg-slate-800 transition disabled:opacity-50">{busy?'جارٍ التنفيذ…':mode==='register'?'إنشاء الحساب':mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'):'دخول'}</button>
+            <button disabled={busy || (mode === 'register' && emailExistsInRailway)} className="w-full py-3.5 rounded-2xl bg-slate-950 text-white font-black shadow-lg hover:bg-slate-800 transition disabled:opacity-50">{busy?'جارٍ التنفيذ…':mode==='register'?'إنشاء الحساب':mode==='forgot'?(resetSent?'تغيير كلمة المرور':'إرسال رمز الاستعادة'):'دخول'}</button>
             {mode === 'login' && <div className="flex items-center justify-between gap-3 text-xs font-bold"><button type="button" onClick={()=>switchMode('forgot')} className="text-slate-600 hover:text-slate-950">نسيت كلمة المرور؟</button><button type="button" onClick={()=>switchMode('register')} className="text-slate-600 hover:text-slate-950">إنشاء حساب</button></div>}
+            {mode === 'register' && emailExistsInRailway && <button type="button" onClick={()=>switchMode('login')} className="w-full py-2 rounded-xl bg-amber-50 border border-amber-200 text-sm font-black text-amber-900">هذا البريد مسجل بالفعل — الانتقال لتسجيل الدخول</button>}
             {mode !== 'login' && <button type="button" onClick={()=>switchMode('login')} className="w-full text-xs font-bold text-slate-500">العودة لتسجيل الدخول</button>}
             <button type="button" onClick={onGuest} className="w-full py-3 rounded-2xl border border-slate-200 text-slate-800 font-black bg-white hover:bg-slate-50">الدخول كزائر</button>
           </form>
