@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
-import { loginWithIdentifier, registerWithEmail, requestPasswordReset, resetPassword, selectLoginRole } from '../services/authService';
+import { forgotPassword, loginWithIdentifier, registerWithEmail, resetPassword, selectLoginRole } from '../services/authService';
 import { renderTurnstile, resetTurnstile } from '../services/turnstileService';
 
 interface Props {
@@ -90,7 +90,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       }
       if (mode === 'forgot') {
         if (!resetSent) {
-          const d:any = await requestPasswordReset(email.trim(), challenge);
+          const d:any = await forgotPassword(email.trim());
           if (d.accountExists === false) {
             setMode('register');
             setResetSent(false);
@@ -103,7 +103,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
             throw new Error(d.message || 'تعذر إرسال رمز الاستعادة حاليًا. حاول لاحقًا.');
           }
           setResetSent(true); setCode('');
-          setError('تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني. افحص الوارد والرسائل غير المرغوب فيها.');
+          setError('تم إرسال الكود');
           return;
         }
         await resetPassword(email.trim(), code.trim(), password, challenge);
@@ -119,7 +119,19 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         return;
       }
       onAuthenticated();
-    } catch (err:any) { setError(err.message || 'تعذر تنفيذ العملية.'); }
+    } catch (err:any) {
+      const message = err?.message || 'تعذر تنفيذ العملية.';
+      setError(message);
+      if (mode === 'forgot' && message.includes('غير مسجل')) {
+        window.setTimeout(() => {
+          setMode('register');
+          setResetSent(false);
+          setCode('');
+          setPassword('');
+          setError('هذا البريد غير مسجل، يرجى التسجيل أولاً');
+        }, 2000);
+      }
+    }
     finally { setBusy(false); if (!showRoleChoice) resetAuthChallenge(); }
   };
 
