@@ -42,7 +42,7 @@ export function authHeaders() {
 async function request(path: string, body: Record<string, unknown>) {
   const res = await api(path, { method: 'POST', body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'حدث خطأ في الاتصال بالخادم');
+  if (!res.ok) throw new Error(data.message || data.error || 'حدث خطأ في الاتصال بالخادم');
   return data;
 }
 
@@ -114,27 +114,21 @@ export async function forgotPassword(email: string) {
   }
 
   const data: any = await response.json().catch(() => ({}));
-  const exists = data.accountExists ?? data.registered;
-  const sent = data.emailSent ?? data.ok;
-
-  if (response.status === 404 || !exists) {
-    // Avoid account-enumeration and the old "غير مسجل" redirect loop.
-    // This is a neutral acknowledgement, not a claim that an email was sent.
-    return {
-      ok: true,
-      registered: true,
-      accountExists: true,
-      emailSent: false,
-      message: 'لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.',
-    };
-  }
   if (!response.ok) {
     throw new Error(data.message || data.error || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
   }
-  if (exists && sent) return data;
 
-  if (response.ok && data.ok === true) return data;
-  throw new Error(data.message || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
+  // Oracle is the authority for the reset-code store and email delivery.
+  // Do not infer "not registered" merely because its response omits accountExists.
+  if (data.emailSent === true) return { ...data, ok: data.ok !== false };
+  if (data.ok === true) {
+    return {
+      ...data,
+      emailSent: false,
+      message: data.message || 'لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.',
+    };
+  }
+  throw new Error(data.message || data.error || 'تعذر إرسال كود استعادة كلمة المرور. حاول مرة أخرى.');
 }
 
 // Compatibility alias for existing callers; the reset request now uses the Oracle API.
