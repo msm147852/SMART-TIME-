@@ -102,8 +102,8 @@ app.use((req, res, next) => {
     !origin ||
     /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin) ||
     origin === "https://smart-time-production-661f.up.railway.app" ||
-    /^https?:\/\/localhost(?::\\d+)?$/i.test(origin) ||
-    /^https?:\/\/127\.0\.0\.1(?::\\d+)?$/i.test(origin);
+    /^https?:\/\/localhost(?::\d+)?$/i.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(origin);
 
   if (allowed && origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -889,7 +889,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ ok: false, message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
   }
-  if (!/^\\d{6}$/.test(code)) {
+  if (!/^\d{6}$/.test(code)) {
     return res.status(400).json({ ok: false, message: 'أدخل رمز الاستعادة المكوّن من 6 أرقام.' });
   }
   if (newPassword.length < 8 || newPassword.length > 256) {
