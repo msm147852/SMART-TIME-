@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { forgotPassword, loginWithIdentifier, register as registerWithOracle, registerWithEmail, resetPassword, selectLoginRole } from '../services/authService';
+import { apiUrl } from '../services/apiConfig';
 
 interface Props {
   onAuthenticated: () => void;
@@ -24,6 +25,52 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const [resetSent, setResetSent] = useState(false);
   const [roleChoiceTicket, setRoleChoiceTicket] = useState('');
   const [showRoleChoice, setShowRoleChoice] = useState(false);
+  const [emailExistsInRailway, setEmailExistsInRailway] = useState(false);
+
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setEmailExistsInRailway(false);
+      if (mode === 'register') setError('');
+      return;
+    }
+    if (mode !== 'register') {
+      setError('');
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        // Oracle's check-email is deliberately permissive; Railway is the
+        // authority for whether this app already has a local account.
+        await fetch('https://smart-time-ai.duckdns.org/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail }),
+        }).catch(() => null);
+        const response = await fetch(apiUrl('/api/auth/check'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (cancelled) return;
+        const exists = response.ok && data.accountExists === true;
+        setEmailExistsInRailway(exists);
+        setError(exists ? 'هذا البريد مسجل بالفعل، يرجى تسجيل الدخول' : '');
+      } catch {
+        if (!cancelled) {
+          setEmailExistsInRailway(false);
+          setError('');
+        }
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [email, mode]);
 
   const clearError = () => setError('');
   const switchMode = (next: Mode) => { setMode(next); clearError(); setCode(''); setResetSent(false); };
@@ -33,9 +80,13 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     try {
       const challenge = '';
       if (mode === 'register') {
+        if (emailExistsInRailway) throw new Error('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
         if (name.trim().length < 2) throw new Error('اكتب اسمًا صحيحًا.');
         if (!username.trim()) throw new Error('اسم المستخدم مطلوب.');
-        await registerWithEmail(name.trim(), username.trim(), email.trim(), password, challenge);
+        const registration = await registerWithEmail(name.trim(), username.trim(), email.trim().toLowerCase(), password, challenge);
+        if (registration?.alreadyExists || registration?.registered && !registration?.token) {
+          throw new Error('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
+        }
         try {
           await registerWithOracle(email.trim(), name.trim(), password);
         } catch (oracleError) {
@@ -124,7 +175,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
               <label className="block"><span className="text-xs font-bold text-slate-700">الاسم</span><div className="relative mt-1"><UserRound className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required value={name} onChange={e=>setName(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="اكتب اسمك" /></div></label>
               <label className="block"><span className="text-xs font-bold text-slate-700">اسم المستخدم</span><input required dir="ltr" value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,'').slice(0,30))} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="ahmed_123" /></label>
             </>}
-            <label className="block"><span className="text-xs font-bold text-slate-700">البريد الإلكتروني</span><div className="relative mt-1"><Mail className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="name@example.com" /></div></label>
+            <label className="block"><span className="text-xs font-bold text-slate-700">البريد الإلكتروني</span><div className="relative mt-1"><Mail className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required type="email" value={email} onChange={e=>{setEmail(e.target.value); setError('');}} className="w-full pr-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="name@example.com" /></div></label>
             {mode === 'forgot' && resetSent && <label className="block"><span className="text-xs font-bold text-slate-700">رمز إعادة التعيين المرسل بالبريد</span><input required value={code} onChange={e=>setCode(e.target.value)} className="w-full mt-1 p-3 rounded-xl border border-slate-200 text-center tracking-[.3em]" placeholder="أدخل الرمز" /></label>}
             {mode !== 'forgot' || resetSent ? <label className="block"><span className="text-xs font-bold text-slate-700">{mode === 'forgot' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</span><div className="relative mt-1"><LockKeyhole className="absolute right-3 top-3.5 w-4 h-4 text-slate-400" /><input required minLength={8} type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} className="w-full pr-10 pl-10 p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-200" placeholder="8 أحرف على الأقل" /><button type="button" aria-label={show?'إخفاء كلمة المرور':'إظهار كلمة المرور'} onClick={()=>setShow(!show)} className="absolute left-3 top-3 text-slate-500">{show?<EyeOff className="w-5"/>:<Eye className="w-5"/>}</button></div></label> : null}
             {error && <div className={`rounded-xl p-3 text-xs font-bold ${error.includes('تم ') ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'}`}>{error}</div>}
