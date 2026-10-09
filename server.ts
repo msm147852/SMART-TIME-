@@ -564,7 +564,6 @@ app.get('/api/trial/session', (req,res) => {
 
 app.post('/api/auth/register', async (req,res)=>{
   if (!consumeAuthRateLimit(req, "register")) return res.status(429).json({error:'تم تجاوز عدد محاولات التسجيل من هذا العنوان. حاول لاحقًا.'});
-  if (!(await requireTurnstile(req, res))) return;
   try{
     const name=String(req.body.name||'').trim(), username=normalizeUsername(req.body.username), email=String(req.body.email||'').trim().toLowerCase(), password=String(req.body.password||'');
     const deviceId=String(req.body.deviceId||'').trim().slice(0,200);
