@@ -145,10 +145,10 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
           <img
             src="/logo-smarttime-original.png"
             alt="SmartTime TIME GOLD"
-            className="mb-1 h-auto w-[460px] max-w-full object-contain drop-shadow-[0_8px_14px_rgba(197,160,89,0.08)]"
+            className="mb-2 h-auto w-[360px] max-w-full object-contain"
           />
           {/* Eng.mamdouh saad in GOLD */}
-          <p className="mt-1 font-serif text-[25px] sm:text-[32px] font-medium tracking-wide text-[#B88A32]">Eng.mamdouh saad</p>
+          <p className="mt-1 font-serif text-[24px] font-medium tracking-wide text-[#C5A059]">Eng.mamdouh saad</p>
           <h1 className="mt-4 sm:mt-5 font-serif text-[34px] sm:text-[42px] font-medium leading-tight text-black">
             {mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create account' : 'Forgot password?'}
           </h1>
