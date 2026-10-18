@@ -5,7 +5,7 @@ const DEFAULT_API_BASE = 'https://smart-time-production-661f.up.railway.app';
 const RAW_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).trim();
 
 // Remove trailing slashes to avoid double slashes in generated URLs.
-export const API_BASE_URL = RAW_BASE.replace(/\\/+$/, '');
+export const API_BASE_URL = RAW_BASE.replace(/\/+$/, '');
 
 /** Build a complete backend API URL. */
 export function apiUrl(path: string): string {
