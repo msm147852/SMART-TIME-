@@ -176,12 +176,28 @@ export default function App() {
 
   const handleGuest = useCallback(async () => {
     try {
-      const session = await startTrialSession();
+      const session = await Promise.race([
+        startTrialSession(),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error('انتهت مهلة الاتصال بالخادم')), 8000)
+        ),
+      ]);
       setAuthenticated(Boolean(session));
       if (session) setUserProfile(UserRepository.getProfile());
     } catch (error) {
-      console.error('Trial session error:', error);
-      setAuthenticated(false);
+      // Guest access must remain available when the remote API is unavailable.
+      // This is a local-only guest session; server-backed features may require a connection.
+      console.warn('Guest API unavailable; opening local guest mode:', error);
+      try {
+        const guestProfile = UserRepository.updateProfile({
+          name: 'زائر',
+          isOnboarded: true,
+        });
+        setUserProfile(guestProfile);
+      } catch (profileError) {
+        console.error('Could not initialize local guest profile:', profileError);
+      }
+      setAuthenticated(true);
     }
   }, []);
 
