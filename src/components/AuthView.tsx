@@ -5,7 +5,7 @@ import { apiUrl } from '../services/apiConfig';
 
 interface Props {
   onAuthenticated: () => void;
-  onGuest: () => void;
+  onGuest: () => Promise<void>;
   loginNotice?: string;
   requireTripPhoneVerification?: boolean;
 }
