@@ -12,6 +12,23 @@ interface Props {
 
 type Mode = 'login'|'register'|'forgot';
 
+function getDisplayError(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (value instanceof Error && typeof value.message === 'string' && value.message.trim()) return value.message.trim();
+  if (value && typeof value === 'object') {
+    const item = value as Record<string, unknown>;
+    for (const key of ['message', 'error', 'detail', 'description', 'title']) {
+      const candidate = item[key];
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+      if (candidate && typeof candidate === 'object' && candidate !== value) {
+        const nested = getDisplayError(candidate, '');
+        if (nested) return nested;
+      }
+    }
+  }
+  return fallback;
+}
+
 export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotice, requireTripPhoneVerification = false }) => {
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
@@ -73,7 +90,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     try {
       await onGuest();
     } catch (err: any) {
-      setError(err?.message || 'تعذر بدء جلسة الزائر. تحقق من اتصال الخادم ثم حاول مرة أخرى.');
+      setError(getDisplayError(err, 'تعذر بدء جلسة الزائر. تحقق من اتصال الخادم ثم حاول مرة أخرى.'));
     } finally {
       setGuestBusy(false);
     }
@@ -120,7 +137,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       }
       onAuthenticated();
     } catch (err:any) {
-      const message = err?.message || 'تعذر تنفيذ العملية.';
+      const message = getDisplayError(err, 'تعذر تنفيذ العملية.');
       if (mode === 'forgot' && message.includes('غير مسجل')) {
         setError('لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.');
       } else {
@@ -141,7 +158,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
       if (!roleChoiceTicket) throw new Error('انتهت صلاحية اختيار نوع الدخول. سجّل الدخول مرة أخرى.');
       await selectLoginRole(roleChoiceTicket, role);
       onAuthenticated();
-    } catch (err:any) { setError(err.message || 'تعذر اختيار نوع الدخول.'); }
+    } catch (err:any) { setError(getDisplayError(err, 'تعذر اختيار نوع الدخول.')); }
     finally { setBusy(false); }
   };
 
