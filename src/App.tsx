@@ -408,7 +408,7 @@ export default function App() {
     return (
       <AuthView
         onAuthenticated={() => { void handleAuthenticated(); }}
-        onGuest={() => { void handleGuest(); }}
+        onGuest={handleGuest}
       />
     );
   }
