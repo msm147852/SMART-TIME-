@@ -39,10 +39,24 @@ export function authHeaders() {
   return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
 }
 
+function getApiErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (value && typeof value === 'object') {
+    const item = value as Record<string, unknown>;
+    for (const key of ['message', 'error', 'detail', 'description', 'title']) {
+      const candidate = item[key];
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    }
+  }
+  return fallback;
+}
+
 async function request(path: string, body: Record<string, unknown>) {
   const res = await api(path, { method: 'POST', body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || data.error || 'حدث خطأ في الاتصال بالخادم');
+  if (!res.ok) {
+    throw new Error(getApiErrorMessage(data?.message ?? data?.error, 'حدث خطأ في الاتصال بالخادم'));
+  }
   return data;
 }
 
@@ -73,7 +87,10 @@ export async function startTrialSession(): Promise<AuthSession> {
 
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
-    throw new Error(data?.error || data?.message || `فشل إنشاء جلسة الزائر (HTTP ${res.status}).`);
+    throw new Error(getApiErrorMessage(
+      data?.error ?? data?.message,
+      `فشل إنشاء جلسة الزائر (HTTP ${res.status}).`,
+    ));
   }
   if (typeof data?.token !== 'string' || !data.token.trim() || !data?.user || typeof data.user !== 'object') {
     throw new Error('استجابة الخادم غير صالحة: لم يتم استلام رمز الجلسة وبيانات المستخدم.');
