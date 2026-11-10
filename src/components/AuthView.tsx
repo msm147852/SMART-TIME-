@@ -26,12 +26,12 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const [resetSent, setResetSent] = useState(false);
   const [roleChoiceTicket, setRoleChoiceTicket] = useState('');
   const [showRoleChoice, setShowRoleChoice] = useState(false);
-  const [emailExistsOnServer, setEmailExistsInRailway] = useState(false);
+  const [emailExistsOnServer, setEmailExistsOnServer] = useState(false);
 
   useEffect(() => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setEmailExistsInRailway(false);
+      setEmailExistsOnServer(false);
       if (mode === 'register') setError('');
       return;
     }
@@ -50,11 +50,11 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         const data = await response.json().catch(() => ({}));
         if (cancelled) return;
         const exists = response.ok && (data.accountExists === true || data.registered === true);
-        setEmailExistsInRailway(exists);
+        setEmailExistsOnServer(exists);
         setError(exists ? 'هذا البريد مسجل بالفعل، يرجى تسجيل الدخول' : '');
       } catch {
         if (!cancelled) {
-          setEmailExistsInRailway(false);
+          setEmailExistsOnServer(false);
           setError('');
         }
       }
@@ -125,7 +125,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
         setError('لو البريد الإلكتروني مرتبط بحساب، هيوصلك كود استعادة كلمة المرور.');
       } else {
         if (mode === 'register' && /مسجل بالفعل|already exists/i.test(message)) {
-          setEmailExistsInRailway(true);
+          setEmailExistsOnServer(true);
           setError('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
         } else {
           setError(message);
