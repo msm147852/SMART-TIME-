@@ -675,6 +675,7 @@ app.post('/api/auth/login',async(req,res)=>{
     else row=db.prepare('SELECT * FROM users WHERE lower(username)=? LIMIT 1').get(normalizedUsername) as any;
 
     let localPasswordValid=Boolean(row && verifyPassword(password,row.password_hash));
+    const accountWasMissing = !row;
     // Legacy accounts may exist only in Oracle. Never create an account based
     // only on /check-email: authenticate against Oracle first, then persist locally.
     if ((!row || !localPasswordValid) && identifier.includes('@') && password) {
