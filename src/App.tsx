@@ -175,29 +175,19 @@ export default function App() {
   }, []);
 
   const handleGuest = useCallback(async () => {
+    let timeoutId: number | undefined;
     try {
-      const session = await Promise.race([
-        startTrialSession(),
-        new Promise<never>((_, reject) =>
-          window.setTimeout(() => reject(new Error('انتهت مهلة الاتصال بالخادم')), 8000)
-        ),
-      ]);
-      setAuthenticated(Boolean(session));
-      if (session) setUserProfile(UserRepository.getProfile());
-    } catch (error) {
-      // Guest access must remain available when the remote API is unavailable.
-      // This is a local-only guest session; server-backed features may require a connection.
-      console.warn('Guest API unavailable; opening local guest mode:', error);
-      try {
-        const guestProfile = UserRepository.updateProfile({
-          name: 'زائر',
-          isOnboarded: true,
-        });
-        setUserProfile(guestProfile);
-      } catch (profileError) {
-        console.error('Could not initialize local guest profile:', profileError);
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error('انتهت مهلة الاتصال بالخادم')), 8000);
+      });
+      const session = await Promise.race([startTrialSession(), timeout]);
+      if (!session?.token || !session?.user) {
+        throw new Error('استجابة الخادم غير مكتملة: لم يتم استلام جلسة زائر صالحة.');
       }
+      setUserProfile(UserRepository.getProfile());
       setAuthenticated(true);
+    } finally {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     }
   }, []);
 
