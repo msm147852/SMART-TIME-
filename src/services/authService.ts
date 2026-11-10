@@ -60,9 +60,25 @@ function applyUserToProfile(user: AuthUser): UserProfile {
 }
 
 export async function startTrialSession(): Promise<AuthSession> {
-  const res = await fetch(apiUrl('/api/trial/session'));
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.token) throw new Error(data.error || 'تعذر بدء النسخة التجريبية');
+  let res: Response;
+  try {
+    res = await fetch(apiUrl('/api/trial/session'), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('تعذر الاتصال بخادم التطبيق. تحقق من الاتصال وحاول مرة أخرى.');
+  }
+
+  const data = await res.json().catch(() => ({} as any));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `فشل إنشاء جلسة الزائر (HTTP ${res.status}).`);
+  }
+  if (typeof data?.token !== 'string' || !data.token.trim() || !data?.user || typeof data.user !== 'object') {
+    throw new Error('استجابة الخادم غير صالحة: لم يتم استلام رمز الجلسة وبيانات المستخدم.');
+  }
+
   const session: AuthSession = { token: data.token, user: data.user };
   saveSession(session);
   applyUserToProfile(session.user);
