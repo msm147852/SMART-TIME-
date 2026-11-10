@@ -104,7 +104,7 @@ export async function startTrialSession(): Promise<AuthSession> {
     try { data = responseText ? JSON.parse(responseText) : {}; }
     catch { throw new Error('استجابة خادم الزائر غير صالحة (JSON).'); }
   } else {
-    const looksLikeHtml = /<!doctype html|<html[\\s>]/i.test(responseText);
+    const looksLikeHtml = /<!doctype html|<html[\s>]/i.test(responseText);
     if (looksLikeHtml) {
       throw new Error('طلب الزائر وصل إلى صفحة الموقع بدل واجهة API. يلزم إصلاح توجيه /api/trial/session إلى خادم التطبيق.');
     }
