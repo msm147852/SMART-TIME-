@@ -26,7 +26,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   const [resetSent, setResetSent] = useState(false);
   const [roleChoiceTicket, setRoleChoiceTicket] = useState('');
   const [showRoleChoice, setShowRoleChoice] = useState(false);
-  const [emailExistsInRailway, setEmailExistsInRailway] = useState(false);
+  const [emailExistsOnServer, setEmailExistsInRailway] = useState(false);
 
   useEffect(() => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -42,19 +42,14 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        await fetch('https://smart-time-ai.duckdns.org/check-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalizedEmail }),
-        }).catch(() => null);
-        const response = await fetch(apiUrl('/api/auth/check'), {
+        const response = await fetch(apiUrl('/check-email'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: normalizedEmail }),
         });
         const data = await response.json().catch(() => ({}));
         if (cancelled) return;
-        const exists = response.ok && data.accountExists === true;
+        const exists = response.ok && (data.accountExists === true || data.registered === true);
         setEmailExistsInRailway(exists);
         setError(exists ? 'هذا البريد مسجل بالفعل، يرجى تسجيل الدخول' : '');
       } catch {
@@ -90,7 +85,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
     try {
       const challenge = '';
       if (mode === 'register') {
-        if (emailExistsInRailway) throw new Error('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
+        if (emailExistsOnServer) throw new Error('هذا البريد مسجل بالفعل، يرجى تسجيل الدخول');
         if (name.trim().length < 2) throw new Error('اكتب اسمًا صحيحًا.');
         if (!username.trim()) throw new Error('اسم المستخدم مطلوب.');
         const registration = await registerWithEmail(name.trim(), username.trim(), email.trim().toLowerCase(), password, challenge);
@@ -223,7 +218,7 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
 
             {error && <div role="alert" className={`rounded-xl p-3 text-sm font-medium ${error.includes('تم ') ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-700'}`}>{error}</div>}
 
-            <button disabled={busy || (mode === 'register' && emailExistsInRailway)} className="flex h-[60px] sm:h-[72px] w-full items-center justify-center rounded-full bg-[#090909] px-4 font-semibold text-[20px] sm:text-[24px] text-[#D6AD52] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+            <button disabled={busy || (mode === 'register' && emailExistsOnServer)} className="flex h-[60px] sm:h-[72px] w-full items-center justify-center rounded-full bg-[#090909] px-4 font-semibold text-[20px] sm:text-[24px] text-[#D6AD52] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
               {busy?'Please wait…':mode==='register'?'Create account':mode==='forgot'?(resetSent?'Reset password':'Send reset code'):'Sign In'}
             </button>
 
@@ -265,15 +260,15 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
               </>
             )}
 
-            {mode === 'register' && emailExistsInRailway && <button type="button" onClick={()=>switchMode('login')} className="w-full rounded-xl border border-amber-200 bg-amber-50 py-3 text-sm font-semibold text-amber-900">Email already registered — Sign In</button>}
+            {mode === 'register' && emailExistsOnServer && <button type="button" onClick={()=>switchMode('login')} className="w-full rounded-xl border border-amber-200 bg-amber-50 py-3 text-sm font-semibold text-amber-900">Email already registered — Sign In</button>}
             {mode !== 'login' && <button type="button" onClick={()=>switchMode('login')} className="w-full py-2 text-sm text-gray-600 transition hover:text-black hover:underline">Back to Sign In</button>}
 
             {/* Guest for register/forgot modes */}
             {mode !== 'login' && (
               <div className="pt-3">
-                <button type="button" onClick={onGuest} className="flex min-h-[60px] sm:min-h-[68px] w-full items-center justify-center gap-3 rounded-[14px] border border-[#A88B52] bg-white px-3 text-[15px] sm:text-[18px] text-gray-900 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
+                <button type="button" onClick={() => { void handleGuest(); }} disabled={busy || guestBusy} aria-busy={guestBusy} className="flex min-h-[60px] sm:min-h-[68px] w-full items-center justify-center gap-3 rounded-[14px] border border-[#A88B52] bg-white px-3 text-[15px] sm:text-[18px] text-gray-900 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 disabled:cursor-not-allowed disabled:opacity-60">
                   <UserRound className="h-5 w-5 shrink-0 text-[#C5A059]"/>
-                  <span>الدخول كزائر — Continue as Guest</span>
+                  <span>{guestBusy ? 'جارٍ بدء جلسة الزائر…' : 'الدخول كزائر — Continue as Guest'}</span>
                 </button>
               </div>
             )}
