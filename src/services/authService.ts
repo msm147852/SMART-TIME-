@@ -39,13 +39,25 @@ export function authHeaders() {
   return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
 }
 
-function getApiErrorMessage(value: unknown, fallback: string): string {
+function getApiErrorMessage(value: unknown, fallback: string, depth = 0): string {
+  if (depth > 4 || value == null) return fallback;
   if (typeof value === 'string' && value.trim()) return value.trim();
-  if (value && typeof value === 'object') {
+  if (value instanceof Error && value.message.trim()) return value.message.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = getApiErrorMessage(item, '', depth + 1);
+      if (message) return message;
+    }
+    return fallback;
+  }
+  if (typeof value === 'object') {
     const item = value as Record<string, unknown>;
-    for (const key of ['message', 'error', 'detail', 'description', 'title']) {
-      const candidate = item[key];
-      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    for (const key of ['message', 'error', 'detail', 'description', 'title', 'errors']) {
+      if (key in item) {
+        const message = getApiErrorMessage(item[key], '', depth + 1);
+        if (message) return message;
+      }
     }
   }
   return fallback;
@@ -85,10 +97,26 @@ export async function startTrialSession(): Promise<AuthSession> {
     throw new Error('تعذر الاتصال بخادم التطبيق. تحقق من الاتصال وحاول مرة أخرى.');
   }
 
-  const data = await res.json().catch(() => ({} as any));
+  const contentType = res.headers.get('content-type') || '';
+  const responseText = await res.text().catch(() => '');
+  let data: any = {};
+  if (contentType.toLowerCase().includes('application/json')) {
+    try { data = responseText ? JSON.parse(responseText) : {}; }
+    catch { throw new Error('استجابة خادم الزائر غير صالحة (JSON).'); }
+  } else {
+    const looksLikeHtml = /<!doctype html|<html[\\s>]/i.test(responseText);
+    if (looksLikeHtml) {
+      throw new Error('طلب الزائر وصل إلى صفحة الموقع بدل واجهة API. يلزم إصلاح توجيه /api/trial/session إلى خادم التطبيق.');
+    }
+    if (!res.ok) {
+      throw new Error(`تعذر بدء جلسة الزائر: استجابة غير JSON (HTTP ${res.status}).`);
+    }
+    throw new Error('استجابة خادم الزائر ليست JSON؛ تحقق من توجيه واجهة API.');
+  }
+
   if (!res.ok) {
     throw new Error(getApiErrorMessage(
-      data?.error ?? data?.message,
+      data?.error ?? data?.message ?? data,
       `فشل إنشاء جلسة الزائر (HTTP ${res.status}).`,
     ));
   }
