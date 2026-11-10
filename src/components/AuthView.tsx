@@ -71,6 +71,18 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
   }, [email, mode]);
 
   const clearError = () => setError('');
+  const handleGuest = async () => {
+    if (busy || guestBusy) return;
+    setGuestBusy(true);
+    setError('');
+    try {
+      await onGuest();
+    } catch (err: any) {
+      setError(err?.message || 'تعذر بدء جلسة الزائر. تحقق من اتصال الخادم ثم حاول مرة أخرى.');
+    } finally {
+      setGuestBusy(false);
+    }
+  };
   const switchMode = (next: Mode) => { setMode(next); clearError(); setCode(''); setResetSent(false); };
 
   const submit = async (e: React.FormEvent) => {
