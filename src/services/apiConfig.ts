@@ -1,8 +1,8 @@
 // Central backend URL configuration.
-// An explicit VITE_API_URL always wins. Otherwise use the deployed Railway API,
-// because the Vercel deployment serves the frontend and does not host Express routes.
-const DEFAULT_API_BASE = 'https://smart-time-production-661f.up.railway.app';
-const RAW_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).trim();
+// An explicit VITE_API_URL can point to a dedicated API. By default, use the
+// current origin so the Cloudflare Worker can proxy API and WebSocket traffic.
+const DEFAULT_API_BASE = '';
+const RAW_BASE = (import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE).trim();
 
 // Remove trailing slashes to avoid double slashes in generated URLs.
 export const API_BASE_URL = RAW_BASE.replace(/\/+$/, '');
