@@ -257,9 +257,9 @@ export const AuthView: React.FC<Props> = ({ onAuthenticated, onGuest, loginNotic
 
                 {/* Guest directly after Google - no second divider */}
                 <div className="pt-3">
-                  <button type="button" onClick={onGuest} className="flex min-h-[60px] sm:min-h-[68px] w-full items-center justify-center gap-3 rounded-[14px] border border-[#A88B52] bg-white px-3 text-[15px] sm:text-[18px] text-gray-900 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40">
+                  <button type="button" onClick={() => { void handleGuest(); }} disabled={busy || guestBusy} aria-busy={guestBusy} className="flex min-h-[60px] sm:min-h-[68px] w-full items-center justify-center gap-3 rounded-[14px] border border-[#A88B52] bg-white px-3 text-[15px] sm:text-[18px] text-gray-900 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 disabled:cursor-not-allowed disabled:opacity-60">
                     <UserRound className="h-5 w-5 shrink-0 text-[#C5A059]"/>
-                    <span>الدخول كزائر — Continue as Guest</span>
+                    <span>{guestBusy ? 'جارٍ بدء جلسة الزائر…' : 'الدخول كزائر — Continue as Guest'}</span>
                   </button>
                 </div>
               </>
